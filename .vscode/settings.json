@@ -1,0 +1,12 @@
+{
+  "material-icon-theme.folders.associations": {
+    "Pure-Frontend": "public",
+    "alembic": "database",
+    "versions": "command",
+    "migrations": "tools",
+    "workflows": "context"
+  },
+  "ruff.nativeServer": true,
+  "ruff.lint.select": ["ALL"],
+  "ruff.lineLength": 120,
+}

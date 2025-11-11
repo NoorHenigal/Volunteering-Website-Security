@@ -1,0 +1,12 @@
+{
+  "recommendations": [
+    "PKief.material-icon-theme",
+    "usernamehw.errorlens",
+    "tamasfe.even-better-toml",
+    "ms-python.vscode-python-envs",
+    "shardulm94.trailing-spaces",
+    "aaron-bond.better-comments",
+    "charliermarsh.ruff",
+    "ms-python.vscode-pylance"
+  ]
+}
