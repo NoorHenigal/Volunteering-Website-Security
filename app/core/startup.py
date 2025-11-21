@@ -15,7 +15,6 @@ if TYPE_CHECKING:
     from alembic.config import Config
     from alembic.runtime.migration import MigrationContext
     from alembic.script import ScriptDirectory
-    from sqlalchemy.engine import Connection
     from sqlalchemy.ext.asyncio import AsyncEngine
 else:
     # Import alembic modules safely at runtime, avoiding conflicts with local alembic/ directory
@@ -89,7 +88,7 @@ async def check_database_connection(db_engine: AsyncEngine) -> None:
         raise StartupCheckError(msg) from e
 
 
-async def check_migrations_applied(db_engine: AsyncEngine) -> None:
+async def check_migrations_applied(_db_engine: AsyncEngine) -> None:
     """Verify that all Alembic migrations have been applied.
 
     Args:
@@ -101,7 +100,7 @@ async def check_migrations_applied(db_engine: AsyncEngine) -> None:
     try:
         # Load Alembic configuration
         alembic_cfg = Config("alembic.ini")
-        alembic_cfg.set_main_option("sqlalchemy.url", settings.async_database_url.replace("%", "%%"))
+        alembic_cfg.set_main_option("sqlalchemy.url", settings.sync_database_url.replace("%", "%%"))
 
         # Get script directory to find latest migration
         script = ScriptDirectory.from_config(alembic_cfg)
@@ -111,14 +110,16 @@ async def check_migrations_applied(db_engine: AsyncEngine) -> None:
             _log("✓ No migrations defined")
             return
 
-        # Check current database revision using async connection
-        async with db_engine.connect() as conn:
-            # Run sync operation within async context
-            def get_current_revision(connection: Connection) -> str | None:
-                context = MigrationContext.configure(connection)
-                return context.get_current_revision()
+        # Check current database revision using sync connection for Alembic
+        from sqlalchemy import create_engine
 
-            current_revision = await conn.run_sync(get_current_revision)
+        sync_engine = create_engine(settings.sync_database_url)
+
+        with sync_engine.connect() as conn:
+            context = MigrationContext.configure(conn)
+            current_revision = context.get_current_revision()
+
+        sync_engine.dispose()
 
         # If no migration history exists, show clear instructions
         if current_revision is None:
