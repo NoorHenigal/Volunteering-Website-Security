@@ -55,6 +55,14 @@ class Settings(BaseSettings):
         )
 
     @property
+    def sync_database_url(self) -> str:
+        """Generate sync database URL for Alembic migrations."""
+        return (
+            f"postgresql+psycopg://{self.postgres_user}:{self.postgres_password}"
+            f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
+        )
+
+    @property
     def access_token_expiry(self) -> timedelta:
         """Get access token expiry as timedelta."""
         return timedelta(minutes=self.access_token_expire_minutes)
