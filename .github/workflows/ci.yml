@@ -72,5 +72,8 @@ jobs:
       - name: Run tests (pytest)
         run: uv run pytest -xvs
 
+      - name: Run database migrations
+        run: uv run alembic upgrade head
+
       - name: Run smoke test (server startup)
         run: TEST_RUN_DURATION=5 uv run python run_server.py
