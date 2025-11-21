@@ -20,5 +20,15 @@ export-schema:
 migrate:
 	uv run alembic upgrade head
 
+check:
+	uv sync --extra dev
+	uv run ruff check
+	uv run ruff format
+	uv run pytest -xvs
+	uv run mypy --strict .
+
+test:
+	uv run pytest -xvs
+
 run:
 	uv run granian --interface asgi app.main:app

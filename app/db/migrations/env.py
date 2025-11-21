@@ -9,6 +9,7 @@ if TYPE_CHECKING:
     from sqlalchemy.engine import Connection
 
 from alembic import context
+
 from app.core.config import settings
 from app.db.models import Base
 

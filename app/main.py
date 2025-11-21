@@ -1,5 +1,6 @@
 """Main FastAPI application."""
 
+import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated
@@ -15,7 +16,7 @@ from app.auth.router import api_router as auth_api_router
 from app.auth.router import ui_router as auth_ui_router
 from app.core.config import settings
 from app.core.security import get_user_from_cookie
-from app.core.startup import run_preflight_checks
+from app.core.startup import StartupCheckError, run_preflight_checks
 from app.db.session import get_db
 
 if TYPE_CHECKING:
@@ -38,7 +39,12 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None]:
         None
     """
     # Startup: Run pre-flight checks
-    await run_preflight_checks()
+    try:
+        run_preflight_checks()
+    except StartupCheckError:
+        # Error already logged, exit immediately without traceback
+        os._exit(1)
+
     yield
     # Shutdown: Add cleanup logic here if needed
 

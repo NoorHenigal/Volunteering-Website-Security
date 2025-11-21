@@ -1,14 +1,13 @@
 """Initial migration.
 
-Revision ID: e17a2f14d6e4
+Revision ID: 985dc6c8a263
 Revises:
-Create Date: 2025-11-21 15:47:42.572167+00:00
+Create Date: 2025-11-21 17:27:00.903863+00:00
 """
 
 from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
-
 from alembic import op
 
 if TYPE_CHECKING:
@@ -16,7 +15,7 @@ if TYPE_CHECKING:
 
 
 # Revision identifiers, used by Alembic.
-revision: str = "e17a2f14d6e4"
+revision: str = "985dc6c8a263"
 down_revision: str | None = None
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
