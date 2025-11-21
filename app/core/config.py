@@ -1,6 +1,7 @@
 """Strict typed configuration settings."""
 
 from datetime import timedelta
+from pathlib import Path
 from typing import Literal
 
 from pydantic import Field, SecretStr
@@ -13,6 +14,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
+        env_ignore_empty=True,
         strict=True,
         extra="forbid",
     )
@@ -73,4 +75,15 @@ class Settings(BaseSettings):
         return timedelta(days=self.refresh_token_expire_days)
 
 
-settings: Settings = Settings()
+def _create_settings() -> Settings:
+    """Create settings instance with helpful error handling."""
+    try:
+        return Settings()
+    except Exception as e:
+        if not Path(".env").exists():
+            msg = "\n❌ Configuration missing!\n--> See README.md for setup instructions"
+            raise RuntimeError(msg) from e
+        raise
+
+
+settings: Settings = _create_settings()
