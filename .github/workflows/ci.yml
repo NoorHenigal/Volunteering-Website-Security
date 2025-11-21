@@ -2,6 +2,8 @@ name: Setup and Test Web App
 
 on:
   push:
+    branches:
+      - main
   pull_request:
   workflow_dispatch:
 
@@ -30,11 +32,14 @@ jobs:
           - 5432:5432
 
     env:
-      DB_USER: user
-      DB_PASSWORD: ${{ secrets.POSTGRES_TEST_DB_PASSWORD }}
-      DB_NAME: volunteeringapp
-      DB_HOST: localhost
-      DB_PORT: 5432
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: ${{ secrets.POSTGRES_TEST_DB_PASSWORD }}
+      POSTGRES_DB: volunteeringapp
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: 5432
+      SECRET_KEY: ${{ secrets.APP_TEST_KEY }}
+      JWT_ALGORITHM: HS256
+      ENVIRONMENT: test
 
     steps:
       - name: Checkout code
@@ -52,10 +57,8 @@ jobs:
           cache-dependency-glob: "uv.lock"
 
       - name: Initialize PostgreSQL extensions
-        env:
-          PGPASSWORD: ${{ secrets.POSTGRES_TEST_DB_PASSWORD }}
         run: |
-          psql -h localhost -U user -d volunteeringapp -f Docker/init-postgres-extensions.sql
+          PGPASSWORD=${{ secrets.POSTGRES_TEST_DB_PASSWORD }} psql -h localhost -U user -d volunteeringapp -f Docker/init-postgres-extensions.sql
 
       - name: Install dependencies
         run: uv sync --extra dev
