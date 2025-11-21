@@ -53,3 +53,17 @@ or simply:
 ```bash
 make pg-persistent
 ```
+
+## Database Migration Guide
+
+After you have started the database as shown above, run the following commands to apply the migrations:
+
+```bash
+make migrate
+```
+
+## Run the Web App
+
+```bash
+make run
+```

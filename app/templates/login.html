@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% from "components/auth_form.html" import render_auth_form %}
+
+{% block title %}Login{% endblock %}
+
+{% block content %}
+{{ render_auth_form(
+    title="Login",
+    action="/auth/login",
+    button_text="Login",
+    footer_text="Don't have an account?",
+    footer_link="/auth/register",
+    footer_link_text="Register"
+) }}
+{% endblock %}
