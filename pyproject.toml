@@ -20,6 +20,7 @@ dependencies = [
     "python-jose[cryptography]>=3.5.0",
     "python-multipart>=0.0.20",
     "sqlalchemy>=2.0.44",
+    "uvicorn>=0.38.0",
 ]
 
 [project.optional-dependencies]
@@ -30,6 +31,7 @@ dev = [
     "aiosqlite>=0.21.0",
     "pytest>=9.0.1",
     "mypy>=1.18.2",
+    "types-python-jose>=3.5.0.20250531",
     "ruff>=0.14.5",
     "httpx>=0.28.1"
 ]
@@ -59,8 +61,3 @@ fixable = ["ALL"]
 
 [tool.ruff.format]
 docstring-code-format = true
-
-[dependency-groups]
-dev = [
-    "types-python-jose>=3.5.0.20250531",
-]
