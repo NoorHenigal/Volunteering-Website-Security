@@ -30,5 +30,7 @@ check:
 test:
 	uv run pytest -xvs
 
+run-hold:
+	TEST_RUN_DURATION=5 uv run  python run_server.py
 run:
-	uv run granian --interface asgi app.main:app
+	uv run python run_server.py

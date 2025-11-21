@@ -1,7 +1,9 @@
 """Main FastAPI application."""
 
+import asyncio
 import os
-from contextlib import asynccontextmanager
+import signal
+from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated
 
@@ -15,6 +17,7 @@ from starlette.templating import Jinja2Templates
 from app.auth.router import api_router as auth_api_router
 from app.auth.router import ui_router as auth_ui_router
 from app.core.config import settings
+from app.core.log import log
 from app.core.security import get_user_from_cookie
 from app.core.startup import StartupCheckError, run_preflight_checks
 from app.db.session import get_db
@@ -24,6 +27,19 @@ if TYPE_CHECKING:
 
     from fastapi.responses import Response
     from sqlalchemy.ext.asyncio import AsyncSession
+
+
+async def auto_shutdown(duration: int) -> None:
+    """Automatically shutdown the application after specified duration.
+
+    Args:
+        duration: Number of seconds to wait before shutdown
+    """
+    log.warning("TEST MODE: Server will shutdown in %d seconds", duration)
+    await asyncio.sleep(duration)
+    log.warning("TEST MODE: %d seconds elapsed, shutting down gracefully", duration)
+    # Send SIGTERM to granian main for graceful shutdown
+    os.kill(os.getppid(), signal.SIGTERM)
 
 
 @asynccontextmanager
@@ -45,8 +61,18 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None]:
         # Error already logged, exit immediately without traceback
         os._exit(1)
 
+    # If TEST_RUN_DURATION is set, schedule automatic shutdown
+    shutdown_task = None
+    if test_duration := os.getenv("TEST_RUN_DURATION"):
+        shutdown_task = asyncio.create_task(auto_shutdown(int(test_duration)))
+
     yield
-    # Shutdown: Add cleanup logic here if needed
+
+    # Shutdown: Cancel auto-shutdown task if it's still running
+    if shutdown_task and not shutdown_task.done():
+        shutdown_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await shutdown_task
 
 
 # Create FastAPI app
