@@ -26,7 +26,7 @@ services:
       POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256 --auth-local=scram-sha-256
       POSTGRES_PASSWORD_ENCRYPTION: scram-sha-256
     ports:
-      - "5433:5432"
+      - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./init-postgres-extensions.sql:/docker-entrypoint-initdb.d/init-postgres-extensions.sql

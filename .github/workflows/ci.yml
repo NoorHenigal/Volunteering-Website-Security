@@ -1,0 +1,79 @@
+name: Setup and Test Web App
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Test & Lint
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: user
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_TEST_DB_PASSWORD }}
+          POSTGRES_DB: volunteeringapp
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    env:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: ${{ secrets.POSTGRES_TEST_DB_PASSWORD }}
+      POSTGRES_DB: volunteeringapp
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: 5432
+      SECRET_KEY: ${{ secrets.APP_TEST_KEY }}
+      JWT_ALGORITHM: HS256
+      ENVIRONMENT: test
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Python 3.14
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.14'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Initialize PostgreSQL extensions
+        run: |
+          PGPASSWORD=${{ secrets.POSTGRES_TEST_DB_PASSWORD }} psql -h localhost -U user -d volunteeringapp -f Docker/init-postgres-extensions.sql
+
+      - name: Install dependencies
+        run: uv sync --extra dev
+
+      - name: Run linting (ruff check)
+        run: uv run ruff check
+
+      - name: Run type checking (mypy)
+        run: uv run mypy --strict .
+
+      - name: Run tests (pytest)
+        run: uv run pytest -xvs
+
+      - name: Run database migrations
+        run: uv run alembic upgrade head
+
+      - name: Run smoke test (server startup)
+        run: TEST_RUN_DURATION=5 uv run python run_server.py

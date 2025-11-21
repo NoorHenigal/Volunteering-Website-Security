@@ -1,74 +1,136 @@
-from fastapi import FastAPI, Request, Form
-from fastapi.templating import Jinja2Templates
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import RedirectResponse
+"""Main FastAPI application."""
+
+import asyncio
+import os
+import signal
+from contextlib import asynccontextmanager, suppress
 from pathlib import Path
+from typing import TYPE_CHECKING, Annotated
 
-app = FastAPI(title="Volunteering App")
+from fastapi import Depends, FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
+from fastapi.staticfiles import StaticFiles
+from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.templating import Jinja2Templates
 
+from app.auth.router import api_router as auth_api_router
+from app.auth.router import ui_router as auth_ui_router
+from app.core.config import settings
+from app.core.log import log
+from app.core.security import get_user_from_cookie
+from app.core.startup import StartupCheckError, run_preflight_checks
+from app.db.session import get_db
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
+
+    from fastapi.responses import Response
+    from sqlalchemy.ext.asyncio import AsyncSession
+
+
+async def auto_shutdown(duration: int) -> None:
+    """Automatically shutdown the application after specified duration.
+
+    Args:
+        duration: Number of seconds to wait before shutdown
+    """
+    log.warning("TEST MODE: Server will shutdown in %d seconds", duration)
+    await asyncio.sleep(duration)
+    log.warning("TEST MODE: %d seconds elapsed, shutting down gracefully", duration)
+    # Send SIGTERM to granian main for graceful shutdown
+    os.kill(os.getppid(), signal.SIGTERM)
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI) -> AsyncGenerator[None]:
+    """Application lifespan handler.
+
+    Runs pre-flight checks on startup and cleanup on shutdown.
+
+    Args:
+        app: FastAPI application instance
+
+    Yields:
+        None
+    """
+    # Startup: Run pre-flight checks
+    try:
+        run_preflight_checks()
+    except StartupCheckError:
+        # Error already logged, exit immediately without traceback
+        os._exit(1)
+
+    # If TEST_RUN_DURATION is set, schedule automatic shutdown
+    shutdown_task = None
+    if test_duration := os.getenv("TEST_RUN_DURATION"):
+        shutdown_task = asyncio.create_task(auto_shutdown(int(test_duration)))
+
+    yield
+
+    # Shutdown: Cancel auto-shutdown task if it's still running
+    if shutdown_task and not shutdown_task.done():
+        shutdown_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await shutdown_task
+
+
+# Create FastAPI app
+app = FastAPI(
+    title="Volunteering Web App",
+    description="KV6014",
+    version="0.1.0",
+    lifespan=lifespan,
+)
+
+# Configure CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"] if settings.environment == "development" else [],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Mount static files
 BASE_DIR = Path(__file__).resolve().parent
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
+
+# Setup templates
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
+
+# Include routers
+app.include_router(auth_api_router)
+app.include_router(auth_ui_router)
 
 
 @app.get("/")
-async def home(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
-
-
-@app.get("/login")
-async def login_page(request: Request):
-    return templates.TemplateResponse("login.html", {"request": request})
-
-
-@app.post("/login")
-async def login_user(
+async def home(
     request: Request,
-    email: str = Form(...),
-    password: str = Form(...)
-):
-    # TODO: Check credentials against database
-    # For now, just a placeholder
-    if email == "test@test.com" and password == "password":
-        return RedirectResponse(url="/", status_code=303)
-    else:
-        return templates.TemplateResponse(
-            "login.html",
-            {"request": request, "error": "Invalid email or password"}
-        )
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> Response:
+    """Home page.
+
+    Args:
+        request: FastAPI request object
+        db: Database session
+
+    Returns:
+        Rendered home page template
+    """
+    user = await get_user_from_cookie(request, db)
+    return templates.TemplateResponse(
+        request,
+        "index.html",
+        {"request": request, "user": user},
+    )
 
 
-@app.get("/register")
-async def register_page(request: Request):
-    return templates.TemplateResponse("register.html", {"request": request})
+@app.get("/health")
+async def health() -> dict[str, str]:
+    """Health check endpoint.
 
-
-@app.post("/register")
-async def register_user(
-    request: Request,
-    name: str = Form(...),
-    email: str = Form(...),
-    password: str = Form(...),
-    confirm_password: str = Form(...)
-):
-    # Validation in Python
-    if password != confirm_password:
-        return templates.TemplateResponse(
-            "register.html",
-            {"request": request, "error": "Passwords do not match"}
-        )
-    
-    if len(password) < 8:
-        return templates.TemplateResponse(
-            "register.html",
-            {"request": request, "error": "Password must be at least 8 characters"}
-        )
-    
-    # TODO: Save to database
-    
-    # Redirect to login after successful registration
-    return RedirectResponse(url="/login", status_code=303)
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run("app.main:app", host="127.0.0.1", port=8000, reload=True)
+    Returns:
+        Health status
+    """
+    return {"status": "healthy"}
