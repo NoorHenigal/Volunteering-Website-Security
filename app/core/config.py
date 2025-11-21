@@ -50,7 +50,7 @@ class Settings(BaseSettings):
     def async_database_url(self) -> str:
         """Generate async database URL."""
         return (
-            f"postgresql+asyncpg://{self.postgres_user}:{self.postgres_password}"
+            f"postgresql+psycopg://{self.postgres_user}:{self.postgres_password}"
             f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
         )
 

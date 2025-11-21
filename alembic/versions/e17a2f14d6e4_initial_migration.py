@@ -1,8 +1,8 @@
 """Initial migration.
 
-Revision ID: 89eb56a50d25
+Revision ID: e17a2f14d6e4
 Revises:
-Create Date: 2025-11-21 01:51:51.179891+00:00
+Create Date: 2025-11-21 15:47:42.572167+00:00
 """
 
 from typing import TYPE_CHECKING
@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 
 
 # Revision identifiers, used by Alembic.
-revision: str = "89eb56a50d25"
+revision: str = "e17a2f14d6e4"
 down_revision: str | None = None
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
