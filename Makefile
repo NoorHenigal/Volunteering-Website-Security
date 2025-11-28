@@ -32,5 +32,9 @@ test:
 
 run-hold:
 	TEST_RUN_DURATION=5 uv run  python run_server.py
+
+run-ui:
+	uv run python run_ui_dev.py
+
 run:
 	uv run python run_server.py
