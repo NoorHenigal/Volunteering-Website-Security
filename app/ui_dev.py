@@ -1,11 +1,4 @@
-"""UI Development mode FastAPI application.
-
-This module provides a lightweight FastAPI app for UI development that:
-- Serves static files and templates
-- Does NOT require database connection
-- Provides mock data for template rendering
-- Skips authentication and API endpoints
-"""
+"""UI Development mode FastAPI application."""
 
 import asyncio
 import os

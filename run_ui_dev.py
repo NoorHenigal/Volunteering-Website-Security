@@ -1,11 +1,4 @@
-"""UI Development server - serves static files without database.
-
-This script runs a lightweight FastAPI server for UI development that:
-- Serves static files (CSS, JS, images)
-- Renders HTML templates
-- Does NOT require database connection
-- Does NOT run authentication or API endpoints
-"""
+"""UI Development server - serves static files without database."""
 
 import asyncio
 import sys
