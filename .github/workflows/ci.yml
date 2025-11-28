@@ -77,3 +77,6 @@ jobs:
 
       - name: Run smoke test (server startup)
         run: TEST_RUN_DURATION=5 uv run python run_server.py
+
+      - name: Run smoke test (UI dev mode)
+        run: TEST_RUN_DURATION=5 uv run python run_ui_dev.py
