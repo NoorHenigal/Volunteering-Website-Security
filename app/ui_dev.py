@@ -20,6 +20,8 @@ from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
 from starlette.templating import Jinja2Templates
 
+from app.core.log import log
+
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
@@ -32,7 +34,9 @@ async def auto_shutdown(duration: int) -> None:
     Args:
         duration: Number of seconds to wait before shutdown
     """
+    log.warning("TEST MODE: Server will shutdown in %d seconds", duration)
     await asyncio.sleep(duration)
+    log.warning("TEST MODE: %d seconds elapsed, shutting down gracefully", duration)
     # Send SIGTERM to granian main for graceful shutdown
     os.kill(os.getppid(), signal.SIGTERM)
 
