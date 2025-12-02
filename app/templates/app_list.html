@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% from "components/ui.html" import page_header, application_status_badge, datetime_display, empty_state %}
+
+{% block title %}My Applications{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto">
+    {{ page_header('My Applications', '/opp/list', 'Browse Opportunities', 'blue', True) }}
+
+    {% if applications %}
+    <div class="space-y-4">
+        {% for app in applications %}
+        <div class="bg-white rounded-lg shadow-lg p-6">
+            <div class="flex justify-between items-start">
+                <div class="flex-1">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-2">
+                        <a href="/opp/{{ app.opportunity_id }}" class="hover:text-blue-600">
+                            {% if app.opportunity %}{{ app.opportunity.title }}{% else %}Opportunity #{{ app.opportunity_id }}{% endif %}
+                        </a>
+                    </h2>
+                    {% if app.opportunity %}
+                    <p class="text-gray-600 mb-3">{{ app.opportunity.description[:150] }}{% if app.opportunity.description|length > 150 %}...{% endif %}</p>
+                    {% endif %}
+                    {% if app.message %}
+                    <div class="bg-gray-50 rounded p-3 mb-3">
+                        <p class="text-sm font-semibold text-gray-700 mb-1">Your message:</p>
+                        <p class="text-gray-600">{{ app.message }}</p>
+                    </div>
+                    {% endif %}
+                    {{ datetime_display(app.created_at, 'Applied on ') }}
+                </div>
+                <div class="ml-6">
+                    {{ application_status_badge(app.status, 'md') }}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    {{ empty_state("You haven't applied to any opportunities yet", '/opp/list', 'Browse Opportunities', 'blue', True) }}
+    {% endif %}
+</div>
+{% endblock %}

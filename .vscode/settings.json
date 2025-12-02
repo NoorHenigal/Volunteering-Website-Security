@@ -4,7 +4,9 @@
     "alembic": "database",
     "versions": "command",
     "migrations": "tools",
-    "workflows": "context"
+    "workflows": "context",
+    "opportunities": "global",
+    "organizations": "contract"
   },
   "ruff.nativeServer": true,
   "ruff.lint.select": ["ALL"],

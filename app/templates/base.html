@@ -14,12 +14,21 @@
                 <ul class="flex space-x-6 items-center">
                     <li><a href="/" class="hover:text-gray-200">Home</a></li>
                     {% if user %}
+                        <li><a href="/opp/list" class="hover:text-gray-200">Opportunities</a></li>
+                        <li><a href="/org/list" class="hover:text-gray-200">Organizations</a></li>
+                        {% if user.role == 'volunteer' %}
+                        <li><a href="/opp/applications/list" class="hover:text-gray-200">My Applications</a></li>
+                        {% endif %}
                         <li><a href="/auth/status" class="hover:text-gray-200">Dashboard</a></li>
                         <li class="text-gray-200">
                             <span class="font-semibold">{{ user.email }}</span>
                             <span class="text-xs bg-blue-800 px-2 py-1 rounded ml-2">{{ user.role }}</span>
                         </li>
-                        <li><a href="/auth/logout" class="bg-red-500 hover:bg-red-600 px-4 py-2 rounded">Logout</a></li>
+                        <li>
+                            <form action="/auth/logout" method="POST" class="inline">
+                                <button type="submit" class="bg-red-500 hover:bg-red-600 px-4 py-2 rounded cursor-pointer">Logout</button>
+                            </form>
+                        </li>
                     {% else %}
                         <li><a href="/auth/login" class="hover:text-gray-200">Login</a></li>
                         <li><a href="/auth/register" class="bg-green-500 hover:bg-green-600 px-4 py-2 rounded">Register</a></li>

@@ -1,0 +1,318 @@
+"""Unified request context, router utilities, and template rendering."""
+
+import inspect
+from collections.abc import Awaitable, Callable
+from functools import wraps
+from pathlib import Path
+from typing import TYPE_CHECKING, Annotated, Protocol, cast, runtime_checkable
+from uuid import UUID
+
+from fastapi import Depends, Header, HTTPException, Request, Response, status
+from fastapi.responses import JSONResponse, RedirectResponse
+from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.templating import Jinja2Templates
+
+from app.core.security import get_user_from_cookie, get_user_from_token
+from app.db.repositories import UserOrganizationRoleRepository
+from app.db.session import get_db
+
+if TYPE_CHECKING:
+    from app.db.models import User
+
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
+
+
+def render_template(
+    request: Request,
+    name: str,
+    status_code: int = 200,
+    **context: object,
+) -> Response:
+    """Render a template with context."""
+    ctx = dict(context)
+    ctx.setdefault("request", request)
+    return templates.TemplateResponse(
+        request,
+        name,
+        ctx,
+        status_code=status_code,
+    )
+
+
+@runtime_checkable
+class RepositoryProtocol[T](Protocol):
+    """Protocol for repository classes that can be used with get_or_404."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        """Initialize repository with database session."""
+        ...
+
+    async def get_by_id(self, obj_id: UUID) -> T | None:
+        """Get entity by ID."""
+        ...
+
+
+TEMPLATE_REQUIRED_ERROR = "Template required for UI responses"
+
+_DB_DEPENDENCY = Depends(get_db)
+_AUTH_HEADER = Header(default=None)
+
+
+def require_role(user: User, role: str, action: str) -> None:
+    """Require user to have a specific role.
+
+    Args:
+        user: Authenticated user
+        role: Required role ("organization" or "volunteer")
+        action: Description of the action for error message
+
+    Raises:
+        HTTPException: 403 if user doesn't have required role
+    """
+    if user.role != role:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Only {role}s can {action}",
+        )
+
+
+class _UIRouteHandler(Protocol):
+    """Protocol for UI route handlers with signature support."""
+
+    __signature__: inspect.Signature
+
+    def __call__(self, *args: object, **kwargs: object) -> Awaitable[Response]:
+        """Call the handler."""
+        ...
+
+
+def ui_auth_required(func: Callable[..., Awaitable[Response]]) -> _UIRouteHandler:
+    """Decorator for UI routes requiring authentication.
+
+    Handles the common pattern of checking auth and redirecting to login.
+    The decorated function receives `user` as its second argument after `ctx`.
+
+    Usage:
+        @ui_router.get("/list")
+        @ui_auth_required
+        async def list_items(ctx: ContextDep, user: User) -> Response:
+            # user is guaranteed to be authenticated
+            ...
+    """
+    # Get original signature and remove 'user' param (we inject it)
+    original_sig = inspect.signature(func)
+    params = [p for p in original_sig.parameters.values() if p.name != "user"]
+    new_sig = original_sig.replace(parameters=params)
+
+    @wraps(func)
+    async def wrapper(ctx: RequestContext, *args: object, **kwargs: object) -> Response:
+        result = ctx.require_ui_auth()
+        if isinstance(result, RedirectResponse):
+            return result
+        # Inject user as second positional argument
+        return await func(ctx, result, *args, **kwargs)
+
+    object.__setattr__(wrapper, "__signature__", new_sig)
+    return cast("_UIRouteHandler", wrapper)
+
+
+def handle_form_error(
+    request: Request,
+    template: str,
+    error: HTTPException | Exception,
+    **context: object,
+) -> Response:
+    """Handle form submission errors with consistent template rendering.
+
+    Args:
+        request: FastAPI request object
+        template: Template name to render
+        error: Exception that occurred
+        **context: Additional template context
+
+    Returns:
+        Rendered template response with error message
+    """
+    error_msg = error.detail if isinstance(error, HTTPException) else str(error)
+    return render_template(
+        request,
+        template,
+        error=error_msg,
+        status_code=400,
+        **context,
+    )
+
+
+class RequestContext:
+    """Unified request context for both API and UI."""
+
+    def __init__(
+        self,
+        request: Request,
+        db: AsyncSession,
+        user: User | None = None,
+        authorization: str | None = None,
+    ) -> None:
+        """Initialize request context."""
+        self.request = request
+        self.db = db
+        self.user = user
+        self.authorization = authorization
+        self.is_ui = not authorization and "text/html" in request.headers.get("accept", "")
+
+    def success_response(
+        self,
+        data: BaseModel | None = None,
+        redirect_url: str | None = None,
+        template: str | None = None,
+        status_code: int = 200,
+        **template_ctx: object,
+    ) -> Response:
+        """Return appropriate success response based on request type."""
+        if self.is_ui:
+            if redirect_url:
+                return RedirectResponse(url=redirect_url, status_code=303)
+
+            if not template:
+                raise ValueError(TEMPLATE_REQUIRED_ERROR)
+            return render_template(
+                self.request,
+                template,
+                user=self.user,
+                status_code=status_code,
+                **template_ctx,
+            )
+
+        if data:
+            return JSONResponse(content=data.model_dump(mode="json"), status_code=status_code)
+        return JSONResponse(content={}, status_code=status_code)
+
+    def error_response(
+        self,
+        error: str | Exception,
+        status_code: int = 400,
+        template: str | None = None,
+        **template_ctx: object,
+    ) -> Response:
+        """Return appropriate error response based on request type."""
+        error_msg = str(error)
+
+        if self.is_ui:
+            if template:
+                return render_template(
+                    self.request,
+                    template,
+                    error=error_msg,
+                    user=self.user,
+                    status_code=status_code,
+                    **template_ctx,
+                )
+            return RedirectResponse(url="/auth/login", status_code=303)
+
+        return JSONResponse(
+            content={"detail": error_msg},
+            status_code=status_code,
+        )
+
+    def require_authenticated(self, redirect_to: str = "/auth/login") -> User:
+        """Require user to be authenticated, redirect to login if UI."""
+        if not self.user:
+            if self.is_ui:
+                raise HTTPException(
+                    status_code=status.HTTP_303_SEE_OTHER,
+                    detail=redirect_to,
+                    headers={"Location": redirect_to},
+                )
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+        return self.user
+
+    def require_ui_auth(self) -> User | RedirectResponse:
+        """Require authentication for UI routes, returning redirect if not authenticated."""
+        if not self.user:
+            return RedirectResponse(url="/auth/login", status_code=303)
+        return self.user
+
+    async def parse_body[T: BaseModel](self, schema: type[T], form_fields: dict[str, str]) -> T | None:
+        """Parse request body as JSON or form data into a Pydantic schema."""
+        content_type = self.request.headers.get("content-type", "")
+
+        if "application/json" in content_type:
+            body = await self.request.json()
+            return schema(**body)
+
+        if "application/x-www-form-urlencoded" in content_type or "multipart/form-data" in content_type:
+            form = await self.request.form()
+            form_data = {field: str(form.get(form_name)) for field, form_name in form_fields.items()}
+            return schema(**form_data)
+
+        return None
+
+    async def get_or_404[T](
+        self,
+        repo_class: type[RepositoryProtocol[T]],
+        entity_id: UUID,
+        resource_name: str = "Resource",
+    ) -> T:
+        """Get entity by ID or raise HTTPException 404."""
+        repo = repo_class(self.db)
+        entity = await repo.get_by_id(entity_id)
+        if entity is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"{resource_name} not found")
+        return entity
+
+    async def require_organization_admin(self, org_id: UUID) -> User:
+        """Require user to be admin of organization."""
+        user = self.require_authenticated()
+        role_repo = UserOrganizationRoleRepository(self.db)
+        is_admin = await role_repo.is_organization_admin(user.id, org_id)
+        if not is_admin:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only organization admins can perform this action",
+            )
+        return user
+
+    async def require_organization_member(self, org_id: UUID) -> User:
+        """Require user to be member of organization."""
+        user = self.require_authenticated()
+        role_repo = UserOrganizationRoleRepository(self.db)
+        is_member = await role_repo.is_organization_member(user.id, org_id)
+        if not is_member:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Must be organization member",
+            )
+        return user
+
+
+async def get_context(
+    request: Request,
+    db: AsyncSession = _DB_DEPENDENCY,
+    authorization: str | None = _AUTH_HEADER,
+) -> RequestContext:
+    """Dependency for getting unified request context."""
+    user = None
+    if authorization:
+        user = await get_user_from_token(authorization, db)
+    else:
+        user = await get_user_from_cookie(request, db)
+
+    return RequestContext(request, db, user, authorization)
+
+
+# Type alias for cleaner router code
+ContextDep = Annotated[RequestContext, Depends(get_context)]
+
+
+__all__ = [
+    "ContextDep",
+    "RequestContext",
+    "get_context",
+    "handle_form_error",
+    "render_template",
+    "require_role",
+    "ui_auth_required",
+]

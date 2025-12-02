@@ -13,16 +13,16 @@
                 View Dashboard
             </a>
             {% if user.role == 'volunteer' %}
-                <a href="#" class="bg-green-600 text-white px-8 py-3 rounded-lg text-lg font-semibold hover:bg-green-700 shadow-lg">
+                <a href="/opp/list" class="bg-green-600 text-white px-8 py-3 rounded-lg text-lg font-semibold hover:bg-green-700 shadow-lg">
                     Browse Opportunities
                 </a>
             {% elif user.role == 'organization' %}
-                <a href="#" class="bg-purple-600 text-white px-8 py-3 rounded-lg text-lg font-semibold hover:bg-purple-700 shadow-lg">
+                <a href="/opp/new" class="bg-purple-600 text-white px-8 py-3 rounded-lg text-lg font-semibold hover:bg-purple-700 shadow-lg">
                     Post Opportunity
                 </a>
             {% elif user.role == 'admin' %}
-                <a href="#" class="bg-red-600 text-white px-8 py-3 rounded-lg text-lg font-semibold hover:bg-red-700 shadow-lg">
-                    Admin Panel
+                <a href="/org/list" class="bg-red-600 text-white px-8 py-3 rounded-lg text-lg font-semibold hover:bg-red-700 shadow-lg">
+                    Manage Organizations
                 </a>
             {% endif %}
         </div>

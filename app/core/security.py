@@ -1,12 +1,14 @@
 """Security utilities for hashing, JWT, and authentication."""
 
 from typing import TYPE_CHECKING
+from uuid import UUID
 
 from fastapi import HTTPException, Request, Response, status
 from jose import JWTError, jwt
-from pydantic import BaseModel
 
+from app.core.base_schemas import StrictModel
 from app.core.config import settings
+from app.db.models import RoleType
 from app.db.repositories import UserRepository
 
 if TYPE_CHECKING:
@@ -15,24 +17,21 @@ if TYPE_CHECKING:
     from app.db.models import User
 
 
-# Pydantic model for JWT payload
-class TokenPayload(BaseModel):
-    """JWT token payload model."""
-
-    model_config = {"extra": "forbid"}
+class TokenPayload(StrictModel):
+    """JWT token payload model with strict validation."""
 
     sub: str
-    role: str
+    role: RoleType
     exp: int
 
     @property
-    def user_id(self) -> int:
-        """Get user ID as integer.
+    def user_id(self) -> UUID:
+        """Get user ID as UUID.
 
         Returns:
-            User ID as integer
+            User ID as UUID
         """
-        return int(self.sub)
+        return UUID(self.sub)
 
 
 def decode_access_token(token: str) -> TokenPayload:
@@ -68,32 +67,20 @@ def decode_access_token(token: str) -> TokenPayload:
 
 
 def set_cookie(response: Response, name: str, value: str, max_age: int | None = None) -> None:
-    """Sets a cookie with standard security settings.
-
-    Args:
-        response: FastAPI Response object
-        name: Cookie name
-        value: Cookie value
-        max_age: Optional max age in seconds
-    """
+    """Sets a cookie with standard security settings."""
     response.set_cookie(
         key=name,
         value=value,
+        max_age=max_age,
         httponly=settings.cookie_httponly,
         secure=settings.cookie_secure,
         samesite=settings.cookie_samesite,
         domain=settings.cookie_domain,
-        max_age=max_age,
     )
 
 
 def clear_cookie(response: Response, name: str) -> None:
-    """Clears a cookie with standard security settings.
-
-    Args:
-        response: FastAPI Response object
-        name: Cookie name
-    """
+    """Clears a cookie with standard security settings."""
     response.delete_cookie(
         key=name,
         httponly=settings.cookie_httponly,
@@ -126,6 +113,24 @@ def clear_auth_cookies(response: Response) -> None:
     clear_cookie(response, "refresh_token")
 
 
+async def _get_user_from_token(token: str, db: AsyncSession) -> User | None:
+    """Get user from a JWT token string.
+
+    Args:
+        token: JWT token string
+        db: Database session
+
+    Returns:
+        User object if valid token, None otherwise
+    """
+    try:
+        payload = decode_access_token(token)
+        user_repo = UserRepository(db)
+        return await user_repo.get_by_id(payload.user_id)
+    except HTTPException:
+        return None
+
+
 async def get_user_from_cookie(request: Request, db: AsyncSession) -> User | None:
     """Gets the current user from the access_token cookie.
 
@@ -139,9 +144,27 @@ async def get_user_from_cookie(request: Request, db: AsyncSession) -> User | Non
     token = request.cookies.get("access_token")
     if not token:
         return None
+    return await _get_user_from_token(token, db)
 
-    try:
-        payload = decode_access_token(token)
-        return await UserRepository.get_by_id(db, payload.user_id)
-    except HTTPException:
+
+async def get_user_from_token(authorization: str | None, db: AsyncSession) -> User | None:
+    """Gets the current user from the Authorization header.
+
+    Args:
+        authorization: Authorization header with Bearer token
+        db: Database session
+
+    Returns:
+        User object if authenticated, None otherwise
+    """
+    if not authorization or not authorization.startswith("Bearer "):
         return None
+    return await _get_user_from_token(authorization[7:], db)
+
+
+__all__ = [
+    "clear_auth_cookies",
+    "get_user_from_cookie",
+    "get_user_from_token",
+    "set_auth_cookies",
+]

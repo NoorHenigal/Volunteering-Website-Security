@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% from "components/ui.html" import back_link, open_status_badge, application_status_badge, location_display, info_box %}
+
+{% block title %}{{ opportunity.title }}{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    <div class="bg-white rounded-lg shadow-lg p-8">
+        <div class="mb-6">
+            {{ back_link('/opp/list', 'Back to Opportunities') }}
+        </div>
+
+        <div class="mb-6">
+            <h1 class="text-4xl font-bold text-gray-800 mb-4">{{ opportunity.title }}</h1>
+            <div class="flex items-center gap-4">
+                {{ open_status_badge(opportunity.is_open, 'md') }}
+                {{ location_display(opportunity.location) }}
+            </div>
+        </div>
+
+        <div class="mb-8">
+            <h2 class="text-xl font-bold text-gray-800 mb-3">Description</h2>
+            <p class="text-gray-700 leading-relaxed whitespace-pre-wrap">{{ opportunity.description }}</p>
+        </div>
+
+        <div class="border-t pt-6">
+            <h2 class="text-xl font-bold text-gray-800 mb-3">Details</h2>
+            <div class="grid md:grid-cols-2 gap-4">
+                <div>
+                    <p class="text-gray-600">
+                        <span class="font-semibold">Posted:</span> {{ opportunity.created_at.strftime('%B %d, %Y') }}
+                    </p>
+                </div>
+                <div>
+                    <p class="text-gray-600">
+                        <span class="font-semibold">Organization ID:</span> {{ opportunity.organization_id }}
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        {% if is_admin %}
+        <div class="border-t pt-6 mt-6">
+            <div class="flex justify-between items-center">
+                <h2 class="text-xl font-bold text-gray-800">Manage Applications</h2>
+                <a href="/opp/{{ opportunity.id }}/applicants" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-6 rounded-lg">
+                    View Applicants
+                </a>
+            </div>
+            <p class="text-gray-600 mt-2">Review and manage volunteer applications for this opportunity</p>
+        </div>
+        {% endif %}
+
+        {% if opportunity.is_open and user.role == 'volunteer' %}
+        <div class="mt-8 text-center">
+            {% if user_application %}
+            {% call info_box('blue') %}
+                <p class="text-lg font-semibold text-blue-800 mb-2">Application Status</p>
+                {{ application_status_badge(user_application.status, 'lg') }}
+                {% if user_application.message %}
+                <p class="text-gray-700 mt-4"><strong>Your message:</strong> {{ user_application.message }}</p>
+                {% endif %}
+            {% endcall %}
+            {% else %}
+            <a href="/opp/{{ opportunity.id }}/apply" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg text-lg inline-block">
+                Apply to Volunteer
+            </a>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,142 @@
+{# Reusable UI Component Macros #}
+
+{% macro application_status_badge(status, size='md') %}
+{% set size_classes = {
+    'sm': 'px-3 py-1 text-sm',
+    'md': 'px-4 py-2 text-sm',
+    'lg': 'px-6 py-2 text-lg'
+} %}
+{% set status_classes = {
+    'pending': 'bg-yellow-100 text-yellow-800',
+    'accepted': 'bg-green-100 text-green-800',
+    'rejected': 'bg-red-100 text-red-800',
+    'withdrawn': 'bg-gray-100 text-gray-800'
+} %}
+<span class="inline-block rounded-full font-bold {{ size_classes.get(size, size_classes['md']) }} {{ status_classes.get(status, 'bg-gray-100 text-gray-800') }}">
+    {{ status|title }}
+</span>
+{% endmacro %}
+{% macro open_status_badge(is_open, size='sm') %}
+{% set size_classes = {
+    'xs': 'text-xs px-3 py-1',
+    'sm': 'text-sm px-3 py-1',
+    'md': 'text-sm px-4 py-2'
+} %}
+<span class="{{ size_classes.get(size, size_classes['sm']) }} rounded-full font-semibold {% if is_open %}bg-green-100 text-green-800{% else %}bg-gray-100 text-gray-800{% endif %}">
+    {% if is_open %}Open{% else %}Closed{% endif %}
+</span>
+{% endmacro %}
+{% macro member_role_badge(role) %}
+<span class="px-4 py-2 rounded-full text-sm font-semibold {% if role == 'admin' %}bg-purple-100 text-purple-800{% else %}bg-blue-100 text-blue-800{% endif %}">
+    {{ role }}
+</span>
+{% endmacro %}
+{% macro back_link(url, text) %}
+<a href="{{ url }}" class="text-blue-600 hover:text-blue-800 font-semibold">← {{ text }}</a>
+{% endmacro %}
+{% macro card(padding='p-8', extra_classes='') %}
+<div class="bg-white rounded-lg shadow-lg {{ padding }} {{ extra_classes }}">
+    {{ caller() }}
+</div>
+{% endmacro %}
+{% macro page_header(title, action_url=None, action_text=None, action_color='blue', show_action=True) %}
+<div class="flex justify-between items-center mb-8">
+    <h1 class="text-4xl font-bold text-gray-800">{{ title }}</h1>
+    {% if action_url and action_text and show_action %}
+    <a href="{{ action_url }}" class="bg-{{ action_color }}-600 hover:bg-{{ action_color }}-700 text-white font-bold py-2 px-6 rounded-lg">
+        {{ action_text }}
+    </a>
+    {% endif %}
+</div>
+{% endmacro %}
+{% macro empty_state(message, action_url=None, action_text=None, action_color='blue', show_action=True) %}
+<div class="bg-white rounded-lg shadow-lg p-12 text-center">
+    <p class="text-xl text-gray-600 mb-6">{{ message }}</p>
+    {% if action_url and action_text and show_action %}
+    <a href="{{ action_url }}" class="bg-{{ action_color }}-600 hover:bg-{{ action_color }}-700 text-white font-bold py-3 px-8 rounded-lg inline-block">
+        {{ action_text }}
+    </a>
+    {% endif %}
+</div>
+{% endmacro %}
+{% macro form_label(text, for_id=None, required=False) %}
+<label {% if for_id %}for="{{ for_id }}"{% endif %} class="block text-sm font-bold text-gray-700 mb-2">
+    {{ text }}{% if required %} <span class="text-red-500">*</span>{% endif %}
+</label>
+{% endmacro %}
+{% macro form_input(name, type='text', placeholder='', required=False, value='', id=None) %}
+<input
+    type="{{ type }}"
+    id="{{ id or name }}"
+    name="{{ name }}"
+    value="{{ value }}"
+    {% if required %}required{% endif %}
+    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+    placeholder="{{ placeholder }}"
+>
+{% endmacro %}
+{% macro form_textarea(name, rows=6, placeholder='', required=False, value='', id=None) %}
+<textarea
+    id="{{ id or name }}"
+    name="{{ name }}"
+    rows="{{ rows }}"
+    {% if required %}required{% endif %}
+    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+    placeholder="{{ placeholder }}"
+>{{ value }}</textarea>
+{% endmacro %}
+{% macro primary_button(text, type='submit', color='blue', full_width=True) %}
+<button
+    type="{{ type }}"
+    class="{% if full_width %}w-full{% endif %} bg-{{ color }}-600 hover:bg-{{ color }}-700 text-white font-bold py-3 px-6 rounded-lg"
+>
+    {{ text }}
+</button>
+{% endmacro %}
+{% macro cancel_button(url, text='Cancel', full_width=True) %}
+<a
+    href="{{ url }}"
+    class="{% if full_width %}flex-1{% endif %} bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-3 px-6 rounded-lg text-center inline-block"
+>
+    {{ text }}
+</a>
+{% endmacro %}
+{% macro action_buttons(submit_text, cancel_url, submit_color='blue') %}
+<div class="flex gap-4">
+    <button
+        type="submit"
+        class="flex-1 bg-{{ submit_color }}-600 hover:bg-{{ submit_color }}-700 text-white font-bold py-3 px-6 rounded-lg"
+    >
+        {{ submit_text }}
+    </button>
+    <a
+        href="{{ cancel_url }}"
+        class="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-3 px-6 rounded-lg text-center"
+    >
+        Cancel
+    </a>
+</div>
+{% endmacro %}
+{% macro section_title(title, border_top=True) %}
+<div class="{% if border_top %}border-t pt-6 mt-6{% endif %}">
+    <h2 class="text-xl font-bold text-gray-800 mb-3">{{ title }}</h2>
+</div>
+{% endmacro %}
+{% macro info_box(color='blue') %}
+<div class="bg-{{ color }}-50 border border-{{ color }}-200 rounded-lg p-6">
+    {{ caller() }}
+</div>
+{% endmacro %}
+{% macro location_display(location) %}
+{% if location %}
+<span class="text-gray-600">
+    <span class="font-semibold">Location:</span> {{ location }}
+</span>
+{% endif %}
+{% endmacro %}
+{% macro date_display(date, format='%B %d, %Y', prefix='') %}
+<span class="text-sm text-gray-500">{{ prefix }}{{ date.strftime(format) }}</span>
+{% endmacro %}
+{% macro datetime_display(date, prefix='') %}
+<span class="text-sm text-gray-500">{{ prefix }}{{ date.strftime('%B %d, %Y at %I:%M %p') }}</span>
+{% endmacro %}

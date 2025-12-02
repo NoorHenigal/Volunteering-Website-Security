@@ -1,213 +1,132 @@
-"""Authentication routes - both API and UI endpoints."""
+"""Authentication routes - unified API and UI."""
 
-from typing import TYPE_CHECKING, Annotated, cast
+from typing import Annotated
 
-from fastapi import APIRouter, Cookie, Depends, Form, Header, HTTPException, Request, Response, status
-from fastapi.responses import RedirectResponse
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import APIRouter, Depends, Response
+from pydantic import ValidationError
 
 from app.auth import service
-from app.auth.schemas import LoginSchema, MessageResponse, RegisterSchema, TokenResponse, UserResponse
-from app.core.security import clear_auth_cookies, decode_access_token, get_user_from_cookie, set_auth_cookies
-from app.db.session import get_db
+from app.auth.schemas import LoginSchema, RegisterSchema, UserResponse
+from app.core.context import RequestContext, get_context
+from app.core.security import clear_auth_cookies, set_auth_cookies
 
-if TYPE_CHECKING:
-    from sqlalchemy.ext.asyncio import AsyncSession
-
-# API routes (JSON)
-api_router = APIRouter(prefix="/api/auth", tags=["Authentication"])
-
-# UI routes (HTML forms)
-ui_router = APIRouter(prefix="/auth", tags=["Auth UI"])
+router = APIRouter(prefix="/auth", tags=["Authentication"])
+api_router = APIRouter(prefix="/api/auth", tags=["Authentication API"])
 
 
-@api_router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/register")
 async def register(
-    data: RegisterSchema,
-    db: Annotated[AsyncSession, Depends(get_db)],
-) -> UserResponse:
-    """Register a new user.
+    ctx: Annotated[RequestContext, Depends(get_context)],
+) -> Response:
+    """Register new user - handles both API and UI requests."""
+    try:
+        reg_data = await ctx.parse_body(
+            RegisterSchema,
+            {"email": "email", "password": "password", "role": "role"},
+        )
+        if not reg_data:
+            return ctx.error_response("Invalid content type", status_code=400)
+    except ValidationError as e:
+        return ctx.error_response(str(e), status_code=422)
 
-    Args:
-        data: Registration data
-        db: Database session
+    try:
+        user = await service.register_user(reg_data, ctx.db)
 
-    Returns:
-        UserResponse with user details
-    """
-    return await service.register_user(data, db)
+        # For UI, also log them in
+        if ctx.is_ui:
+            tokens = await service.login_user(
+                ctx.db,
+                reg_data.email,
+                reg_data.password,
+                ctx.request.headers.get("user-agent"),
+            )
+            response = ctx.success_response(redirect_url="/auth/status")
+            set_auth_cookies(response, tokens.access_token)
+            return response
+
+        return ctx.success_response(data=user, status_code=201)
+
+    except Exception as e:
+        if ctx.is_ui:
+            return ctx.error_response(e, template="register.html")
+        raise
 
 
-@api_router.post("/login", response_model=TokenResponse)
+@router.post("/login")
 async def login(
-    data: LoginSchema,
-    db: Annotated[AsyncSession, Depends(get_db)],
-    user_agent: Annotated[str | None, Header()] = None,
-) -> TokenResponse:
-    """Logs in the user and issues tokens.
+    ctx: Annotated[RequestContext, Depends(get_context)],
+) -> Response:
+    """Login - handles both API and UI requests."""
+    try:
+        login_data = await ctx.parse_body(
+            LoginSchema,
+            {"email": "email", "password": "password"},
+        )
+        if not login_data:
+            return ctx.error_response("Invalid content type", status_code=400)
+    except ValidationError as e:
+        return ctx.error_response(str(e), status_code=422)
 
-    Args:
-        data: Login credentials
-        db: Database session
-        user_agent: User agent header for device info
-
-    Returns:
-        TokenResponse with access token
-    """
-    return await service.login_user(db, data.email, data.password, user_agent)
-
-
-@api_router.post("/refresh", response_model=TokenResponse)
-async def refresh(
-    db: Annotated[AsyncSession, Depends(get_db)],
-    refresh_token: Annotated[str | None, Cookie()] = None,
-) -> TokenResponse:
-    """Refresh access token using refresh token.
-
-    Args:
-        db: Database session
-        refresh_token: Refresh token from cookie
-
-    Returns:
-        TokenResponse with new access token
-    """
-    if not refresh_token:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Refresh token not found",
+    try:
+        tokens = await service.login_user(
+            ctx.db,
+            login_data.email,
+            login_data.password,
+            ctx.request.headers.get("user-agent"),
         )
 
-    return await service.refresh_tokens(refresh_token, db)
+        if ctx.is_ui:
+            response = ctx.success_response(redirect_url="/auth/status")
+            set_auth_cookies(response, tokens.access_token)
+            return response
+
+        return ctx.success_response(data=tokens)
+
+    except Exception as e:
+        if ctx.is_ui:
+            return ctx.error_response(e, template="login.html")
+        raise
 
 
-@api_router.post("/logout", response_model=MessageResponse)
-async def logout(
-    response: Response,
-    db: Annotated[AsyncSession, Depends(get_db)],
-    refresh_token: Annotated[str | None, Cookie()] = None,
-) -> MessageResponse:
-    """Logout user by invalidating refresh token.
+@router.get("/login")
+async def login_page(ctx: Annotated[RequestContext, Depends(get_context)]) -> Response:
+    """Show login page (UI only)."""
+    return ctx.success_response(template="login.html")
 
-    Args:
-        response: FastAPI response for clearing cookies
-        db: Database session
-        refresh_token: Refresh token from cookie
 
-    Returns:
-        MessageResponse confirming logout
-    """
+@router.get("/register")
+async def register_page(ctx: Annotated[RequestContext, Depends(get_context)]) -> Response:
+    """Show registration page (UI only)."""
+    return ctx.success_response(template="register.html")
+
+
+@router.post("/logout")
+async def logout(ctx: Annotated[RequestContext, Depends(get_context)]) -> Response:
+    """Logout user."""
+    refresh_token = ctx.request.cookies.get("refresh_token")
     if refresh_token:
-        await service.logout(refresh_token, db)
+        await service.logout(refresh_token, ctx.db)
 
-    # Clear auth cookies
-    clear_auth_cookies(response)
-
-    return MessageResponse(message="Logged out successfully")
-
-
-@api_router.get("/me", response_model=UserResponse)
-async def get_current_user(
-    db: Annotated[AsyncSession, Depends(get_db)],
-    authorization: Annotated[str | None, Header()] = None,
-) -> UserResponse:
-    """Returns the current authenticated user's details.
-
-    Args:
-        db: Database session
-        authorization: Authorization header with Bearer token
-
-    Returns:
-        UserResponse with user details
-    """
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Not authenticated",
-        )
-    token = authorization[7:]
-
-    payload = decode_access_token(token)
-    user = await service.verify_user_exists(db, payload.user_id)
-
-    return UserResponse(
-        id=user.id,
-        email=user.email,
-        role=user.role,
-    )
-
-
-@ui_router.get("/login")
-async def login_form(
-    request: Request,
-    db: Annotated[AsyncSession, Depends(get_db)],
-) -> Response:
-    """Shows the login form."""
-    user = await get_user_from_cookie(request, db)
-    return service.render(request, "login.html", user=cast("object", user))
-
-
-@ui_router.post("/login")
-async def login_form_post(
-    request: Request,
-    db: Annotated[AsyncSession, Depends(get_db)],
-    email: Annotated[str, Form(...)],
-    password: Annotated[str, Form(...)],
-    user_agent: Annotated[str | None, Header()] = None,
-) -> Response:
-    """Logs in the user, sets the cookies, and redirects to status page."""
-    try:
-        tokens = await service.login_user(db, email, password, user_agent)
-    except (ValueError, HTTPException) as e:
-        return service.render_err(request, "login.html", e)
-    else:
-        response = RedirectResponse(url="/auth/status", status_code=303)
-        set_auth_cookies(response, tokens.access_token)
-        return response
-
-
-@ui_router.get("/register")
-async def register_form(
-    request: Request,
-    db: Annotated[AsyncSession, Depends(get_db)],
-) -> Response:
-    """Shows the registration form."""
-    user = await get_user_from_cookie(request, db)
-    return service.render(request, "register.html", user=cast("object", user))
-
-
-@ui_router.post("/register")
-async def register_form_post(
-    request: Request,
-    db: Annotated[AsyncSession, Depends(get_db)],
-    email: Annotated[str, Form(...)],
-    password: Annotated[str, Form(...)],
-    role: Annotated[str, Form(...)],
-    user_agent: Annotated[str | None, Header()] = None,
-) -> Response:
-    """Registers a new user, logs them in, and redirects to status page."""
-    try:
-        tokens = await service.register_user_and_login(db, email, password, role, user_agent)
-    except (ValueError, HTTPException) as e:
-        return service.render_err(request, "register.html", e)
-    else:
-        response = RedirectResponse(url="/auth/status", status_code=303)
-        set_auth_cookies(response, tokens.access_token)
-        return response
-
-
-@ui_router.get("/status")
-async def status_page(
-    request: Request,
-    db: Annotated[AsyncSession, Depends(get_db)],
-) -> Response:
-    """Shows the login status page."""
-    user = await get_user_from_cookie(request, db)
-    return service.render(request, "status.html", user=cast("object", user))
-
-
-@ui_router.get("/logout")
-async def logout_form() -> Response:
-    """Logs out the user by clearing cookies and redirecting to login."""
-    response = RedirectResponse(url="/auth/login", status_code=303)
+    response = ctx.success_response(redirect_url="/auth/login") if ctx.is_ui else ctx.success_response(data=None)
     clear_auth_cookies(response)
     return response
+
+
+@router.get("/me")
+async def get_current_user(ctx: Annotated[RequestContext, Depends(get_context)]) -> Response:
+    """Get current user details."""
+    user = ctx.require_authenticated()
+    return ctx.success_response(data=UserResponse.model_validate(user))
+
+
+@router.get("/status")
+async def status_page(ctx: Annotated[RequestContext, Depends(get_context)]) -> Response:
+    """Show status page (UI only)."""
+    return ctx.success_response(template="status.html")
+
+
+# API routes - expose same handlers under /api/auth prefix for JSON API clients
+api_router.post("/register")(register)
+api_router.post("/login")(login)
+api_router.post("/logout")(logout)
+api_router.get("/me")(get_current_user)

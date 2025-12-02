@@ -1,0 +1,245 @@
+"""Database repositories for centralized data access."""
+
+from uuid import UUID
+
+from sqlalchemy import ColumnElement, select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import DeclarativeBase, selectinload
+from sqlalchemy.orm.strategy_options import _AbstractLoad
+
+from app.db.models import Application, Opportunity, Organization, RefreshToken, User, UserOrganizationRole
+
+
+class BaseRepository[T: DeclarativeBase]:
+    """Generic repository providing common CRUD operations for all models."""
+
+    def __init__(self, session: AsyncSession, model: type[T]) -> None:
+        """Initialize repository with database session and model class."""
+        self.session = session
+        self.model = model
+
+    async def create(self, obj: T) -> T:
+        """Create a new object in the database."""
+        self.session.add(obj)
+        await self.session.flush()
+        await self.session.refresh(obj)
+        return obj
+
+    async def get_by_id(self, obj_id: UUID) -> T | None:
+        """Get object by ID."""
+        return await self.session.get(self.model, obj_id)
+
+    async def find_one(
+        self,
+        *filters: ColumnElement[bool],
+        options: list[_AbstractLoad] | None = None,
+    ) -> T | None:
+        """Find a single entity matching the given filters.
+
+        Args:
+            *filters: SQLAlchemy filter expressions (e.g., Model.field == value)
+            options: Optional list of eager loading options
+
+        Returns:
+            Entity if found, None otherwise
+        """
+        query = select(self.model).where(*filters)
+        if options:
+            query = query.options(*options)
+        result = await self.session.execute(query)
+        return result.scalar_one_or_none()
+
+    async def find_many(
+        self,
+        *filters: ColumnElement[bool],
+        options: list[_AbstractLoad] | None = None,
+        skip: int = 0,
+        limit: int = 100,
+    ) -> list[T]:
+        """Find all entities matching the given filters.
+
+        Args:
+            *filters: SQLAlchemy filter expressions
+            options: Optional list of eager loading options
+            skip: Number of records to skip
+            limit: Maximum number of records to return
+
+        Returns:
+            List of matching entities
+        """
+        query = select(self.model).where(*filters)
+        if options:
+            query = query.options(*options)
+        query = query.offset(skip).limit(limit)
+        result = await self.session.execute(query)
+        return list(result.scalars().all())
+
+    async def get_all(
+        self,
+        skip: int = 0,
+        limit: int = 100,
+        filters: dict[str, str | int | bool | UUID | None] | None = None,
+    ) -> list[T]:
+        """Get all objects with optional filtering and pagination."""
+        query = select(self.model)
+        if filters:
+            for key, value in filters.items():
+                query = query.where(getattr(self.model, key) == value)
+        query = query.offset(skip).limit(limit)
+        result = await self.session.execute(query)
+        return list(result.scalars().all())
+
+    async def update(self, obj: T) -> T:
+        """Update an existing object."""
+        await self.session.flush()
+        await self.session.refresh(obj)
+        return obj
+
+    async def delete(self, obj: T) -> None:
+        """Delete an object from the database."""
+        await self.session.delete(obj)
+        await self.session.flush()
+
+
+class UserRepository(BaseRepository[User]):
+    """Repository for User model database operations."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        """Initialize UserRepository."""
+        super().__init__(session, User)
+
+    async def get_by_email(self, email: str) -> User | None:
+        """Get user by email."""
+        return await self.find_one(User.email == email)
+
+
+class RefreshTokenRepository(BaseRepository[RefreshToken]):
+    """Repository for RefreshToken model database operations."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        """Initialize RefreshTokenRepository."""
+        super().__init__(session, RefreshToken)
+
+    async def get_by_token_hash(self, token_hash: str) -> RefreshToken | None:
+        """Get refresh token by token hash."""
+        return await self.find_one(RefreshToken.token_hash == token_hash)
+
+
+class OrganizationRepository(BaseRepository[Organization]):
+    """Repository for Organization model database operations."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        """Initialize OrganizationRepository."""
+        super().__init__(session, Organization)
+
+    async def get_by_id_with_opportunities(self, org_id: UUID) -> Organization | None:
+        """Get organization by ID with opportunities eagerly loaded."""
+        return await self.find_one(
+            Organization.id == org_id,
+            options=[selectinload(Organization.opportunities)],
+        )
+
+    async def create_with_admin(self, name: str, description: str | None, user_id: UUID) -> Organization:
+        """Create organization and assign user as admin in one operation."""
+        organization = Organization(name=name, description=description)
+        organization = await self.create(organization)
+        role = UserOrganizationRole(user_id=user_id, organization_id=organization.id, role="admin")
+        self.session.add(role)
+        await self.session.flush()
+        return organization
+
+
+class UserOrganizationRoleRepository(BaseRepository[UserOrganizationRole]):
+    """Repository for UserOrganizationRole model database operations."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        """Initialize UserOrganizationRoleRepository."""
+        super().__init__(session, UserOrganizationRole)
+
+    async def get_by_user_and_org(self, user_id: UUID, organization_id: UUID) -> UserOrganizationRole | None:
+        """Get user-organization role by user ID and organization ID."""
+        return await self.find_one(
+            UserOrganizationRole.user_id == user_id,
+            UserOrganizationRole.organization_id == organization_id,
+        )
+
+    async def get_user_organizations(self, user_id: UUID) -> list[UserOrganizationRole]:
+        """Get all organizations for a user."""
+        return await self.find_many(UserOrganizationRole.user_id == user_id)
+
+    async def is_organization_admin(self, user_id: UUID, organization_id: UUID) -> bool:
+        """Check if a user is an admin of an organization."""
+        role = await self.get_by_user_and_org(user_id, organization_id)
+        return role is not None and role.role == "admin"
+
+    async def is_organization_member(self, user_id: UUID, organization_id: UUID) -> bool:
+        """Check if a user is a member of an organization (any role)."""
+        role = await self.get_by_user_and_org(user_id, organization_id)
+        return role is not None
+
+    async def get_members_with_users(self, organization_id: UUID) -> list[UserOrganizationRole]:
+        """Get all members of an organization with user details eagerly loaded."""
+        return await self.find_many(
+            UserOrganizationRole.organization_id == organization_id,
+            options=[selectinload(UserOrganizationRole.user)],
+        )
+
+
+class OpportunityRepository(BaseRepository[Opportunity]):
+    """Repository for Opportunity model database operations."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        """Initialize OpportunityRepository."""
+        super().__init__(session, Opportunity)
+
+    async def get_all_open(self) -> list[Opportunity]:
+        """Get all open opportunities."""
+        return await self.find_many(Opportunity.is_open == True)  # noqa: E712
+
+
+class ApplicationRepository(BaseRepository[Application]):
+    """Repository for Application model database operations."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        """Initialize ApplicationRepository."""
+        super().__init__(session, Application)
+
+    async def get_by_volunteer(self, volunteer_id: UUID) -> list[Application]:
+        """Get all applications for a volunteer."""
+        return await self.find_many(Application.volunteer_id == volunteer_id)
+
+    async def get_by_volunteer_with_opportunity(self, volunteer_id: UUID) -> list[Application]:
+        """Get all applications for a volunteer with opportunity eagerly loaded."""
+        return await self.find_many(
+            Application.volunteer_id == volunteer_id,
+            options=[selectinload(Application.opportunity)],
+        )
+
+    async def get_by_opportunity_with_volunteer(self, opportunity_id: UUID) -> list[Application]:
+        """Get all applications for an opportunity with volunteer details eagerly loaded."""
+        return await self.find_many(
+            Application.opportunity_id == opportunity_id,
+            options=[selectinload(Application.volunteer)],
+        )
+
+    async def get_by_volunteer_and_opportunity(self, volunteer_id: UUID, opportunity_id: UUID) -> Application | None:
+        """Get application by volunteer and opportunity."""
+        return await self.find_one(
+            Application.volunteer_id == volunteer_id,
+            Application.opportunity_id == opportunity_id,
+        )
+
+    async def update_status(self, application: Application, new_status: str) -> Application:
+        """Update application status."""
+        application.status = new_status
+        return await self.update(application)
+
+
+__all__ = [
+    "ApplicationRepository",
+    "OpportunityRepository",
+    "OrganizationRepository",
+    "RefreshTokenRepository",
+    "UserOrganizationRoleRepository",
+    "UserRepository",
+]
