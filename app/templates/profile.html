@@ -1,0 +1,285 @@
+{% extends "base.html" %}
+{% from "components/ui.html" import user_avatar %}
+{% block title %}{{ profile_user.first_name }} {{ profile_user.last_name }} (@{{ profile_user.username }}){% endblock %}
+{% block content %}
+<div class="max-w-4xl mx-auto py-8 px-4" x-data="avatarCropper()">
+  <!-- Crop Modal -->
+  <div x-show="show" x-transition.opacity class="fixed inset-0 bg-black/70 flex items-center justify-center z-50" style="display: none;">
+    <div class="bg-white rounded-lg shadow-xl max-w-lg w-full mx-4 overflow-hidden" @click.outside="close()">
+      <div class="p-4 border-b border-gray-200">
+        <h3 class="text-lg font-semibold text-gray-900">Adjust Profile Picture</h3>
+        <p class="text-sm text-gray-500">Drag to position, use slider to zoom</p>
+      </div>
+
+      <div class="relative bg-gray-100 overflow-hidden" style="height: 400px">
+        <div class="absolute inset-0 flex items-center justify-center overflow-hidden"
+             @mousedown="startDrag($event)"
+             @mousemove="drag($event)"
+             @mouseup="endDrag()"
+             @mouseleave="endDrag()"
+             @touchstart="startDrag($event)"
+             @touchmove="drag($event)"
+             @touchend="endDrag()">
+          <img x-ref="cropImage"
+               :src="imageSrc"
+               :style="`transform: translate(${imageX}px, ${imageY}px) scale(${scale}); transform-origin: center center;`"
+               class="max-w-none cursor-move select-none"
+               alt="Preview"
+               draggable="false"
+               style="pointer-events: none;" />
+        </div>
+
+        <!-- Circular crop overlay -->
+        <div class="absolute inset-0 pointer-events-none">
+          <div class="absolute rounded-full border-4 border-white shadow-lg"
+               style="left: 50%; top: 50%; transform: translate(-50%, -50%); width: 250px; height: 250px; box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);"></div>
+        </div>
+      </div>
+
+      <div class="p-4 border-t border-gray-200">
+        <label class="block text-sm font-medium text-gray-700 mb-2">Zoom</label>
+        <input type="range"
+               min="0.1"
+               max="3"
+               step="0.01"
+               x-model.number="scale"
+               class="w-full accent-blue-600" />
+      </div>
+
+      <div class="p-4 border-t border-gray-200 flex gap-3">
+        <button type="button"
+                class="flex-1 px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg font-medium transition-colors"
+                @click="close()">
+          Cancel
+        </button>
+        <button type="button"
+                class="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
+                @click="save()">
+          Save
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Profile Card -->
+  <div class="bg-white shadow rounded-lg overflow-hidden">
+    <div class="p-6 sm:p-8">
+      <div class="flex flex-col sm:flex-row items-center sm:items-start space-y-4 sm:space-y-0 sm:space-x-6">
+        {{ user_avatar(profile_user, 'lg') }}
+        <div class="text-center sm:text-left flex-1">
+          <div class="flex items-start justify-between">
+            <div>
+              <h1 class="text-3xl font-bold text-gray-900">
+                {{ profile_user.first_name }} {{ profile_user.last_name }}
+              </h1>
+              <p class="text-lg text-gray-500 font-medium">
+                @{{ profile_user.username }}
+              </p>
+              <div class="mt-2 inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
+                {{ profile_user.role | title }}
+              </div>
+            </div>
+            {% if user and user.id == profile_user.id %}
+            <label for="profile-picture-input"
+                   class="inline-flex items-center px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium cursor-pointer transition-colors">
+              Edit
+            </label>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      {% if user and user.id == profile_user.id %}
+      <form x-ref="profileForm" action="/settings/profile/picture" method="POST" enctype="multipart/form-data" class="hidden">
+        <input type="hidden" x-ref="cropDataInput" name="crop_data" value="" />
+        <input type="file"
+               id="profile-picture-input"
+               name="file"
+               accept="image/*"
+               class="hidden"
+               @change="handleFileSelect($event)" />
+      </form>
+      {% endif %}
+
+      <div class="mt-8 border-t border-gray-200 pt-6">
+        <h2 class="text-xl font-semibold text-gray-900 mb-4">About</h2>
+        <p class="text-gray-600">
+          Member since {{ profile_user.created_at.strftime('%B %Y') }}
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.addEventListener("alpine:init", () => {
+    Alpine.data("avatarCropper", () => ({
+      show: false,
+      imageSrc: '',
+      imageX: 0,
+      imageY: 0,
+      scale: 1,
+      isDragging: false,
+      dragStartX: 0,
+      dragStartY: 0,
+      imageStartX: 0,
+      imageStartY: 0,
+      originalWidth: 0,
+      originalHeight: 0,
+      currentFile: null,
+
+
+      handleFileSelect(event) {
+        const file = event.target.files[0];
+        if (file && file.type.startsWith('image/')) {
+          this.currentFile = file;
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            this.imageSrc = e.target.result;
+            this.show = true;
+
+            // Wait for image to load to get dimensions
+            this.$nextTick(() => {
+              const img = this.$refs.cropImage;
+
+              // Check if image is already loaded (cached)
+              if (img.complete && img.naturalWidth > 0) {
+                this.originalWidth = img.naturalWidth;
+                this.originalHeight = img.naturalHeight;
+                this.resetPosition();
+              } else {
+                // Wait for image to load
+                img.onload = () => {
+                  this.originalWidth = img.naturalWidth;
+                  this.originalHeight = img.naturalHeight;
+                  this.resetPosition();
+                };
+              }
+            });
+          };
+          reader.readAsDataURL(file);
+        }
+      },
+
+      resetPosition() {
+        this.imageX = 0;
+        this.imageY = 0;
+
+        const cropSize = 250;
+        const img = this.$refs.cropImage;
+
+        if (img) {
+          const imgWidth = img.naturalWidth;
+          const imgHeight = img.naturalHeight;
+
+          // Calculate minimum scale needed to cover the crop circle
+          const scaleToFitCrop = Math.max(cropSize / imgWidth, cropSize / imgHeight);
+
+          // Set default scale based on image size
+          if (scaleToFitCrop > 1) {
+            // Small image - scale up to fit crop area
+            this.scale = scaleToFitCrop;
+          } else {
+            // Large image - use default scale of 0.37 (zoomed out to show full image with crop circle)
+            this.scale = 0.37;
+          }
+        }
+      },
+
+      startDrag(event) {
+        this.isDragging = true;
+        const clientX = event.touches ? event.touches[0].clientX : event.clientX;
+        const clientY = event.touches ? event.touches[0].clientY : event.clientY;
+
+        this.dragStartX = clientX;
+        this.dragStartY = clientY;
+        this.imageStartX = this.imageX;
+        this.imageStartY = this.imageY;
+
+        event.preventDefault();
+      },
+
+      drag(event) {
+        if (!this.isDragging) return;
+
+        const clientX = event.touches ? event.touches[0].clientX : event.clientX;
+        const clientY = event.touches ? event.touches[0].clientY : event.clientY;
+
+        const deltaX = clientX - this.dragStartX;
+        const deltaY = clientY - this.dragStartY;
+
+        this.imageX = this.imageStartX + deltaX;
+        this.imageY = this.imageStartY + deltaY;
+
+        event.preventDefault();
+      },
+
+
+      endDrag() {
+        this.isDragging = false;
+      },
+
+      close() {
+        this.show = false;
+        this.imageSrc = '';
+        this.resetPosition();
+        // Reset file input
+        const fileInput = document.getElementById('profile-picture-input');
+        if (fileInput) fileInput.value = '';
+      },
+
+      save() {
+        const cropData = this.calculateCropData();
+        this.$refs.cropDataInput.value = JSON.stringify(cropData);
+        this.$refs.profileForm.submit();
+        this.show = false;
+      },
+
+      calculateCropData() {
+        const img = this.$refs.cropImage;
+        if (!img) return {};
+
+        const cropSize = 250; // Size of the crop circle
+        const containerRect = img.parentElement.getBoundingClientRect();
+
+        // Center of the crop circle in container coordinates
+        const cropCenterX = containerRect.width / 2;
+        const cropCenterY = containerRect.height / 2;
+
+        // Get the displayed image dimensions
+        const displayedWidth = img.naturalWidth * this.scale;
+        const displayedHeight = img.naturalHeight * this.scale;
+
+        // Calculate the top-left corner of the displayed image in container coordinates
+        const imageLeft = cropCenterX + this.imageX - (displayedWidth / 2);
+        const imageTop = cropCenterY + this.imageY - (displayedHeight / 2);
+
+        // Calculate crop area in displayed image coordinates
+        const cropLeft = cropCenterX - (cropSize / 2) - imageLeft;
+        const cropTop = cropCenterY - (cropSize / 2) - imageTop;
+
+        // Convert to original image coordinates
+        const scaleRatio = 1 / this.scale;
+        const x = Math.round(cropLeft * scaleRatio);
+        const y = Math.round(cropTop * scaleRatio);
+        const width = Math.round(cropSize * scaleRatio);
+        const height = Math.round(cropSize * scaleRatio);
+
+        // Clamp values to valid pixel ranges
+        const clampedX = Math.max(0, Math.min(x, this.originalWidth - 1));
+        const clampedY = Math.max(0, Math.min(y, this.originalHeight - 1));
+        const clampedWidth = Math.max(1, Math.min(width, this.originalWidth - clampedX));
+        const clampedHeight = Math.max(1, Math.min(height, this.originalHeight - clampedY));
+
+        // Convert pixel coordinates to percentages (0-1 range) for backend
+        return {
+          x: clampedX / this.originalWidth,
+          y: clampedY / this.originalHeight,
+          width: clampedWidth / this.originalWidth,
+          height: clampedHeight / this.originalHeight
+        };
+      }
+    }));
+  });
+</script>
+{% endblock %}

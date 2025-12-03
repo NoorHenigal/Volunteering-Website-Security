@@ -6,7 +6,8 @@
     "migrations": "tools",
     "workflows": "context",
     "opportunities": "global",
-    "organizations": "contract"
+    "organizations": "contract",
+    "profiles" : "client"
   },
   "ruff.nativeServer": true,
   "ruff.lint.select": ["ALL"],
