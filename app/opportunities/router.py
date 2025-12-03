@@ -120,13 +120,12 @@ async def update_application_status(
     return ApplicationResponse.model_validate(application)
 
 
-@app_api_router.put("/{application_id}/withdraw", response_model=ApplicationResponse)
-async def withdraw_application(application_id: UUID, ctx: ContextDep) -> ApplicationResponse:
+@app_api_router.delete("/{application_id}/withdraw", status_code=status.HTTP_204_NO_CONTENT)
+async def withdraw_application(application_id: UUID, ctx: ContextDep) -> None:
     """Withdraw an application (volunteers only)."""
     user = ctx.require_authenticated()
     app_svc = ApplicationService(ctx.db)
-    application = await app_svc.withdraw(application_id, user)
-    return ApplicationResponse.model_validate(application)
+    await app_svc.withdraw(application_id, user)
 
 
 @ui_router.get("/list")
@@ -333,3 +332,16 @@ async def accept_applicant(ctx: ContextDep, opportunity_id: UUID, application_id
 async def reject_applicant(ctx: ContextDep, opportunity_id: UUID, application_id: UUID) -> Response:
     """Reject an application (organization admins only)."""
     return await _update_applicant_status(ctx, opportunity_id, application_id, "rejected")
+
+
+@ui_router.post("/applications/{application_id}/withdraw")
+async def withdraw_application_ui(ctx: ContextDep, application_id: UUID) -> Response:
+    """Withdraw an application (volunteers only)."""
+    result = ctx.require_ui_auth()
+    if isinstance(result, RedirectResponse):
+        return result
+    user = result
+
+    app_svc = ApplicationService(ctx.db)
+    await app_svc.withdraw(application_id, user)
+    return RedirectResponse(url="/opp/applications/list", status_code=303)

@@ -155,6 +155,18 @@ class APIHelper:
         assert isinstance(result, Response)
         return result
 
+    async def no_content(
+        self,
+        method: str,
+        endpoint: str,
+        *,
+        auth: AuthenticatedUser | None = None,
+        json: dict[str, Any] | None = None,
+        **kwargs: Any,
+    ) -> None:
+        """Assert 204 No Content."""
+        await self(method, endpoint, expected=204, auth=auth, json=json, **kwargs)
+
     async def list_contains(
         self,
         endpoint: str,

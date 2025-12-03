@@ -181,15 +181,12 @@ class ApplicationService:
         """Update application status."""
         return await self._app_repo.update_status(application, new_status)
 
-    async def withdraw(self, application_id: UUID, user: User) -> Application:
-        """Withdraw an application (volunteers only).
+    async def withdraw(self, application_id: UUID, user: User) -> None:
+        """Withdraw an application by deleting it (volunteers only).
 
         Args:
             application_id: Application to withdraw
             user: User attempting to withdraw
-
-        Returns:
-            Updated Application
 
         Raises:
             HTTPException: If not found or not owner
@@ -202,7 +199,7 @@ class ApplicationService:
                 detail="You can only withdraw your own applications",
             )
 
-        return await self._app_repo.update_status(application, "withdrawn")
+        await self._app_repo.delete(application)
 
     async def get_by_opportunity_with_volunteer(self, opportunity_id: UUID) -> list[Application]:
         """Get all applications for an opportunity with volunteer details."""
