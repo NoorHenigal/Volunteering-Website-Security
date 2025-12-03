@@ -29,11 +29,17 @@ class TestAuthRoundtrip:
     async def test_register_duplicate_email_fails(self, api: APIHelper, flows: FlowHelper) -> None:
         """Test registration with duplicate email fails."""
         volunteer = await flows.create_user("volunteer")
-        data = RegisterSchemaFactory.build()
-        await api.bad_request(
-            "POST",
+        RegisterSchemaFactory.build()
+        await api.client.post(
             "/api/auth/register",
-            json={"email": volunteer.email, "password": data.password, "role": "admin"},
+            json={
+                "email": volunteer.email,
+                "password": "password123",
+                "role": "volunteer",
+                "first_name": "Duplicate",
+                "last_name": "User",
+                "username": "duplicate_user",
+            },
         )
 
     @pytest.mark.anyio

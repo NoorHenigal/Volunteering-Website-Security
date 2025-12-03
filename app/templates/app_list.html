@@ -5,7 +5,7 @@
 
 {% block content %}
 <div class="max-w-6xl mx-auto">
-    {{ page_header('My Applications', '/opp/list', 'Browse Opportunities', 'blue', True) }}
+    {{ page_header('My Applications', '/opp/list', 'Browse Opportunities', 'blue', applications|length > 0) }}
 
     {% if applications %}
     <div class="space-y-4">
@@ -15,11 +15,13 @@
                 <div class="flex-1">
                     <h2 class="text-2xl font-bold text-gray-800 mb-2">
                         <a href="/opp/{{ app.opportunity_id }}" class="hover:text-blue-600">
-                            {% if app.opportunity %}{{ app.opportunity.title }}{% else %}Opportunity #{{ app.opportunity_id }}{% endif %}
+                            {% if app.opportunity %}{{ app.opportunity.title }}{% else %}Opportunity #{{
+                            app.opportunity_id }}{% endif %}
                         </a>
                     </h2>
                     {% if app.opportunity %}
-                    <p class="text-gray-600 mb-3">{{ app.opportunity.description[:150] }}{% if app.opportunity.description|length > 150 %}...{% endif %}</p>
+                    <p class="text-gray-600 mb-3">{{ app.opportunity.description[:150] }}{% if
+                        app.opportunity.description|length > 150 %}...{% endif %}</p>
                     {% endif %}
                     {% if app.message %}
                     <div class="bg-gray-50 rounded p-3 mb-3">

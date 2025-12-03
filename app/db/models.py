@@ -75,6 +75,10 @@ class User(Base, FullModelMixin):
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     role: Mapped[str] = mapped_column(String(50), nullable=False)
     ip_address: Mapped[str | None] = mapped_column(String(45), nullable=True)
+    first_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    last_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    username: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
+    profile_picture: Mapped[str | None] = mapped_column(String(255), nullable=True, default=None)
 
     # Relationship to refresh tokens
     refresh_tokens: Mapped[list[RefreshToken]] = relationship(

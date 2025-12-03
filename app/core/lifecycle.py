@@ -12,6 +12,7 @@ from alembic.script import ScriptDirectory
 from sqlalchemy import text
 
 from app.core.config import settings
+from app.db.seed import seed_demo_data
 from app.db.session import sync_engine
 
 log = logging.getLogger(__name__)
@@ -59,13 +60,22 @@ def _check_migrations() -> None:
     log.info("✓ Database schema up to date")
 
 
-def run_preflight_checks() -> None:
-    """Run all pre-flight checks before starting the application."""
+async def run_preflight_checks() -> None:
+    """Run all pre-flight checks before starting the application.
+
+    This function is async to support demo data seeding.
+    """
     log.info("Running startup checks...")
 
     try:
         _check_database_connection()
         _check_migrations()
+
+        # Seed demo data if enabled
+        if settings.demo_data:
+            log.info("DEMO_DATA enabled, checking demo data...")
+            await seed_demo_data()
+
         log.info("All startup checks passed\n")
 
     except StartupCheckError:

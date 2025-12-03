@@ -20,6 +20,7 @@ from app.opportunities.router import app_api_router
 from app.opportunities.router import ui_router as opp_ui_router
 from app.organizations.router import api_router as org_api_router
 from app.organizations.router import ui_router as org_ui_router
+from app.profiles.router import router as profiles_router
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
@@ -39,7 +40,7 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None]:
     """
     # Startup: Run pre-flight checks
     try:
-        run_preflight_checks()
+        await run_preflight_checks()
     except StartupCheckError:
         # Error already logged, exit immediately without traceback
         os._exit(1)
@@ -82,6 +83,7 @@ app.include_router(app_api_router)
 app.include_router(opp_ui_router)
 app.include_router(org_api_router)
 app.include_router(org_ui_router)
+app.include_router(profiles_router)
 
 
 @app.get("/")

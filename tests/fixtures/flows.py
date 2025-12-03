@@ -32,7 +32,14 @@ class FlowHelper:
         data = RegisterSchemaFactory.build(role=role)
         resp = await self.api.client.post(
             "/api/auth/register",
-            json={"email": data.email, "password": data.password, "role": role},
+            json={
+                "email": data.email,
+                "password": data.password,
+                "role": role,
+                "first_name": data.first_name,
+                "last_name": data.last_name,
+                "username": data.username,
+            },
         )
         assert 200 <= resp.status_code < 300, f"Registration failed: {resp.text}"
 

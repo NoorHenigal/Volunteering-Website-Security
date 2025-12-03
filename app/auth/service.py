@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from argon2 import PasswordHasher
+from argon2 import PasswordHasher, Type
 from argon2.exceptions import VerifyMismatchError
 from fastapi import HTTPException, status
 from jose import jwt
@@ -15,8 +15,14 @@ from app.core.config import settings
 from app.db.models import RefreshToken, User
 from app.db.repositories import RefreshTokenRepository, UserRepository
 
-# Password hasher instance
-_ph = PasswordHasher()
+_ph = PasswordHasher(
+    time_cost=4,
+    memory_cost=512,
+    parallelism=4,
+    hash_len=32,
+    salt_len=16,
+    type=Type.ID,
+)
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -211,6 +217,9 @@ async def register_user(data: RegisterSchema, db: AsyncSession) -> UserResponse:
         email=data.email,
         password_hash=hashed_password,
         role=data.role,
+        first_name=data.first_name,
+        last_name=data.last_name,
+        username=data.username,
     )
     new_user = await user_repo.create(new_user)
 

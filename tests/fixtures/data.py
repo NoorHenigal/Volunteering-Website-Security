@@ -24,11 +24,6 @@ from app.organizations.schemas import OrganizationCreate
 RoleType = Literal["admin", "volunteer", "organization"]
 
 
-# =============================================================================
-# FACTORIES
-# =============================================================================
-
-
 class RegisterSchemaFactory(ModelFactory[RegisterSchema]):
     """Factory for generating registration data."""
 
@@ -37,6 +32,18 @@ class RegisterSchemaFactory(ModelFactory[RegisterSchema]):
     @classmethod
     def role(cls) -> RoleType:
         return "volunteer"
+
+    @classmethod
+    def first_name(cls) -> str:
+        return cls.__faker__.first_name()
+
+    @classmethod
+    def last_name(cls) -> str:
+        return cls.__faker__.last_name()
+
+    @classmethod
+    def username(cls) -> str:
+        return cls.__faker__.user_name()
 
 
 class OrganizationCreateFactory(ModelFactory[OrganizationCreate]):
@@ -55,11 +62,6 @@ class ApplicationCreateFactory(ModelFactory[ApplicationCreate]):
     """Factory for generating application creation data."""
 
     __model__ = ApplicationCreate
-
-
-# =============================================================================
-# DATACLASSES
-# =============================================================================
 
 
 @dataclass
@@ -94,25 +96,33 @@ class OpportunityContext:
     organization: OrganizationContext
 
 
-# =============================================================================
-# DOMAIN HELPERS (moved from conftest to eliminate circular imports)
-# =============================================================================
-
-
 async def register_user(
     client: AsyncClient,
     role: RoleType = "volunteer",
     email: str | None = None,
     password: str | None = None,
+    first_name: str | None = None,
+    last_name: str | None = None,
+    username: str | None = None,
 ) -> AuthenticatedUser:
     """Register a new user."""
     data = RegisterSchemaFactory.build(role=role)
     email = email or data.email
     password = password or data.password
+    first_name = first_name or data.first_name
+    last_name = last_name or data.last_name
+    username = username or data.username
 
     response = await client.post(
         "/api/auth/register",
-        json={"email": email, "password": password, "role": role},
+        json={
+            "email": email,
+            "password": password,
+            "role": role,
+            "first_name": first_name,
+            "last_name": last_name,
+            "username": username,
+        },
     )
     assert response.status_code == 201, f"Registration failed: {response.text}"
     return AuthenticatedUser(email=email, password=password, tokens={}, role=role)
@@ -251,11 +261,6 @@ async def create_application_db(
     await db.commit()
     await db.refresh(app_obj)
     return app_obj
-
-
-# =============================================================================
-# FIXTURE CONTEXT (uses local helpers, no circular imports)
-# =============================================================================
 
 
 @dataclass

@@ -16,6 +16,9 @@ class RegisterSchema(BaseCreate):
     email: EmailStr
     password: str = Field(min_length=8)
     role: RoleType
+    first_name: str = Field(min_length=1)
+    last_name: str = Field(min_length=1)
+    username: str = Field(min_length=3, pattern=r"^[a-zA-Z0-9_-]+$")
 
 
 class LoginSchema(StrictModel):
@@ -37,3 +40,7 @@ class UserResponse(BaseOut):
 
     email: EmailStr
     role: RoleType
+    first_name: str
+    last_name: str
+    username: str
+    profile_picture: str | None

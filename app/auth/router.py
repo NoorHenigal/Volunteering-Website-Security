@@ -22,7 +22,14 @@ async def register(
     try:
         reg_data = await ctx.parse_body(
             RegisterSchema,
-            {"email": "email", "password": "password", "role": "role"},
+            {
+                "email": "email",
+                "password": "password",
+                "role": "role",
+                "first_name": "first_name",
+                "last_name": "last_name",
+                "username": "username",
+            },
         )
         if not reg_data:
             return ctx.error_response("Invalid content type", status_code=400)

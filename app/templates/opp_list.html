@@ -5,7 +5,8 @@
 
 {% block content %}
 <div class="max-w-6xl mx-auto">
-    {{ page_header('Volunteering Opportunities', '/opp/new', 'Create Opportunity', 'green', user.role == 'organization') }}
+    {{ page_header('Volunteering Opportunities', '/opp/new', 'Create Opportunity', 'green', user.role == 'organization'
+    and opportunities|length > 0) }}
 
     {% if opportunities %}
     <div class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -28,7 +29,8 @@
         {% endfor %}
     </div>
     {% else %}
-    {{ empty_state('No opportunities available at the moment.', '/opp/new', 'Create the First Opportunity', 'green', user.role == 'organization') }}
+    {{ empty_state('No opportunities available at the moment.', '/opp/new', 'Create the First Opportunity', 'green',
+    user.role == 'organization') }}
     {% endif %}
 </div>
 {% endblock %}

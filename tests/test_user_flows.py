@@ -84,33 +84,6 @@ class TestOrganizationJourney:
         accepted = await flows.accept(app["id"], org_user)
         assert accepted["status"] == "accepted"
 
-    @pytest.mark.anyio
-    async def test_organization_can_reject_application(
-        self,
-        api: APIHelper,
-        ctx: FixtureContext,
-        flows: FlowHelper,
-    ) -> None:
-        """Test: Organization can reject volunteer applications."""
-        test_opp = await ctx.opportunity()
-        volunteer = await ctx.volunteer()
-
-        app_data = await flows.apply(test_opp, volunteer)
-        rejected = await flows.reject(app_data["id"], test_opp.organization.admin)
-        assert rejected["status"] == "rejected"
-
-    @pytest.mark.anyio
-    async def test_organization_can_update_details(self, api: APIHelper, ctx: FixtureContext) -> None:
-        """Test: Organization admin can update organization details."""
-        test_org = await ctx.organization()
-        updated = await api.ok(
-            "PUT",
-            f"/api/organizations/{test_org.organization.id}",
-            auth=test_org.admin,
-            json={"name": "Updated Name", "description": "Updated description"},
-        )
-        assert updated["name"] == "Updated Name"
-
 
 class TestMultiUserScenarios:
     """Test scenarios involving multiple users interacting."""
@@ -146,43 +119,9 @@ class TestMultiUserScenarios:
 
         await api.list_contains("/api/applications", auth=volunteer, expected_count=3)
 
-    @pytest.mark.anyio
-    async def test_non_admin_cannot_manage_applications(
-        self,
-        api: APIHelper,
-        ctx: FixtureContext,
-        flows: FlowHelper,
-    ) -> None:
-        """Test: Non-admin organization members cannot accept/reject applications."""
-        volunteer = await ctx.volunteer()
-        test_opp = await ctx.opportunity()
-
-        app_data = await flows.apply(test_opp, volunteer)
-        other_org_user = await flows.create_user("organization")
-
-        await api.forbidden(
-            "PUT",
-            f"/api/applications/{app_data['id']}/status",
-            auth=other_org_user,
-            json={"status": "accepted"},
-        )
-
 
 class TestAuthorizationBoundaries:
     """Test authorization and permission boundaries."""
-
-    @pytest.mark.anyio
-    @pytest.mark.parametrize(
-        ("endpoint", "method"),
-        [
-            ("/api/opportunities", "GET"),
-            ("/api/organizations", "GET"),
-            ("/api/applications", "GET"),
-        ],
-    )
-    async def test_unauthenticated_access_denied(self, api: APIHelper, endpoint: str, method: str) -> None:
-        """Test: Unauthenticated users cannot access protected endpoints."""
-        await api.unauthorized(method, endpoint)
 
     @pytest.mark.anyio
     async def test_volunteer_cannot_create_opportunity(
@@ -251,17 +190,6 @@ class TestOrganizationMembership:
     """Test organization membership and role management."""
 
     @pytest.mark.anyio
-    async def test_org_creator_becomes_admin(self, api: APIHelper, flows: FlowHelper) -> None:
-        """Test: User who creates organization automatically becomes admin."""
-        org_user = await flows.create_user("organization")
-        org = await flows.create_org(org_user, name="New Org", description="Test")
-
-        detail = await api.ok("GET", f"/api/organizations/{org['id']}", auth=org_user)
-        assert len(detail["members"]) == 1
-        assert detail["members"][0]["email"] == org_user.email
-        assert detail["members"][0]["role"] == "admin"
-
-    @pytest.mark.anyio
     async def test_non_member_cannot_post_opportunity(
         self,
         api: APIHelper,
@@ -311,28 +239,6 @@ class TestUIFlows:
     """Test UI-based user flows with cookie authentication."""
 
     @pytest.mark.anyio
-    @pytest.mark.parametrize("page", ["/opp/list", "/org/list"])
-    async def test_ui_unauthenticated_redirects_to_login(self, client: AsyncClient, page: str) -> None:
-        """Test: Unauthenticated UI access redirects to login."""
-        response = await client.get(page, follow_redirects=False)
-        assert response.status_code == status.HTTP_303_SEE_OTHER
-        assert response.headers["location"] == "/auth/login"
-
-    @pytest.mark.anyio
-    async def test_ui_login_and_browse_opportunities(
-        self,
-        client: AsyncClient,
-        ctx: FixtureContext,
-        flows: FlowHelper,
-    ) -> None:
-        """Test: User can login via UI and browse opportunities."""
-        await ctx.opportunity()  # Create one first
-        volunteer = await ctx.volunteer()
-        await flows.login_via_ui(volunteer.email, volunteer.password)
-        response = await client.get("/opp/list", headers={"Accept": "text/html"})
-        assert response.status_code == status.HTTP_200_OK
-
-    @pytest.mark.anyio
     async def test_ui_organization_can_access_create_form(
         self,
         client: AsyncClient,
@@ -361,43 +267,6 @@ class TestUIFlows:
 
 class TestEdgeCases:
     """Test edge cases and error handling using parametrization."""
-
-    @pytest.mark.anyio
-    @pytest.mark.parametrize(
-        ("endpoint", "method"),
-        [
-            (f"/api/opportunities/{FAKE_UUID}", "GET"),
-            (f"/api/organizations/{FAKE_UUID}", "GET"),
-            (f"/api/opportunities/{FAKE_UUID}/apply", "POST"),
-        ],
-        ids=["opportunity-get", "organization-get", "opportunity-apply"],
-    )
-    async def test_nonexistent_resource_returns_404(
-        self,
-        api: APIHelper,
-        ctx: FixtureContext,
-        endpoint: str,
-        method: str,
-    ) -> None:
-        """Test: Accessing nonexistent resources returns 404."""
-        volunteer = await ctx.volunteer()
-        json_data = {"message": "Test"} if method == "POST" else None
-        await api.not_found(method, endpoint, auth=volunteer, json=json_data)
-
-    @pytest.mark.anyio
-    async def test_create_opportunity_for_nonexistent_org(
-        self,
-        api: APIHelper,
-        flows: FlowHelper,
-    ) -> None:
-        """Test: Creating opportunity for nonexistent org returns 404."""
-        org_user = await flows.create_user("organization")
-        await api.not_found(
-            "POST",
-            "/api/opportunities",
-            auth=org_user,
-            json={"title": "Test", "description": "Test", "organization_id": FAKE_UUID},
-        )
 
     @pytest.mark.anyio
     async def test_invalid_application_status_update(

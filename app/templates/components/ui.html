@@ -2,32 +2,35 @@
 
 {% macro application_status_badge(status, size='md') %}
 {% set size_classes = {
-    'sm': 'px-3 py-1 text-sm',
-    'md': 'px-4 py-2 text-sm',
-    'lg': 'px-6 py-2 text-lg'
+'sm': 'px-3 py-1 text-sm',
+'md': 'px-4 py-2 text-sm',
+'lg': 'px-6 py-2 text-lg'
 } %}
 {% set status_classes = {
-    'pending': 'bg-yellow-100 text-yellow-800',
-    'accepted': 'bg-green-100 text-green-800',
-    'rejected': 'bg-red-100 text-red-800',
-    'withdrawn': 'bg-gray-100 text-gray-800'
+'pending': 'bg-yellow-100 text-yellow-800',
+'accepted': 'bg-green-100 text-green-800',
+'rejected': 'bg-red-100 text-red-800',
+'withdrawn': 'bg-gray-100 text-gray-800'
 } %}
-<span class="inline-block rounded-full font-bold {{ size_classes.get(size, size_classes['md']) }} {{ status_classes.get(status, 'bg-gray-100 text-gray-800') }}">
+<span
+    class="inline-block rounded-full font-bold {{ size_classes.get(size, size_classes['md']) }} {{ status_classes.get(status, 'bg-gray-100 text-gray-800') }}">
     {{ status|title }}
 </span>
 {% endmacro %}
 {% macro open_status_badge(is_open, size='sm') %}
 {% set size_classes = {
-    'xs': 'text-xs px-3 py-1',
-    'sm': 'text-sm px-3 py-1',
-    'md': 'text-sm px-4 py-2'
+'xs': 'text-xs px-3 py-1',
+'sm': 'text-sm px-3 py-1',
+'md': 'text-sm px-4 py-2'
 } %}
-<span class="{{ size_classes.get(size, size_classes['sm']) }} rounded-full font-semibold {% if is_open %}bg-green-100 text-green-800{% else %}bg-gray-100 text-gray-800{% endif %}">
+<span
+    class="{{ size_classes.get(size, size_classes['sm']) }} rounded-full font-semibold {% if is_open %}bg-green-100 text-green-800{% else %}bg-gray-100 text-gray-800{% endif %}">
     {% if is_open %}Open{% else %}Closed{% endif %}
 </span>
 {% endmacro %}
 {% macro member_role_badge(role) %}
-<span class="px-4 py-2 rounded-full text-sm font-semibold {% if role == 'admin' %}bg-purple-100 text-purple-800{% else %}bg-blue-100 text-blue-800{% endif %}">
+<span
+    class="px-4 py-2 rounded-full text-sm font-semibold {% if role == 'admin' %}bg-purple-100 text-purple-800{% else %}bg-blue-100 text-blue-800{% endif %}">
     {{ role }}
 </span>
 {% endmacro %}
@@ -43,7 +46,8 @@
 <div class="flex justify-between items-center mb-8">
     <h1 class="text-4xl font-bold text-gray-800">{{ title }}</h1>
     {% if action_url and action_text and show_action %}
-    <a href="{{ action_url }}" class="bg-{{ action_color }}-600 hover:bg-{{ action_color }}-700 text-white font-bold py-2 px-6 rounded-lg">
+    <a href="{{ action_url }}"
+        class="bg-{{ action_color }}-600 hover:bg-{{ action_color }}-700 text-white font-bold py-2 px-6 rounded-lg">
         {{ action_text }}
     </a>
     {% endif %}
@@ -53,66 +57,49 @@
 <div class="bg-white rounded-lg shadow-lg p-12 text-center">
     <p class="text-xl text-gray-600 mb-6">{{ message }}</p>
     {% if action_url and action_text and show_action %}
-    <a href="{{ action_url }}" class="bg-{{ action_color }}-600 hover:bg-{{ action_color }}-700 text-white font-bold py-3 px-8 rounded-lg inline-block">
+    <a href="{{ action_url }}"
+        class="bg-{{ action_color }}-600 hover:bg-{{ action_color }}-700 text-white font-bold py-3 px-8 rounded-lg inline-block">
         {{ action_text }}
     </a>
     {% endif %}
 </div>
 {% endmacro %}
 {% macro form_label(text, for_id=None, required=False) %}
-<label {% if for_id %}for="{{ for_id }}"{% endif %} class="block text-sm font-bold text-gray-700 mb-2">
+<label {% if for_id %}for="{{ for_id }}" {% endif %} class="block text-sm font-bold text-gray-700 mb-2">
     {{ text }}{% if required %} <span class="text-red-500">*</span>{% endif %}
 </label>
 {% endmacro %}
 {% macro form_input(name, type='text', placeholder='', required=False, value='', id=None) %}
-<input
-    type="{{ type }}"
-    id="{{ id or name }}"
-    name="{{ name }}"
-    value="{{ value }}"
-    {% if required %}required{% endif %}
+<input type="{{ type }}" id="{{ id or name }}" name="{{ name }}" value="{{ value }}" {% if required %}required{% endif
+    %}
     class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-    placeholder="{{ placeholder }}"
->
+    placeholder="{{ placeholder }}">
 {% endmacro %}
 {% macro form_textarea(name, rows=6, placeholder='', required=False, value='', id=None) %}
-<textarea
-    id="{{ id or name }}"
-    name="{{ name }}"
-    rows="{{ rows }}"
-    {% if required %}required{% endif %}
+<textarea id="{{ id or name }}" name="{{ name }}" rows="{{ rows }}" {% if required %}required{% endif %}
     class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-    placeholder="{{ placeholder }}"
->{{ value }}</textarea>
+    placeholder="{{ placeholder }}">{{ value }}</textarea>
 {% endmacro %}
 {% macro primary_button(text, type='submit', color='blue', full_width=True) %}
-<button
-    type="{{ type }}"
-    class="{% if full_width %}w-full{% endif %} bg-{{ color }}-600 hover:bg-{{ color }}-700 text-white font-bold py-3 px-6 rounded-lg"
->
+<button type="{{ type }}"
+    class="{% if full_width %}w-full{% endif %} bg-{{ color }}-600 hover:bg-{{ color }}-700 text-white font-bold py-3 px-6 rounded-lg">
     {{ text }}
 </button>
 {% endmacro %}
 {% macro cancel_button(url, text='Cancel', full_width=True) %}
-<a
-    href="{{ url }}"
-    class="{% if full_width %}flex-1{% endif %} bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-3 px-6 rounded-lg text-center inline-block"
->
+<a href="{{ url }}"
+    class="{% if full_width %}flex-1{% endif %} bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-3 px-6 rounded-lg text-center inline-block">
     {{ text }}
 </a>
 {% endmacro %}
 {% macro action_buttons(submit_text, cancel_url, submit_color='blue') %}
 <div class="flex gap-4">
-    <button
-        type="submit"
-        class="flex-1 bg-{{ submit_color }}-600 hover:bg-{{ submit_color }}-700 text-white font-bold py-3 px-6 rounded-lg"
-    >
+    <button type="submit"
+        class="flex-1 bg-{{ submit_color }}-600 hover:bg-{{ submit_color }}-700 text-white font-bold py-3 px-6 rounded-lg">
         {{ submit_text }}
     </button>
-    <a
-        href="{{ cancel_url }}"
-        class="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-3 px-6 rounded-lg text-center"
-    >
+    <a href="{{ cancel_url }}"
+        class="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-3 px-6 rounded-lg text-center">
         Cancel
     </a>
 </div>
@@ -139,4 +126,84 @@
 {% endmacro %}
 {% macro datetime_display(date, prefix='') %}
 <span class="text-sm text-gray-500">{{ prefix }}{{ date.strftime('%B %d, %Y at %I:%M %p') }}</span>
+{% endmacro %}
+{% macro user_avatar(user, size='md') %}
+{% set size_classes = {
+'sm': 'h-8 w-8 text-sm',
+'md': 'h-10 w-10 text-base',
+'lg': 'h-16 w-16 text-2xl'
+} %}
+{% set initials = ((user.first_name[0] + user.last_name[0]) if (user and user.first_name and user.last_name) else
+(user.username[:2] if user else '?')).upper() %}
+<div
+    class="{{ size_classes.get(size, size_classes['md']) }} rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold shadow-md">
+    {{ initials }}
+</div>
+{% endmacro %}
+{% macro user_dropdown(user) %}
+<div class="relative group">
+    <button type="button"
+        class="flex items-center space-x-3 hover:bg-blue-700 px-3 py-2 rounded-lg transition-colors duration-200"
+        aria-expanded="false" aria-haspopup="true">
+        {{ user_avatar(user, 'sm') }}
+        <div class="hidden md:block text-left">
+            <div class="text-sm font-semibold">{{ user.first_name }}</div>
+            <div class="text-xs text-blue-200">{{ user.role|title }}</div>
+        </div>
+        <svg class="h-4 w-4 text-blue-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+        </svg>
+    </button>
+
+    <!-- Dropdown Menu -->
+    <div
+        class="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 border border-gray-100">
+        <div class="px-4 py-3 border-b border-gray-100">
+            <p class="text-sm font-semibold text-gray-900">{{ user.first_name }} {{ user.last_name }}</p>
+            <p class="text-xs text-gray-500 truncate">{{ user.email }}</p>
+            <span class="inline-block mt-2 px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                {{ user.role|title }}
+            </span>
+        </div>
+        <div class="py-2">
+            <a href="/{{ user.username }}"
+                class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors">
+                <svg class="inline h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+                View Profile
+            </a>
+            <a href="/auth/status" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors">
+                <svg class="inline h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+                Dashboard
+            </a>
+            {% if user.role == 'volunteer' %}
+            <a href="/opp/applications/list"
+                class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors">
+                <svg class="inline h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                My Applications
+            </a>
+            {% endif %}
+        </div>
+        <div class="border-t border-gray-100 py-2">
+            <form action="/auth/logout" method="POST">
+                <button type="submit"
+                    class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors">
+                    <svg class="inline h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                    </svg>
+                    Logout
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
 {% endmacro %}

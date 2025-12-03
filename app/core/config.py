@@ -49,6 +49,9 @@ class Settings(BaseSettings):
     # Logging
     log_level: str = Field(default="normal", alias="LOG_LEVEL")
 
+    # Demo Data
+    demo_data: bool = Field(default=False, alias="DEMO_DATA")
+
     @property
     def database_url(self) -> str:
         """Generate database URL (psycopg driver works for both sync and async)."""

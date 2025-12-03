@@ -1,8 +1,8 @@
 """Initial Migration.
 
-Revision ID: d619ebcda729
+Revision ID: 273c6e381564
 Revises:
-Create Date: 2025-12-02 19:08:54.214583+00:00
+Create Date: 2025-12-03 05:41:33.256788+00:00
 """
 
 from collections.abc import Sequence
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 from alembic import op
 
 # Revision identifiers, used by Alembic.
-revision: str = "d619ebcda729"
+revision: str = "273c6e381564"
 down_revision: str | None = None
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
@@ -36,12 +36,17 @@ def upgrade() -> None:
         sa.Column("password_hash", sa.String(length=255), nullable=False),
         sa.Column("role", sa.String(length=50), nullable=False),
         sa.Column("ip_address", sa.String(length=45), nullable=True),
+        sa.Column("first_name", sa.String(length=100), nullable=False),
+        sa.Column("last_name", sa.String(length=100), nullable=False),
+        sa.Column("username", sa.String(length=50), nullable=False),
+        sa.Column("profile_picture", sa.String(length=255), nullable=True),
         sa.Column("id", sa.UUID(), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index(op.f("ix_users_email"), "users", ["email"], unique=True)
+    op.create_index(op.f("ix_users_username"), "users", ["username"], unique=True)
     op.create_table(
         "opportunities",
         sa.Column("title", sa.String(length=255), nullable=False),
@@ -123,6 +128,7 @@ def downgrade() -> None:
     op.drop_index(op.f("ix_opportunities_posted_by"), table_name="opportunities")
     op.drop_index(op.f("ix_opportunities_organization_id"), table_name="opportunities")
     op.drop_table("opportunities")
+    op.drop_index(op.f("ix_users_username"), table_name="users")
     op.drop_index(op.f("ix_users_email"), table_name="users")
     op.drop_table("users")
     op.drop_index(op.f("ix_organizations_name"), table_name="organizations")

@@ -5,7 +5,8 @@
 
 {% block content %}
 <div class="max-w-6xl mx-auto">
-    {{ page_header('Organizations', '/org/new', 'Create Organization', 'blue', user.role == 'organization') }}
+    {{ page_header('Organizations', '/org/new', 'Create Organization', 'blue', user.role == 'organization' and
+    organizations|length > 0) }}
 
     {% if organizations %}
     <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -24,7 +25,8 @@
         {% endfor %}
     </div>
     {% else %}
-    {{ empty_state('No organizations found', '/org/new', 'Create the First Organization', 'blue', user.role == 'organization') }}
+    {{ empty_state('No organizations found', '/org/new', 'Create the First Organization', 'blue', user.role ==
+    'organization') }}
     {% endif %}
 </div>
 {% endblock %}
