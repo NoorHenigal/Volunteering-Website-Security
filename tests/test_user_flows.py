@@ -51,9 +51,12 @@ class TestVolunteerJourney:
         assert len(apps["items"]) == 1
         assert UUID(apps["items"][0]["opportunity_id"]) == test_opp.opportunity.id
 
-        # Withdraw application
-        withdrawn = await flows.withdraw(app["id"], volunteer)
-        assert withdrawn["status"] == "withdrawn"
+        # Withdraw application (deletes it)
+        await flows.withdraw(app["id"], volunteer)
+
+        # Verify application is gone
+        apps_after = await api.ok("GET", "/api/applications", auth=volunteer)
+        assert len(apps_after["items"]) == 0
 
 
 class TestOrganizationJourney:
@@ -189,7 +192,7 @@ class TestAuthorizationBoundaries:
         app_data = await flows.apply(test_opp, vol1)
 
         vol2 = await ctx.volunteer(key="vol2")
-        await api.forbidden("PUT", f"/api/applications/{app_data['id']}/withdraw", auth=vol2)
+        await api.forbidden("DELETE", f"/api/applications/{app_data['id']}/withdraw", auth=vol2)
 
 
 class TestOrganizationMembership:

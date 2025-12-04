@@ -54,14 +54,17 @@ class TestApplicationAPI:
     async def test_volunteer_can_withdraw_application(
         self, api: APIHelper, ctx: FixtureContext, flows: FlowHelper
     ) -> None:
-        """Test: Volunteer can withdraw their application."""
+        """Test: Volunteer can withdraw their application (deletes it)."""
         volunteer = await ctx.volunteer()
         test_opp = await ctx.opportunity()
 
         app_data = await flows.apply(test_opp, volunteer)
 
-        data = await api.ok("PUT", f"/api/applications/{app_data['id']}/withdraw", auth=volunteer)
-        assert data["status"] == "withdrawn"
+        # Withdraw should delete the application
+        await api.no_content("DELETE", f"/api/applications/{app_data['id']}/withdraw", auth=volunteer)
+
+        # Verify application is gone
+        await api.list_contains("/api/applications", auth=volunteer, expected_count=0)
 
     @pytest.mark.anyio
     async def test_org_admin_can_update_application_status(

@@ -97,10 +97,10 @@ class FlowHelper:
         self,
         app_id: str | UUID,
         volunteer: AuthenticatedUser,
-    ) -> dict[str, Any]:
-        """Withdraw an application."""
-        return await self.api.ok(
-            "PUT",
+    ) -> None:
+        """Withdraw an application (deletes it)."""
+        await self.api.no_content(
+            "DELETE",
             f"/api/applications/{app_id}/withdraw",
             auth=volunteer,
         )
@@ -157,7 +157,8 @@ class FlowHelper:
         if final_status == "rejected":
             return await self.reject(app["id"], opp.organization.admin)
         if final_status == "withdrawn":
-            return await self.withdraw(app["id"], volunteer)
+            await self.withdraw(app["id"], volunteer)
+            return app
         return app
 
     async def login_via_ui(
