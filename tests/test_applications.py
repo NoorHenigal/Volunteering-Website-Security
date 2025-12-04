@@ -33,7 +33,7 @@ class TestApplicationAPI:
 
         await flows.apply(test_opp, volunteer)
 
-        await api.bad_request(
+        await api.conflict(
             "POST",
             f"/api/opportunities/{test_opp.opportunity.id}/apply",
             auth=volunteer,

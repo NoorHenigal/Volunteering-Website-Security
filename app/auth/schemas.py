@@ -4,7 +4,7 @@ from typing import Literal
 
 from pydantic import EmailStr, Field
 
-from app.core.base_schemas import BaseCreate, BaseOut, StrictModel
+from app.core.base_schemas import BaseCreate, BaseOut, StrictModel, UserFieldsMixin
 from app.db.models import RoleType
 
 __all__ = ["LoginSchema", "RegisterSchema", "TokenResponse", "UserResponse"]
@@ -35,12 +35,10 @@ class TokenResponse(StrictModel):
     token_type: Literal["bearer"] = "bearer"  # noqa: S105
 
 
-class UserResponse(BaseOut):
+class UserResponse(UserFieldsMixin, BaseOut):
     """User information response."""
 
     email: EmailStr
     role: RoleType
-    first_name: str
-    last_name: str
-    username: str
-    profile_picture: str | None
+    bio: str | None = None
+    description: str | None = None

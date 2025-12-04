@@ -6,8 +6,15 @@ from uuid import UUID
 from fastapi import APIRouter, Form, HTTPException, Response, status
 from fastapi.responses import RedirectResponse
 
-from app.core.base_schemas import ListResponse
-from app.core.context import ContextDep, handle_form_error, render_template, require_role, ui_auth_required
+from app.core.base_schemas import ListResponse, error_responses, list_response
+from app.core.context import (
+    ContextDep,
+    handle_form_error,
+    render_template,
+    require_organization_role,
+    ui_auth_required,
+)
+from app.core.dependencies import OrganizationServiceDep
 from app.db.models import User
 from app.organizations.schemas import (
     OrganizationCreate,
@@ -15,44 +22,55 @@ from app.organizations.schemas import (
     OrganizationResponse,
     OrganizationUpdate,
 )
-from app.organizations.service import OrganizationService
 
 # API routes (JSON)
 api_router = APIRouter(prefix="/api/organizations", tags=["Organizations"])
 
-# UI routes (HTML forms)
-ui_router = APIRouter(prefix="/org", tags=["Organizations UI"])
+# UI routes (HTML forms) - excluded from OpenAPI schema
+ui_router = APIRouter(prefix="/org", tags=["Organizations UI"], include_in_schema=False)
 
 
-@api_router.get("", response_model=ListResponse[OrganizationResponse])
-async def list_organizations(ctx: ContextDep) -> ListResponse[OrganizationResponse]:
+@api_router.get("", response_model=ListResponse[OrganizationResponse], responses=error_responses(auth=True))
+async def list_organizations(ctx: ContextDep, org_svc: OrganizationServiceDep) -> ListResponse[OrganizationResponse]:
     """List all organizations."""
     ctx.require_authenticated()
-    org_svc = OrganizationService(ctx.db)
     organizations = await org_svc.list_all()
-    return ListResponse[OrganizationResponse](
-        items=[OrganizationResponse.model_validate(org) for org in organizations],
-    )
+    return list_response(organizations, OrganizationResponse)
 
 
-@api_router.post("", response_model=OrganizationResponse, status_code=status.HTTP_201_CREATED)
-async def create_organization(data: OrganizationCreate, ctx: ContextDep) -> OrganizationResponse:
+@api_router.post(
+    "",
+    response_model=OrganizationResponse,
+    status_code=status.HTTP_201_CREATED,
+    responses=error_responses(auth=True, forbidden=True),
+)
+async def create_organization(
+    data: OrganizationCreate,
+    ctx: ContextDep,
+    org_svc: OrganizationServiceDep,
+) -> OrganizationResponse:
     """Create a new organization (organization role only).
 
     The creator is automatically assigned as organization admin.
     """
     user = ctx.require_authenticated()
-    require_role(user, "organization", "create organizations")
-    org_svc = OrganizationService(ctx.db)
+    require_organization_role(user)
     organization = await org_svc.create(name=data.name, description=data.description, admin_user_id=user.id)
     return OrganizationResponse.model_validate(organization)
 
 
-@api_router.get("/{organization_id}", response_model=OrganizationDetailResponse)
-async def get_organization(organization_id: UUID, ctx: ContextDep) -> OrganizationDetailResponse:
+@api_router.get(
+    "/{organization_id}",
+    response_model=OrganizationDetailResponse,
+    responses=error_responses(auth=True, not_found=True),
+)
+async def get_organization(
+    organization_id: UUID,
+    ctx: ContextDep,
+    org_svc: OrganizationServiceDep,
+) -> OrganizationDetailResponse:
     """Get a single organization by ID with member details."""
     ctx.require_authenticated()
-    org_svc = OrganizationService(ctx.db)
 
     organization = await org_svc.get_by_id(organization_id)
     members = await org_svc.get_members(organization_id)
@@ -67,15 +85,18 @@ async def get_organization(organization_id: UUID, ctx: ContextDep) -> Organizati
     )
 
 
-@api_router.put("/{organization_id}", response_model=OrganizationResponse)
+@api_router.put(
+    "/{organization_id}",
+    response_model=OrganizationResponse,
+    responses=error_responses(auth=True, forbidden=True, not_found=True),
+)
 async def update_organization(
     organization_id: UUID,
     data: OrganizationUpdate,
     ctx: ContextDep,
+    org_svc: OrganizationServiceDep,
 ) -> OrganizationResponse:
     """Update an organization (organization admins only)."""
-    org_svc = OrganizationService(ctx.db)
-
     organization = await org_svc.get_by_id(organization_id)
     await org_svc.require_admin(ctx.require_authenticated().id, organization_id)
 
@@ -85,9 +106,8 @@ async def update_organization(
 
 @ui_router.get("/list")
 @ui_auth_required
-async def list_organizations_ui(ctx: ContextDep, user: User) -> Response:
+async def list_organizations_ui(ctx: ContextDep, user: User, org_svc: OrganizationServiceDep) -> Response:
     """Shows the organizations list page."""
-    org_svc = OrganizationService(ctx.db)
     organizations = await org_svc.list_all()
     return render_template(
         ctx.request,
@@ -101,7 +121,7 @@ async def list_organizations_ui(ctx: ContextDep, user: User) -> Response:
 @ui_auth_required
 async def new_organization_form(ctx: ContextDep, user: User) -> Response:
     """Shows the create organization form (organization role only)."""
-    require_role(user, "organization", "create organizations")
+    require_organization_role(user)
     return render_template(
         ctx.request,
         "org_form.html",
@@ -114,13 +134,13 @@ async def new_organization_form(ctx: ContextDep, user: User) -> Response:
 async def create_organization_form(
     ctx: ContextDep,
     user: User,
+    org_svc: OrganizationServiceDep,
     name: Annotated[str, Form(...)],
     description: Annotated[str, Form()] = "",
 ) -> Response:
     """Creates a new organization from form submission (organization role only)."""
-    require_role(user, "organization", "create organizations")
+    require_organization_role(user)
     try:
-        org_svc = OrganizationService(ctx.db)
         organization = await org_svc.create(
             name=name,
             description=description if description else None,
@@ -133,10 +153,10 @@ async def create_organization_form(
 
 @ui_router.get("/{organization_id}")
 @ui_auth_required
-async def view_organization(ctx: ContextDep, user: User, organization_id: UUID) -> Response:
+async def view_organization(
+    ctx: ContextDep, user: User, org_svc: OrganizationServiceDep, organization_id: UUID
+) -> Response:
     """Shows a single organization detail page."""
-    org_svc = OrganizationService(ctx.db)
-
     organization = await org_svc.get_by_id_with_opportunities(organization_id)
     members = await org_svc.get_members(organization_id)
     is_admin = await org_svc.is_admin(user.id, organization_id)
@@ -153,10 +173,10 @@ async def view_organization(ctx: ContextDep, user: User, organization_id: UUID) 
 
 @ui_router.get("/{organization_id}/edit")
 @ui_auth_required
-async def edit_organization_form(ctx: ContextDep, user: User, organization_id: UUID) -> Response:
+async def edit_organization_form(
+    ctx: ContextDep, user: User, org_svc: OrganizationServiceDep, organization_id: UUID
+) -> Response:
     """Shows the edit organization form (admins only)."""
-    org_svc = OrganizationService(ctx.db)
-
     organization = await org_svc.get_by_id(organization_id)
     await org_svc.require_admin(user.id, organization_id)
 
@@ -173,13 +193,12 @@ async def edit_organization_form(ctx: ContextDep, user: User, organization_id: U
 async def update_organization_form(
     ctx: ContextDep,
     user: User,
+    org_svc: OrganizationServiceDep,
     organization_id: UUID,
     name: Annotated[str, Form(...)],
     description: Annotated[str, Form()] = "",
 ) -> Response:
     """Updates an organization from form submission."""
-    org_svc = OrganizationService(ctx.db)
-
     organization = await org_svc.get_by_id(organization_id)
     await org_svc.require_admin(user.id, organization_id)
 

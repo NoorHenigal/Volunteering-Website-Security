@@ -145,6 +145,106 @@
 </div>
 {% endif %}
 {% endmacro %}
+{% macro follow_button(username, is_following, size='md') %}
+{% set size_classes = {
+'sm': 'px-3 py-1 text-sm',
+'md': 'px-4 py-2 text-sm',
+'lg': 'px-6 py-3 text-base'
+} %}
+{% if is_following %}
+<form action="/{{ username }}/unfollow" method="POST" class="inline">
+    <button type="submit"
+        class="{{ size_classes.get(size, size_classes['md']) }} rounded-lg font-semibold bg-gray-200 hover:bg-gray-300 text-gray-800 transition-colors">
+        Unfollow
+    </button>
+</form>
+{% else %}
+<form action="/{{ username }}/follow" method="POST" class="inline">
+    <button type="submit"
+        class="{{ size_classes.get(size, size_classes['md']) }} rounded-lg font-semibold bg-blue-600 hover:bg-blue-700 text-white transition-colors">
+        Follow
+    </button>
+</form>
+{% endif %}
+{% endmacro %}
+
+{% macro follower_stats(follower_count, following_count, username, show_links=True) %}
+<div class="flex gap-6 text-sm">
+    {% if show_links %}
+    <a href="/{{ username }}/followers" class="hover:text-blue-600 transition-colors">
+        <span class="font-bold text-gray-900">{{ follower_count }}</span>
+        <span class="text-gray-500">Followers</span>
+    </a>
+    <a href="/{{ username }}/following" class="hover:text-blue-600 transition-colors">
+        <span class="font-bold text-gray-900">{{ following_count }}</span>
+        <span class="text-gray-500">Following</span>
+    </a>
+    {% else %}
+    <span>
+        <span class="font-bold text-gray-900">{{ follower_count }}</span>
+        <span class="text-gray-500">Followers</span>
+    </span>
+    <span>
+        <span class="font-bold text-gray-900">{{ following_count }}</span>
+        <span class="text-gray-500">Following</span>
+    </span>
+    {% endif %}
+</div>
+{% endmacro %}
+
+{% macro bio_section(bio, description, can_edit=False) %}
+{% if bio or description or can_edit %}
+<div class="mt-4">
+    {% if bio %}
+    <p class="text-gray-700">{{ bio }}</p>
+    {% endif %}
+    {% if description %}
+    <div x-data="{ expanded: false }" class="mt-2">
+        <p class="text-gray-600 text-sm" x-show="!expanded">
+            {{ description[:150] }}{% if description|length > 150 %}...{% endif %}
+        </p>
+        <p class="text-gray-600 text-sm" x-show="expanded" style="display: none;">
+            {{ description }}
+        </p>
+        {% if description|length > 150 %}
+        <button @click="expanded = !expanded" class="text-blue-600 hover:text-blue-800 text-sm font-medium mt-1">
+            <span x-show="!expanded">Show more</span>
+            <span x-show="expanded" style="display: none;">Show less</span>
+        </button>
+        {% endif %}
+    </div>
+    {% endif %}
+    {% if can_edit and not bio and not description %}
+    <p class="text-gray-400 italic text-sm">No bio yet. <a href="/settings/profile" class="text-blue-600 hover:underline">Add one</a></p>
+    {% endif %}
+</div>
+{% endif %}
+{% endmacro %}
+
+{% macro privacy_badge(visibility_level, size='sm') %}
+{% set size_classes = {
+'xs': 'text-xs px-2 py-0.5',
+'sm': 'text-xs px-2 py-1',
+'md': 'text-sm px-3 py-1'
+} %}
+{% set visibility_classes = {
+'public': 'bg-green-100 text-green-800',
+'authenticated': 'bg-blue-100 text-blue-800',
+'followers': 'bg-purple-100 text-purple-800',
+'private': 'bg-gray-100 text-gray-800'
+} %}
+{% set visibility_icons = {
+'public': '🌐',
+'authenticated': '👤',
+'followers': '👥',
+'private': '🔒'
+} %}
+<span class="{{ size_classes.get(size, size_classes['sm']) }} {{ visibility_classes.get(visibility_level, 'bg-gray-100 text-gray-800') }} rounded-full font-medium inline-flex items-center gap-1">
+    <span>{{ visibility_icons.get(visibility_level, '🔒') }}</span>
+    <span>{{ visibility_level|title }}</span>
+</span>
+{% endmacro %}
+
 {% macro user_dropdown(user) %}
 <div class="relative" x-data="{ open: false }" @click.outside="open = false">
     <button type="button"
@@ -196,6 +296,14 @@
                         d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
                 Edit Profile
+            </a>
+            <a href="/settings/privacy"
+                class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors">
+                <svg class="inline h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+                Privacy Settings
             </a>
             <a href="/auth/status" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors">
                 <svg class="inline h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">

@@ -1,8 +1,8 @@
 """Initial Migration.
 
-Revision ID: 273c6e381564
+Revision ID: cf647a481fe4
 Revises:
-Create Date: 2025-12-03 05:41:33.256788+00:00
+Create Date: 2025-12-04 20:32:28.615818+00:00
 """
 
 from collections.abc import Sequence
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 from alembic import op
 
 # Revision identifiers, used by Alembic.
-revision: str = "273c6e381564"
+revision: str = "cf647a481fe4"
 down_revision: str | None = None
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
@@ -40,6 +40,13 @@ def upgrade() -> None:
         sa.Column("last_name", sa.String(length=100), nullable=False),
         sa.Column("username", sa.String(length=50), nullable=False),
         sa.Column("profile_picture", sa.String(length=255), nullable=True),
+        sa.Column("bio", sa.String(length=200), nullable=True),
+        sa.Column("description", sa.Text(), nullable=True),
+        sa.Column("profile_visibility", sa.String(length=50), server_default="public", nullable=False),
+        sa.Column("show_email", sa.Boolean(), server_default="0", nullable=False),
+        sa.Column("show_applications", sa.Boolean(), server_default="1", nullable=False),
+        sa.Column("show_organizations", sa.Boolean(), server_default="1", nullable=False),
+        sa.Column("searchable", sa.Boolean(), server_default="1", nullable=False),
         sa.Column("id", sa.UUID(), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
@@ -47,6 +54,17 @@ def upgrade() -> None:
     )
     op.create_index(op.f("ix_users_email"), "users", ["email"], unique=True)
     op.create_index(op.f("ix_users_username"), "users", ["username"], unique=True)
+    op.create_table(
+        "follows",
+        sa.Column("follower_id", sa.UUID(), nullable=False),
+        sa.Column("followed_id", sa.UUID(), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.CheckConstraint("follower_id != followed_id", name="ck_no_self_follow"),
+        sa.ForeignKeyConstraint(["followed_id"], ["users.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(["follower_id"], ["users.id"], ondelete="CASCADE"),
+        sa.PrimaryKeyConstraint("follower_id", "followed_id"),
+    )
+    op.create_index("ix_follows_followed_id", "follows", ["followed_id"], unique=False)
     op.create_table(
         "opportunities",
         sa.Column("title", sa.String(length=255), nullable=False),
@@ -128,6 +146,8 @@ def downgrade() -> None:
     op.drop_index(op.f("ix_opportunities_posted_by"), table_name="opportunities")
     op.drop_index(op.f("ix_opportunities_organization_id"), table_name="opportunities")
     op.drop_table("opportunities")
+    op.drop_index("ix_follows_followed_id", table_name="follows")
+    op.drop_table("follows")
     op.drop_index(op.f("ix_users_username"), table_name="users")
     op.drop_index(op.f("ix_users_email"), table_name="users")
     op.drop_table("users")

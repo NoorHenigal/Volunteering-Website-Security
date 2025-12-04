@@ -6,15 +6,16 @@ from fastapi import APIRouter, Depends, Response
 from pydantic import ValidationError
 
 from app.auth import service
-from app.auth.schemas import LoginSchema, RegisterSchema, UserResponse
-from app.core.context import RequestContext, get_context
+from app.auth.schemas import LoginSchema, RegisterSchema, TokenResponse, UserResponse
+from app.core.base_schemas import ErrorResponse, request_body_from_model
+from app.core.context import RequestContext, get_context, validation_error_response
 from app.core.security import clear_auth_cookies, set_auth_cookies
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 api_router = APIRouter(prefix="/api/auth", tags=["Authentication API"])
 
 
-@router.post("/register")
+@router.post("/register", response_model=None, include_in_schema=False)
 async def register(
     ctx: Annotated[RequestContext, Depends(get_context)],
 ) -> Response:
@@ -34,7 +35,7 @@ async def register(
         if not reg_data:
             return ctx.error_response("Invalid content type", status_code=400)
     except ValidationError as e:
-        return ctx.error_response(str(e), status_code=422)
+        return validation_error_response(e)
 
     try:
         user = await service.register_user(reg_data, ctx.db)
@@ -59,7 +60,7 @@ async def register(
         raise
 
 
-@router.post("/login")
+@router.post("/login", response_model=None, include_in_schema=False)
 async def login(
     ctx: Annotated[RequestContext, Depends(get_context)],
 ) -> Response:
@@ -72,7 +73,7 @@ async def login(
         if not login_data:
             return ctx.error_response("Invalid content type", status_code=400)
     except ValidationError as e:
-        return ctx.error_response(str(e), status_code=422)
+        return validation_error_response(e)
 
     try:
         tokens = await service.login_user(
@@ -95,19 +96,19 @@ async def login(
         raise
 
 
-@router.get("/login")
+@router.get("/login", include_in_schema=False)
 async def login_page(ctx: Annotated[RequestContext, Depends(get_context)]) -> Response:
     """Show login page (UI only)."""
     return ctx.success_response(template="login.html")
 
 
-@router.get("/register")
+@router.get("/register", include_in_schema=False)
 async def register_page(ctx: Annotated[RequestContext, Depends(get_context)]) -> Response:
     """Show registration page (UI only)."""
     return ctx.success_response(template="register.html")
 
 
-@router.post("/logout")
+@router.post("/logout", response_model=None, include_in_schema=False)
 async def logout(ctx: Annotated[RequestContext, Depends(get_context)]) -> Response:
     """Logout user."""
     refresh_token = ctx.request.cookies.get("refresh_token")
@@ -119,21 +120,30 @@ async def logout(ctx: Annotated[RequestContext, Depends(get_context)]) -> Respon
     return response
 
 
-@router.get("/me")
+@router.get("/me", response_model=None, include_in_schema=False)
 async def get_current_user(ctx: Annotated[RequestContext, Depends(get_context)]) -> Response:
     """Get current user details."""
     user = ctx.require_authenticated()
     return ctx.success_response(data=UserResponse.model_validate(user))
 
 
-@router.get("/status")
+@router.get("/status", include_in_schema=False)
 async def status_page(ctx: Annotated[RequestContext, Depends(get_context)]) -> Response:
     """Show status page (UI only)."""
     return ctx.success_response(template="status.html")
 
 
 # API routes - expose same handlers under /api/auth prefix for JSON API clients
-api_router.post("/register")(register)
-api_router.post("/login")(login)
-api_router.post("/logout")(logout)
-api_router.get("/me")(get_current_user)
+# Note: openapi_extra adds requestBody to schema since ctx.parse_body() doesn't auto-document
+api_router.post(
+    "/register",
+    responses={201: {"model": UserResponse}, 400: {"model": ErrorResponse}, 409: {"model": ErrorResponse}},
+    openapi_extra=request_body_from_model(RegisterSchema),
+)(register)
+api_router.post(
+    "/login",
+    responses={200: {"model": TokenResponse}, 400: {"model": ErrorResponse}, 401: {"model": ErrorResponse}},
+    openapi_extra=request_body_from_model(LoginSchema),
+)(login)
+api_router.post("/logout", responses={200: {"description": "Logout successful"}, 400: {"model": ErrorResponse}})(logout)
+api_router.get("/me", responses={200: {"model": UserResponse}, 401: {"model": ErrorResponse}})(get_current_user)
