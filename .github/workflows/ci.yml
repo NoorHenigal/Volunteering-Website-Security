@@ -75,5 +75,35 @@ jobs:
       - name: Run database migrations
         run: uv run alembic upgrade head
 
-      - name: Run smoke test (server startup)
-        run: TEST_RUN_DURATION=5 uv run python run.py
+      - name: Start Application Server
+        run: |
+          uv run python run.py &
+          SERVER_PID=$!
+          echo "SERVER_PID=$SERVER_PID" >> $GITHUB_ENV
+
+      - name: Wait for server to be ready
+        run: |
+          max_attempts=30
+          attempt=0
+          while [ $attempt -lt $max_attempts ]; do
+            if curl -s http://localhost:8000/openapi.json > /dev/null; then
+              echo "Server is ready!"
+              exit 0
+            fi
+            attempt=$((attempt + 1))
+            echo "Waiting for server... (attempt $attempt/$max_attempts)"
+            sleep 1
+          done
+          echo "Server failed to start within timeout"
+          exit 1
+
+      - name: Run Schemathesis tests
+        run: uv run schemathesis run http://localhost:8000/openapi.json
+
+      - name: Cleanup - Stop API server
+        if: always()
+        run: |
+          if [ ! -z "$SERVER_PID" ]; then
+            kill $SERVER_PID || true
+            wait $SERVER_PID 2>/dev/null || true
+          fi

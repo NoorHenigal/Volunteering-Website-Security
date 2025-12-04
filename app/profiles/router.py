@@ -211,10 +211,14 @@ async def follow_user(ctx: ContextDep, user: User, service: ProfileServiceDep, u
     responses={**error_responses(auth=True, not_found=True), 204: {"description": "Successfully unfollowed"}},
 )
 @ui_auth_required
-async def unfollow_user_api(user: User, service: ProfileServiceDep, username: UsernamePath) -> Response:
+async def unfollow_user_api(
+    ctx: ContextDep, user: User, service: ProfileServiceDep, username: UsernamePath
+) -> Response:
     """Unfollow a user (API)."""
     await service.unfollow_user(user, username)
-
+    # Return appropriate response based on request type (API vs UI)
+    if ctx.is_ui:
+        return ctx.success_response(redirect_url=f"/{username}")
     return Response(status_code=204)
 
 
