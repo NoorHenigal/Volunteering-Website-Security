@@ -1,11 +1,11 @@
 {% extends "base.html" %}
-{% from "components/ui.html" import back_link %}
+{% from "components/ui.html" import back_link, action_buttons %}
 {% block title %}Privacy Settings{% endblock %}
 {% block content %}
 <div class="max-w-2xl mx-auto py-8 px-4">
   {{ back_link('/' + user.username, 'Back to profile') }}
 
-  <div class="mt-6 bg-white shadow rounded-lg overflow-hidden">
+  <div class="mt-6 bg-white shadow-lg rounded-lg overflow-hidden">
     <div class="p-6 border-b border-gray-200">
       <h1 class="text-2xl font-bold text-gray-900">Privacy Settings</h1>
       <p class="text-gray-600 mt-1">Control who can see your profile and information</p>
@@ -118,14 +118,7 @@
 
       <!-- Submit Button -->
       <div class="border-t border-gray-200 pt-6">
-        <div class="flex gap-3">
-          <button type="submit" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors">
-            Save Settings
-          </button>
-          <a href="/{{ user.username }}" class="px-6 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium rounded-lg transition-colors">
-            Cancel
-          </a>
-        </div>
+        {{ action_buttons('Save Settings', '/' + user.username, 'blue') }}
       </div>
     </form>
   </div>

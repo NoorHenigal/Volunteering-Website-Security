@@ -146,20 +146,19 @@ async def update_application_status(
     return ApplicationResponse.model_validate(application)
 
 
-@app_api_router.put(
+@app_api_router.delete(
     "/{application_id}/withdraw",
-    response_model=ApplicationResponse,
+    status_code=status.HTTP_204_NO_CONTENT,
     responses=error_responses(auth=True, forbidden=True, not_found=True),
 )
 async def withdraw_application(
     application_id: UUID,
     ctx: ContextDep,
     app_svc: ApplicationServiceDep,
-) -> ApplicationResponse:
+) -> None:
     """Withdraw an application (volunteers only)."""
     user = ctx.require_authenticated()
-    application = await app_svc.withdraw(application_id, user)
-    return ApplicationResponse.model_validate(application)
+    await app_svc.withdraw(application_id, user)
 
 
 @ui_router.get("/list")
@@ -312,6 +311,20 @@ async def list_applications_ui(ctx: ContextDep, user: User, app_svc: Application
         user=user,
         applications=applications,
     )
+
+
+@ui_router.post("/applications/{application_id}/withdraw")
+@ui_auth_required
+async def withdraw_application_ui(
+    ctx: ContextDep,
+    user: User,
+    app_svc: ApplicationServiceDep,
+    application_id: UUID,
+) -> Response:
+    """Withdraw an application (UI form submission)."""
+    require_volunteer_role(user)
+    await app_svc.withdraw(application_id, user)
+    return ctx.success_response(redirect_url="/opp/applications/list")
 
 
 @ui_router.get("/{opportunity_id}/applicants")

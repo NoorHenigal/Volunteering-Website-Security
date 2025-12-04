@@ -1,8 +1,8 @@
 """Initial Migration.
 
-Revision ID: cf647a481fe4
+Revision ID: 54f4b2b9ef8c
 Revises:
-Create Date: 2025-12-04 20:32:28.615818+00:00
+Create Date: 2025-12-04 22:30:33.965833+00:00
 """
 
 from collections.abc import Sequence
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 from alembic import op
 
 # Revision identifiers, used by Alembic.
-revision: str = "cf647a481fe4"
+revision: str = "54f4b2b9ef8c"
 down_revision: str | None = None
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None

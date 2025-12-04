@@ -1,106 +1,95 @@
 {% extends "base.html" %}
-{% from "components/ui.html" import back_link, open_status_badge, application_status_badge, location_display, info_box %}
+{% from "components/ui.html" import back_link, open_status_badge, application_status_badge, location_display, info_box, withdraw_button, section_title, page_card, date_display %}
 
 {% block title %}{{ opportunity.title }}{% endblock %}
 
 {% block content %}
-<div class="max-w-4xl mx-auto">
-    <div class="bg-white rounded-lg shadow-lg p-8">
-        <div class="mb-6">
-            {{ back_link('/opp/list', 'Back to Opportunities') }}
-        </div>
+{% call page_card('4xl') %}
+    <div class="mb-6">
+        {{ back_link('/opp/list', 'Back to Opportunities') }}
+    </div>
 
-        <div class="mb-6">
-            <h1 class="text-4xl font-bold text-gray-800 mb-4">{{ opportunity.title }}</h1>
-            <div class="flex items-center gap-4">
-                {{ open_status_badge(opportunity.is_open, 'md') }}
-                {{ location_display(opportunity.location) }}
-            </div>
+    <div class="mb-6">
+        <h1 class="text-4xl font-bold text-gray-800 mb-4">{{ opportunity.title }}</h1>
+        <div class="flex items-center gap-4">
+            {{ open_status_badge(opportunity.is_open, 'md') }}
+            {{ location_display(opportunity.location) }}
         </div>
+    </div>
 
-        <div class="mb-8">
-            <h2 class="text-xl font-bold text-gray-800 mb-3">Description</h2>
-            <p class="text-gray-700 leading-relaxed whitespace-pre-wrap">{{ opportunity.description }}</p>
+    <div class="mb-8">
+        <h2 class="text-xl font-bold text-gray-800 mb-3">Description</h2>
+        <p class="text-gray-700 leading-relaxed whitespace-pre-wrap">{{ opportunity.description }}</p>
+    </div>
+
+    {{ section_title('Details', True) }}
+    <div class="grid md:grid-cols-2 gap-4">
+        <div>
+            <p class="text-gray-600">
+                <span class="font-semibold">Posted:</span> {{ date_display(opportunity.created_at) }}
+            </p>
         </div>
-
-        <div class="border-t pt-6">
-            <h2 class="text-xl font-bold text-gray-800 mb-3">Details</h2>
-            <div class="grid md:grid-cols-2 gap-4">
-                <div>
-                    <p class="text-gray-600">
-                        <span class="font-semibold">Posted:</span> {{ opportunity.created_at.strftime('%B %d, %Y') }}
-                    </p>
-                </div>
-                <div>
-                    <p class="text-gray-600">
-                        <span class="font-semibold">Organization ID:</span> {{ opportunity.organization_id }}
-                    </p>
-                </div>
-            </div>
+        <div>
+            <p class="text-gray-600">
+                <span class="font-semibold">Organization ID:</span> {{ opportunity.organization_id }}
+            </p>
         </div>
+    </div>
 
-        {% if is_admin %}
-        <div class="border-t pt-6 mt-6">
-            <div class="flex justify-between items-center">
-                <h2 class="text-xl font-bold text-gray-800">Manage Applications</h2>
-                <a href="/opp/{{ opportunity.id }}/applicants" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-6 rounded-lg">
-                    View Applicants
-                </a>
-            </div>
-            <p class="text-gray-600 mt-2">Review and manage volunteer applications for this opportunity</p>
+    {% if is_admin %}
+    <div class="border-t pt-6 mt-6">
+        <div class="flex justify-between items-center">
+            <h2 class="text-xl font-bold text-gray-800">Manage Applications</h2>
+            <a href="/opp/{{ opportunity.id }}/applicants" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-6 rounded-lg">
+                View Applicants
+            </a>
         </div>
-        {% endif %}
+        <p class="text-gray-600 mt-2">Review and manage volunteer applications for this opportunity</p>
+    </div>
+    {% endif %}
 
-        {% if user.role == 'volunteer' %}
-        <div class="border-t pt-6 mt-6">
-            {% if user_application %}
-            <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-xl p-6">
-                <div class="flex items-center justify-between flex-wrap gap-4">
-                    <div class="flex items-center gap-4">
-                        <div class="flex-shrink-0">
-                            <div class="h-12 w-12 rounded-full bg-blue-100 flex items-center justify-center">
-                                <svg class="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                </svg>
-                            </div>
-                        </div>
-                        <div>
-                            <p class="text-sm font-medium text-gray-500">Your Application</p>
-                            <div class="mt-1">
-                                {{ application_status_badge(user_application.status, 'md') }}
-                            </div>
+    {% if user.role == 'volunteer' %}
+    <div class="border-t pt-6 mt-6">
+        {% if user_application %}
+        <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-xl p-6">
+            <div class="flex items-center justify-between flex-wrap gap-4">
+                <div class="flex items-center gap-4">
+                    <div class="flex-shrink-0">
+                        <div class="h-12 w-12 rounded-full bg-blue-100 flex items-center justify-center">
+                            <svg class="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
                         </div>
                     </div>
-                    {% if user_application.status == 'pending' %}
-                    <form action="/opp/applications/{{ user_application.id }}/withdraw" method="POST" class="inline">
-                        <button type="submit" class="inline-flex items-center gap-2 bg-white border border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 font-semibold py-2 px-4 rounded-lg transition-all">
-                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                            Withdraw
-                        </button>
-                    </form>
-                    {% endif %}
+                    <div>
+                        <p class="text-sm font-medium text-gray-500">Your Application</p>
+                        <div class="mt-1">
+                            {{ application_status_badge(user_application.status, 'md') }}
+                        </div>
+                    </div>
                 </div>
-                {% if user_application.message %}
-                <div class="mt-4 pt-4 border-t border-blue-100">
-                    <p class="text-sm font-medium text-gray-500 mb-1">Your message</p>
-                    <p class="text-gray-700">{{ user_application.message }}</p>
-                </div>
+                {% if user_application.status == 'pending' %}
+                {{ withdraw_button(user_application.id) }}
                 {% endif %}
             </div>
-            {% elif opportunity.is_open %}
-            <div class="text-center">
-                <a href="/opp/{{ opportunity.id }}/apply" class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg text-lg transition-colors">
-                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                    </svg>
-                    Apply to Volunteer
-                </a>
+            {% if user_application.message %}
+            <div class="mt-4 pt-4 border-t border-blue-100">
+                <p class="text-sm font-medium text-gray-500 mb-1">Your message</p>
+                <p class="text-gray-700">{{ user_application.message }}</p>
             </div>
             {% endif %}
         </div>
+        {% elif opportunity.is_open %}
+        <div class="text-center">
+            <a href="/opp/{{ opportunity.id }}/apply" class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg text-lg transition-colors">
+                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+                Apply to Volunteer
+            </a>
+        </div>
         {% endif %}
     </div>
-</div>
+    {% endif %}
+{% endcall %}
 {% endblock %}
