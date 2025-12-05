@@ -1,0 +1,15 @@
+# Schemathesis configuration for API testing
+
+hooks = "schemathesis_hooks"
+suppress-health-check = ["filter_too_much"]
+warnings = false
+
+[generation]
+mode = "positive"
+codec = "ascii"
+allow-x00 = false
+exclude-header-characters = "\r\n\t"
+allow-extra-parameters = false
+
+[checks]
+positive_data_acceptance.expected-statuses = ["2XX", 400, 401, 403, 404, 409, 422, "5XX"]

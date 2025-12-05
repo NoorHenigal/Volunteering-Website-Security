@@ -1,0 +1,350 @@
+{% extends "base.html" %}
+{% from "components/ui.html" import user_avatar, follow_button, follower_stats, bio_section, privacy_badge, htmx_form %}
+{% block title %}{{ profile_user.first_name }} {{ profile_user.last_name }} (@{{ profile_user.username }}){% endblock %}
+{% block content %}
+<div class="max-w-4xl mx-auto" {% if user and user.id==profile_user.id %}x-data="avatarCropper()" {% endif %}>
+  <!-- Crop Modal -->
+  <div x-show="show" x-transition.opacity class="fixed inset-0 bg-black/70 flex items-center justify-center z-50"
+    style="display: none;">
+    <div class="bg-white rounded-lg shadow-xl max-w-lg w-full mx-4 overflow-hidden" @click.outside="close()">
+      <div class="p-4 border-b border-gray-200">
+        <h3 class="text-lg font-semibold text-gray-900">Adjust Profile Picture</h3>
+        <p class="text-sm text-gray-500">Drag to position, use slider to zoom</p>
+      </div>
+
+      <div class="relative bg-gray-100 overflow-hidden" style="height: 400px">
+        <div class="absolute inset-0 flex items-center justify-center overflow-hidden" @mousedown="startDrag($event)"
+          @mousemove="drag($event)" @mouseup="endDrag()" @mouseleave="endDrag()" @touchstart="startDrag($event)"
+          @touchmove="drag($event)" @touchend="endDrag()">
+          <img x-ref="cropImage" :src="imageSrc"
+            :style="`transform: translate(${imageX}px, ${imageY}px) scale(${scale}); transform-origin: center center;`"
+            class="max-w-none cursor-move select-none" alt="Preview" draggable="false" style="pointer-events: none;" />
+        </div>
+
+        <!-- Circular crop overlay -->
+        <div class="absolute inset-0 pointer-events-none">
+          <div class="absolute rounded-full border-4 border-white shadow-lg"
+            style="left: 50%; top: 50%; transform: translate(-50%, -50%); width: 250px; height: 250px; box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);">
+          </div>
+        </div>
+      </div>
+
+      <div class="p-4 border-t border-gray-200">
+        <label class="block text-sm font-medium text-gray-700 mb-2">Zoom</label>
+        <input type="range" min="0.1" max="3" step="0.01" x-model.number="scale" class="w-full accent-blue-600" />
+      </div>
+
+      <div class="p-4 border-t border-gray-200 flex gap-3">
+        <button type="button"
+          class="flex-1 px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg font-medium transition-colors"
+          @click="close()">
+          Cancel
+        </button>
+        <button type="button"
+          class="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
+          @click="save()">
+          Save
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Profile Card -->
+  <div class="bg-white shadow-lg rounded-lg overflow-hidden">
+    <div class="p-6 sm:p-8">
+      <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+        {{ user_avatar(profile_user, 'lg') }}
+        <div class="text-center sm:text-left flex-1">
+          <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+            <div>
+              <h1 class="text-3xl font-bold text-gray-900">
+                {{ profile_user.first_name }} {{ profile_user.last_name }}
+              </h1>
+              <p class="text-lg text-gray-500 font-medium">
+                @{{ profile_user.username }}
+              </p>
+              <div class="mt-2 flex items-center gap-2 flex-wrap justify-center sm:justify-start">
+                <span
+                  class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
+                  {{ profile_user.role | title }}
+                </span>
+                {% if user and user.id == profile_user.id and profile %}
+                {{ privacy_badge(profile.profile_visibility) }}
+                {% endif %}
+              </div>
+            </div>
+            <div class="flex justify-center sm:justify-end items-center gap-2">
+              {% if user and user.id == profile_user.id %}
+              <label for="profile-picture-input"
+                class="inline-flex items-center px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium cursor-pointer transition-colors">
+                <svg class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                Photo
+              </label>
+              {% elif user and profile and profile.is_following is not none %}
+              <div id="follow-button-container">
+                {% block follow_button scoped %}
+                {{ follow_button(profile_user.username, profile.is_following) }}
+                {% endblock %}
+              </div>
+              {% endif %}
+            </div>
+          </div>
+
+          <!-- Follower Stats -->
+          {% if profile %}
+          <div class="mt-4">
+            {{ follower_stats(profile.follower_count, profile.following_count, profile_user.username) }}
+          </div>
+          {% endif %}
+
+          <!-- Bio Section -->
+          {% if profile %}
+          <div id="bio-section">
+            {% block bio_display %}
+            {{ bio_section(profile.bio, profile.description, user and user.id == profile_user.id) }}
+            {% endblock %}
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+      {% if user and user.id == profile_user.id %}
+      <input type="file" id="profile-picture-input" accept="image/*" class="hidden"
+        @change="handleFileSelect($event)" />
+      {% endif %}
+
+      <!-- Edit Profile Section (for own profile) -->
+      {% if user and user.id == profile_user.id and edit_mode %}
+      <div class="mt-8 border-t border-gray-200 pt-6" id="edit-profile-container">
+        {% block edit_profile_form %}
+        <h2 class="text-xl font-semibold text-gray-900 mb-4">Edit Profile</h2>
+        {% call htmx_form('/settings/profile', '#edit-profile-container') %}
+        <div
+          x-data="{ bioLength: {{ (profile_user.bio or '')|length }}, descLength: {{ (profile_user.description or '')|length }} }">
+          <div class="mb-4">
+            <label for="bio" class="block text-sm font-medium text-gray-700 mb-1">Bio</label>
+            <textarea id="bio" name="bio" rows="2" maxlength="200" x-on:input="bioLength = $event.target.value.length"
+              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="A short bio about yourself">{{ profile_user.bio or '' }}</textarea>
+            <p class="text-sm text-right mt-1"
+              :class="bioLength > 180 ? (bioLength >= 200 ? 'text-red-600' : 'text-yellow-600') : 'text-gray-500'">
+              <span x-text="bioLength"></span>/200
+            </p>
+          </div>
+          <div class="mb-4">
+            <label for="description" class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+            <textarea id="description" name="description" rows="4" maxlength="1000"
+              x-on:input="descLength = $event.target.value.length"
+              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="Tell us more about yourself, your interests, and experience">{{ profile_user.description or '' }}</textarea>
+            <p class="text-sm text-right mt-1"
+              :class="descLength > 900 ? (descLength >= 1000 ? 'text-red-600' : 'text-yellow-600') : 'text-gray-500'">
+              <span x-text="descLength"></span>/1000
+            </p>
+          </div>
+        </div>
+        <div class="flex gap-3">
+          <button type="submit"
+            class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors">
+            Save Changes
+          </button>
+          <a href="/{{ profile_user.username }}"
+            class="px-6 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium rounded-lg transition-colors">
+            Cancel
+          </a>
+        </div>
+        {% endcall %}
+        {% endblock %}
+      </div>
+      {% endif %}
+
+      <div class="mt-8 border-t border-gray-200 pt-6">
+        <h2 class="text-xl font-semibold text-gray-900 mb-4">About</h2>
+        <div class="grid sm:grid-cols-2 gap-4 text-sm text-gray-600">
+          <div>
+            <span class="font-medium">Member since:</span>
+            {{ profile_user.created_at.strftime('%B %Y') }}
+          </div>
+          {% if profile and profile.email %}
+          <div>
+            <span class="font-medium">Email:</span>
+            {{ profile.email }}
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Quick Actions (for own profile) -->
+      {% if user and user.id == profile_user.id %}
+      <div class="mt-6 border-t border-gray-200 pt-6">
+        <h2 class="text-xl font-semibold text-gray-900 mb-4">Settings</h2>
+        <div class="flex flex-wrap gap-3">
+          <a href="/settings/profile"
+            class="inline-flex items-center px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium transition-colors">
+            <svg class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+            Edit Profile
+          </a>
+          <a href="/settings/privacy"
+            class="inline-flex items-center px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium transition-colors">
+            <svg class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+            Privacy Settings
+          </a>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<script>
+  document.addEventListener("alpine:init", () => {
+    if (!document.querySelector('[x-data="avatarCropper()"]')) return;
+    Alpine.data("avatarCropper", () => ({
+      show: false,
+      saving: false,
+      imageSrc: '',
+      imageX: 0,
+      imageY: 0,
+      scale: 1,
+      isDragging: false,
+      dragStartX: 0,
+      dragStartY: 0,
+      imageStartX: 0,
+      imageStartY: 0,
+      sourceImage: null,
+
+      handleFileSelect(event) {
+        const file = event.target.files[0];
+        if (!file || !file.type.startsWith('image/')) return;
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const img = new Image();
+          img.onload = () => {
+            this.sourceImage = img;
+            this.imageSrc = e.target.result;
+            this.resetPosition();
+            this.show = true;
+          };
+          img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+      },
+
+      resetPosition() {
+        this.imageX = 0;
+        this.imageY = 0;
+        if (!this.sourceImage) return;
+
+        const cropSize = 250;
+        const minScale = Math.max(cropSize / this.sourceImage.width, cropSize / this.sourceImage.height);
+        this.scale = Math.max(minScale, 0.5);
+      },
+
+      startDrag(event) {
+        this.isDragging = true;
+        const clientX = event.touches ? event.touches[0].clientX : event.clientX;
+        const clientY = event.touches ? event.touches[0].clientY : event.clientY;
+        this.dragStartX = clientX;
+        this.dragStartY = clientY;
+        this.imageStartX = this.imageX;
+        this.imageStartY = this.imageY;
+        event.preventDefault();
+      },
+
+      drag(event) {
+        if (!this.isDragging) return;
+        const clientX = event.touches ? event.touches[0].clientX : event.clientX;
+        const clientY = event.touches ? event.touches[0].clientY : event.clientY;
+        this.imageX = this.imageStartX + (clientX - this.dragStartX);
+        this.imageY = this.imageStartY + (clientY - this.dragStartY);
+        event.preventDefault();
+      },
+
+      endDrag() {
+        this.isDragging = false;
+      },
+
+      close() {
+        this.show = false;
+        this.imageSrc = '';
+        this.sourceImage = null;
+        document.getElementById('profile-picture-input').value = '';
+      },
+
+      async save() {
+        if (!this.sourceImage || this.saving) return;
+        this.saving = true;
+
+        try {
+          const blob = await this.cropToBlob();
+          const formData = new FormData();
+          formData.append('file', blob, 'avatar.png');
+
+          const response = await fetch('/settings/profile/picture', {
+            method: 'POST',
+            body: formData
+          });
+
+          if (response.ok) {
+            window.location.reload();
+          } else {
+            const data = await response.json().catch(() => ({}));
+            alert(data.detail || 'Failed to upload image');
+          }
+        } catch (err) {
+          alert('Failed to upload image');
+        } finally {
+          this.saving = false;
+          this.close();
+        }
+      },
+
+      cropToBlob() {
+        return new Promise((resolve) => {
+          const cropSize = 250;
+          const outputSize = 512;
+          const canvas = document.createElement('canvas');
+          canvas.width = outputSize;
+          canvas.height = outputSize;
+          const ctx = canvas.getContext('2d');
+
+          const displayedWidth = this.sourceImage.width * this.scale;
+          const displayedHeight = this.sourceImage.height * this.scale;
+          const containerCenterX = 200;
+          const containerCenterY = 200;
+
+          const imageLeft = containerCenterX + this.imageX - displayedWidth / 2;
+          const imageTop = containerCenterY + this.imageY - displayedHeight / 2;
+
+          const cropLeft = containerCenterX - cropSize / 2;
+          const cropTop = containerCenterY - cropSize / 2;
+
+          const srcX = (cropLeft - imageLeft) / this.scale;
+          const srcY = (cropTop - imageTop) / this.scale;
+          const srcSize = cropSize / this.scale;
+
+          ctx.drawImage(
+            this.sourceImage,
+            srcX, srcY, srcSize, srcSize,
+            0, 0, outputSize, outputSize
+          );
+
+          canvas.toBlob(resolve, 'image/png', 1.0);
+        });
+      }
+    }));
+  });
+</script>
+{% endblock %}

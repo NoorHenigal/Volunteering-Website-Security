@@ -4,9 +4,11 @@ from datetime import UTC, datetime
 from typing import Literal
 from uuid import UUID, uuid4
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text, func
+from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Index, String, Text, func
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, declarative_mixin, mapped_column, relationship
+
+from app.core.types import ProfileVisibilityType
 
 # Type Aliases
 RoleType = Literal["admin", "volunteer", "organization"]
@@ -43,7 +45,7 @@ class IDMixin:
 
 
 @declarative_mixin
-class TimestampMixin:
+class TimestampModelMixin:
     """Mixin for created_at and updated_at timestamp columns."""
 
     created_at: Mapped[datetime] = mapped_column(
@@ -62,7 +64,7 @@ class TimestampMixin:
 
 
 @declarative_mixin
-class FullModelMixin(IDMixin, TimestampMixin):
+class FullModelMixin(IDMixin, TimestampModelMixin):
     """Combines ID and timestamp mixins for complete base model."""
 
 
@@ -80,6 +82,15 @@ class User(Base, FullModelMixin):
     username: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
     profile_picture: Mapped[str | None] = mapped_column(String(255), nullable=True, default=None)
 
+    bio: Mapped[str | None] = mapped_column(String(200), nullable=True, default=None)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True, default=None)
+    profile_visibility: Mapped[str] = mapped_column(
+        String(50), nullable=False, server_default="public", default="public"
+    )
+    show_email: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="0", default=False)
+    show_organizations: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="1", default=True)
+    searchable: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="1", default=True)
+
     # Relationship to refresh tokens
     refresh_tokens: Mapped[list[RefreshToken]] = relationship(
         "RefreshToken",
@@ -91,6 +102,20 @@ class User(Base, FullModelMixin):
     organization_roles: Mapped[list[UserOrganizationRole]] = relationship(
         "UserOrganizationRole",
         back_populates="user",
+        cascade="all, delete-orphan",
+    )
+
+    # Follow relationships
+    following: Mapped[list[Follow]] = relationship(
+        "Follow",
+        foreign_keys="Follow.follower_id",
+        back_populates="follower",
+        cascade="all, delete-orphan",
+    )
+    followers: Mapped[list[Follow]] = relationship(
+        "Follow",
+        foreign_keys="Follow.followed_id",
+        back_populates="followed",
         cascade="all, delete-orphan",
     )
 
@@ -186,15 +211,52 @@ class Application(Base, FullModelMixin):
     volunteer: Mapped[User] = relationship("User", foreign_keys=[volunteer_id])
 
 
+class Follow(Base):
+    """User follow relationship - uses composite primary key."""
+
+    __tablename__ = "follows"
+
+    follower_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    followed_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        default=lambda: datetime.now(UTC),
+    )
+
+    __table_args__ = (
+        CheckConstraint("follower_id != followed_id", name="ck_no_self_follow"),
+        Index("ix_follows_followed_id", "followed_id"),
+    )
+
+    # Relationships
+    follower: Mapped[User] = relationship("User", foreign_keys=[follower_id], back_populates="following")
+    followed: Mapped[User] = relationship("User", foreign_keys=[followed_id], back_populates="followers")
+
+
 # Exports
 __all__ = [
     "Application",
     "ApplicationStatusType",
     "Base",
+    "Follow",
+    "FullModelMixin",
+    "IDMixin",
     "Opportunity",
     "Organization",
+    "ProfileVisibilityType",
     "RefreshToken",
     "RoleType",
+    "TimestampModelMixin",
     "User",
     "UserOrganizationRole",
 ]

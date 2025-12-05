@@ -39,3 +39,6 @@ htmlcov/
 # Temporary project files
 *.log
 .hypothesis
+
+# Production Assests (created locally too, if in a dev environment)
+app/static/uploads/

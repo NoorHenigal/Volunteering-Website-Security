@@ -24,7 +24,7 @@ class TestOrganizationAPI:
         org_user = await flows.create_user("organization")
 
         data = await api.created(
-            "/api/organizations",
+            "/organizations",
             auth=org_user,
             json={
                 "name": "Sustainability Society",
@@ -65,7 +65,7 @@ class TestOrganizationAPI:
         await flows.create_org(org_user, name="Park Clean-Up Group", description="Local park volunteering")
 
         volunteer = await flows.create_user("volunteer")
-        data = await api.ok("GET", "/api/organizations", auth=volunteer)
+        data = await api.ok("GET", "/organizations", auth=volunteer)
         assert "items" in data
         assert len(data["items"]) >= 2
 
@@ -85,7 +85,7 @@ class TestOrganizationAPI:
         member = await flows.create_user("volunteer")
         await flows.add_member(test_db, member, org, role="member")
 
-        data = await api.ok("GET", f"/api/organizations/{org['id']}", auth=member)
+        data = await api.ok("GET", f"/organizations/{org['id']}", auth=member)
         assert data["name"] == "Test Org"
         assert data["description"] == "Test description"
         assert "members" in data
@@ -102,7 +102,7 @@ class TestOrganizationAPI:
         test_org = await ctx.organization()
         data = await api.ok(
             "PUT",
-            f"/api/organizations/{test_org.organization.id}",
+            f"/organizations/{test_org.organization.id}",
             auth=test_org.admin,
             json={"name": "New Name", "description": "New description"},
         )
@@ -125,13 +125,13 @@ class TestOrganizationAPI:
         member = await flows.create_user("volunteer")
         await flows.add_member(test_db, member, org, role="member")
 
-        await api.forbidden("PUT", f"/api/organizations/{org['id']}", auth=member, json={"name": "New Name"})
+        await api.forbidden("PUT", f"/organizations/{org['id']}", auth=member, json={"name": "New Name"})
 
     @pytest.mark.anyio
     async def test_unauthenticated_cannot_create_organization(self, api: APIHelper) -> None:
         """Test that unauthenticated users cannot create organizations."""
         await api.unauthorized(
             "POST",
-            "/api/organizations",
+            "/organizations",
             json={"name": "Test Org", "description": "Test description"},
         )

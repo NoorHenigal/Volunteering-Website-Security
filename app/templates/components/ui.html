@@ -1,5 +1,36 @@
 {# Reusable UI Component Macros #}
 
+{# HTMX-enabled form wrapper #}
+{% macro htmx_form(action, target="#main-content", swap="outerHTML") %}
+<form hx-post="{{ action }}" hx-target="{{ target }}" hx-swap="{{ swap }}" hx-indicator=".htmx-indicator">
+    {{ caller() }}
+</form>
+{% endmacro %}
+
+{# HTMX button with loading state #}
+{% macro htmx_button(text, action, method="post", target="this", color="blue") %}
+<button hx-{{ method }}="{{ action }}" hx-target="{{ target }}" hx-swap="outerHTML"
+    class="bg-{{ color }}-600 hover:bg-{{ color }}-700 text-white font-bold py-2 px-4 rounded inline-flex items-center gap-2">
+    {{ text }}
+    <span class="htmx-indicator hidden">
+        <svg class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+            </path>
+        </svg>
+    </span>
+</button>
+{% endmacro %}
+
+{# Alert that auto-dismisses #}
+{% macro alert_fragment(type, message) %}
+<div id="alert" class="bg-{{ type }}-100 border border-{{ type }}-400 text-{{ type }}-700 px-4 py-3 rounded mb-6"
+    x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 3000)">
+    {{ message }}
+</div>
+{% endmacro %}
+
 {% macro application_status_badge(status, size='md') %}
 {% set size_classes = {
 'sm': 'px-3 py-1 text-sm',
@@ -37,10 +68,51 @@
 {% macro back_link(url, text) %}
 <a href="{{ url }}" class="text-blue-600 hover:text-blue-800 font-semibold">← {{ text }}</a>
 {% endmacro %}
-{% macro card(padding='p-8', extra_classes='') %}
-<div class="bg-white rounded-lg shadow-lg {{ padding }} {{ extra_classes }}">
-    {{ caller() }}
+{% macro card(padding='p-6', max_width='', extra_classes='') %}
+{% set width_class = 'max-w-' + max_width + ' mx-auto' if max_width else '' %}
+<div class="{{ width_class }}">
+    <div class="bg-white rounded-lg shadow-md {{ padding }} {{ extra_classes }}">
+        {{ caller() }}
+    </div>
 </div>
+{% endmacro %}
+
+{% macro page_card(max_width='6xl') %}
+{# Standard page card wrapper - use for detail/form pages #}
+<div class="max-w-{{ max_width }} mx-auto">
+    <div class="bg-white rounded-xl shadow-lg p-8">
+        {{ caller() }}
+    </div>
+</div>
+{% endmacro %}
+
+{% macro page_card_tight(max_width='6xl') %}
+<div class="max-w-{{ max_width }} mx-auto">
+    <div class="bg-white rounded-lg shadow-lg p-6">
+        {{ caller() }}
+    </div>
+</div>
+{% endmacro %}
+
+{% macro detail_header(back_url, back_text, title, subtitle=None) %}
+{# Standard detail page header with back link and title #}
+<div class="mb-6">
+    {{ back_link(back_url, back_text) }}
+</div>
+<div class="mb-6">
+    <h1 class="text-4xl font-bold text-gray-800 mb-2">{{ title }}</h1>
+    {% if subtitle %}
+    <p class="text-xl text-gray-600">{{ subtitle }}</p>
+    {% endif %}
+</div>
+{% endmacro %}
+
+{% macro form_header(back_url, back_text, title) %}
+{# Standard form page header with back link and title #}
+<div class="mb-6">
+    {{ back_link(back_url, back_text) }}
+</div>
+<h1 class="text-3xl font-bold text-gray-800 mb-6">{{ title }}</h1>
 {% endmacro %}
 {% macro page_header(title, action_url=None, action_text=None, action_color='blue', show_action=True) %}
 <div class="flex justify-between items-center mb-8">
@@ -80,15 +152,44 @@
     class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
     placeholder="{{ placeholder }}">{{ value }}</textarea>
 {% endmacro %}
-{% macro primary_button(text, type='submit', color='blue', full_width=True) %}
-<button type="{{ type }}"
-    class="{% if full_width %}w-full{% endif %} bg-{{ color }}-600 hover:bg-{{ color }}-700 text-white font-bold py-3 px-6 rounded-lg">
+{% macro button_solid(text, href=None, color='blue', size='md', full_width=False, icon=None) %}
+{% set size_classes = {
+'sm': 'text-sm py-2 px-3',
+'md': 'text-sm py-2.5 px-4',
+'lg': 'text-base py-3 px-6'
+} %}
+{% set base = size_classes.get(size, size_classes['md']) %}
+{% set width = 'w-full' if full_width else '' %}
+{% set classes = width ~ ' inline-flex items-center justify-center gap-2 font-semibold rounded-lg bg-' ~ color ~ '-600
+hover:bg-' ~ color ~ '-700 text-white transition-colors' %}
+
+{% if href %}
+<a href="{{ href }}" class="{{ classes }} {{ base }}">
     {{ text }}
+</a>
+{% else %}
+<button type="submit" class="{{ classes }} {{ base }}">
+    {{ text }}
+    <span class="htmx-indicator">
+        <svg class="animate-spin h-4 w-4 text-white ml-2" xmlns="http://www.w3.org/2000/svg" fill="none"
+            viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+            </path>
+        </svg>
+    </span>
 </button>
+{% endif %}
 {% endmacro %}
-{% macro cancel_button(url, text='Cancel', full_width=True) %}
+
+{% macro primary_button(text, type='submit', color='blue', full_width=True) %}
+{{ button_solid(text, color=color, full_width=full_width) }}
+{% endmacro %}
+{% macro secondary_button(url, text='Cancel', full_width=False) %}
+{# Secondary/cancel button style #}
 <a href="{{ url }}"
-    class="{% if full_width %}flex-1{% endif %} bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-3 px-6 rounded-lg text-center inline-block">
+    class="{% if full_width %}flex-1{% endif %} bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-2 px-6 rounded-lg text-center inline-block transition-colors">
     {{ text }}
 </a>
 {% endmacro %}
@@ -109,9 +210,37 @@
     <h2 class="text-xl font-bold text-gray-800 mb-3">{{ title }}</h2>
 </div>
 {% endmacro %}
-{% macro info_box(color='blue') %}
-<div class="bg-{{ color }}-50 border border-{{ color }}-200 rounded-lg p-6">
+{% macro info_box(color='blue', padding='p-6') %}
+{# Colored info/message box #}
+<div class="bg-{{ color }}-50 border border-{{ color }}-200 rounded-lg {{ padding }}">
     {{ caller() }}
+</div>
+{% endmacro %}
+
+{% macro message_box(message, label=None, color='gray') %}
+{# Simple message display box #}
+<div class="bg-{{ color }}-50 rounded-lg p-4">
+    {% if label %}
+    <p class="text-sm font-semibold text-{{ color }}-700 mb-1">{{ label }}</p>
+    {% endif %}
+    <p class="text-{{ color }}-700">{{ message }}</p>
+</div>
+{% endmacro %}
+
+{% macro warning_box() %}
+{# Yellow warning box with icon #}
+<div class="bg-yellow-50 border-l-4 border-yellow-400 p-6 mb-6">
+    <div class="flex">
+        <div class="flex-shrink-0">
+            <svg class="h-6 w-6 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+        </div>
+        <div class="ml-3">
+            {{ caller() }}
+        </div>
+    </div>
 </div>
 {% endmacro %}
 {% macro location_display(location) %}
@@ -124,6 +253,44 @@
 {% macro date_display(date, format='%B %d, %Y', prefix='') %}
 <span class="text-sm text-gray-500">{{ prefix }}{{ date.strftime(format) }}</span>
 {% endmacro %}
+
+{% macro form_select(name, options, placeholder='Select an option', required=False, selected_value=None, id=None) %}
+{# Reusable select dropdown #}
+<select name="{{ name }}" id="{{ id or name }}" {% if required %}required{% endif %}
+    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+    <option value="">{{ placeholder }}</option>
+    {% for value, label in options %}
+    <option value="{{ value }}" {% if selected_value==value %}selected{% endif %}>{{ label }}</option>
+    {% endfor %}
+</select>
+{% endmacro %}
+
+{% macro list_grid(items, item_template, empty_message, empty_action_url=None, empty_action_text=None,
+empty_action_color='blue', show_empty_action=True, cols='md:grid-cols-2 lg:grid-cols-3') %}
+{# Grid layout with empty state handling - requires caller to define item rendering #}
+{% if items %}
+<div class="grid gap-6 {{ cols }}">
+    {{ caller() }}
+</div>
+{% else %}
+{{ empty_state(empty_message, empty_action_url, empty_action_text, empty_action_color, show_empty_action) }}
+{% endif %}
+{% endmacro %}
+
+{% macro user_info_row(label, value) %}
+{# Simple label-value row for user info display #}
+<div class="flex justify-between items-center">
+    <span class="text-gray-600 font-semibold">{{ label }}:</span>
+    <span class="text-gray-900">{{ value }}</span>
+</div>
+{% endmacro %}
+
+{% macro role_badge(role) %}
+{# User role badge #}
+<span class="inline-block px-3 py-1 text-sm font-semibold rounded-full bg-blue-100 text-blue-800">
+    {{ role|title }}
+</span>
+{% endmacro %}
 {% macro datetime_display(date, prefix='') %}
 <span class="text-sm text-gray-500">{{ prefix }}{{ date.strftime('%B %d, %Y at %I:%M %p') }}</span>
 {% endmacro %}
@@ -135,29 +302,157 @@
 } %}
 {% set initials = ((user.first_name[0] + user.last_name[0]) if (user and user.first_name and user.last_name) else
 (user.username[:2] if user else '?')).upper() %}
+{% if user and user.profile_picture %}
+<img src="/static/uploads/avatars/{{ user.profile_picture }}" alt="{{ user.first_name }}'s avatar"
+    class="{{ size_classes.get(size, size_classes['md']) }} rounded-full object-cover shadow-md">
+{% else %}
 <div
     class="{{ size_classes.get(size, size_classes['md']) }} rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold shadow-md">
     {{ initials }}
 </div>
+{% endif %}
 {% endmacro %}
+{% macro follow_button(username, is_following, size='md') %}
+{% set size_classes = {
+'sm': 'px-3 py-1 text-sm',
+'md': 'px-4 py-2 text-sm',
+'lg': 'px-6 py-3 text-base'
+} %}
+{% if is_following %}
+<form action="/{{ username }}/unfollow" method="POST" class="inline">
+    <button type="submit"
+        class="{{ size_classes.get(size, size_classes['md']) }} rounded-lg font-semibold bg-gray-200 hover:bg-gray-300 text-gray-800 transition-colors">
+        Unfollow
+    </button>
+</form>
+{% else %}
+<form action="/{{ username }}/follow" method="POST" class="inline">
+    <button type="submit"
+        class="{{ size_classes.get(size, size_classes['md']) }} rounded-lg font-semibold bg-blue-600 hover:bg-blue-700 text-white transition-colors">
+        Follow
+    </button>
+</form>
+{% endif %}
+{% endmacro %}
+
+{% macro follower_stats(follower_count, following_count, username, show_links=True) %}
+<div class="flex gap-6 text-sm">
+    {% if show_links %}
+    <a href="/{{ username }}/followers" class="hover:text-blue-600 transition-colors">
+        <span class="font-bold text-gray-900">{{ follower_count }}</span>
+        <span class="text-gray-500">Followers</span>
+    </a>
+    <a href="/{{ username }}/following" class="hover:text-blue-600 transition-colors">
+        <span class="font-bold text-gray-900">{{ following_count }}</span>
+        <span class="text-gray-500">Following</span>
+    </a>
+    {% else %}
+    <span>
+        <span class="font-bold text-gray-900">{{ follower_count }}</span>
+        <span class="text-gray-500">Followers</span>
+    </span>
+    <span>
+        <span class="font-bold text-gray-900">{{ following_count }}</span>
+        <span class="text-gray-500">Following</span>
+    </span>
+    {% endif %}
+</div>
+{% endmacro %}
+
+{% macro bio_section(bio, description, can_edit=False) %}
+{% if bio or description or can_edit %}
+<div class="mt-4">
+    {% if bio %}
+    <p class="text-gray-700">{{ bio }}</p>
+    {% endif %}
+    {% if description %}
+    <div x-data="{ expanded: false }" class="mt-2">
+        <p class="text-gray-600 text-sm" x-show="!expanded">
+            {{ description[:150] }}{% if description|length > 150 %}...{% endif %}
+        </p>
+        <p class="text-gray-600 text-sm" x-show="expanded" style="display: none;">
+            {{ description }}
+        </p>
+        {% if description|length > 150 %}
+        <button @click="expanded = !expanded" class="text-blue-600 hover:text-blue-800 text-sm font-medium mt-1">
+            <span x-show="!expanded">Show more</span>
+            <span x-show="expanded" style="display: none;">Show less</span>
+        </button>
+        {% endif %}
+    </div>
+    {% endif %}
+    {% if can_edit and not bio and not description %}
+    <p class="text-gray-400 italic text-sm">No bio yet. <a href="/settings/profile"
+            class="text-blue-600 hover:underline">Add one</a></p>
+    {% endif %}
+</div>
+{% endif %}
+{% endmacro %}
+
+{% macro privacy_badge(visibility_level, size='sm') %}
+{% set size_classes = {
+'xs': 'text-xs px-2 py-0.5',
+'sm': 'text-xs px-2 py-1',
+'md': 'text-sm px-3 py-1'
+} %}
+{% set visibility_classes = {
+'public': 'bg-green-100 text-green-800',
+'authenticated': 'bg-blue-100 text-blue-800',
+'followers': 'bg-purple-100 text-purple-800',
+'private': 'bg-gray-100 text-gray-800'
+} %}
+{% set visibility_icons = {
+'public': '🌐',
+'authenticated': '👤',
+'followers': '👥',
+'private': '🔒'
+} %}
+<span
+    class="{{ size_classes.get(size, size_classes['sm']) }} {{ visibility_classes.get(visibility_level, 'bg-gray-100 text-gray-800') }} rounded-full font-medium inline-flex items-center gap-1">
+    <span>{{ visibility_icons.get(visibility_level, '🔒') }}</span>
+    <span>{{ visibility_level|title }}</span>
+</span>
+{% endmacro %}
+
+{% macro withdraw_button(application_id, size='md') %}
+{% set size_classes = {
+'sm': 'py-2 px-4 text-sm',
+'md': 'py-2 px-4 text-base'
+} %}
+<form action="/applications/{{ application_id }}/withdraw" method="POST" class="inline">
+    <button type="submit"
+        class="inline-flex items-center gap-2 bg-white border border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 font-semibold {{ size_classes.get(size, size_classes['md']) }} rounded-lg transition-all">
+        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+        Withdraw
+    </button>
+</form>
+{% endmacro %}
+
 {% macro user_dropdown(user) %}
-<div class="relative group">
-    <button type="button"
-        class="flex items-center space-x-3 hover:bg-blue-700 px-3 py-2 rounded-lg transition-colors duration-200"
-        aria-expanded="false" aria-haspopup="true">
+<div class="relative" x-data="{ open: false }" @click.outside="open = false">
+    <button type="button" @click="open = !open"
+        class="flex items-center space-x-3 hover:bg-gray-100 px-3 py-2 rounded-lg transition-colors duration-200"
+        :aria-expanded="open" aria-haspopup="true">
         {{ user_avatar(user, 'sm') }}
         <div class="hidden md:block text-left">
-            <div class="text-sm font-semibold">{{ user.first_name }}</div>
-            <div class="text-xs text-blue-200">{{ user.role|title }}</div>
+            <div class="text-sm font-semibold text-gray-800">{{ user.first_name }}</div>
+            <div class="text-xs text-gray-500">{{ user.role|title }}</div>
         </div>
-        <svg class="h-4 w-4 text-blue-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg class="h-4 w-4 text-gray-500 transition-transform duration-200" :class="{ 'rotate-180': open }" fill="none"
+            viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
         </svg>
     </button>
 
     <!-- Dropdown Menu -->
-    <div
-        class="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 border border-gray-100">
+    <div x-show="open" x-transition:enter="transition ease-out duration-200"
+        x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
+        x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100 scale-100"
+        x-transition:leave-end="opacity-0 scale-95"
+        class="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-xl z-50 border border-gray-100"
+        style="display: none;">
         <div class="px-4 py-3 border-b border-gray-100">
             <p class="text-sm font-semibold text-gray-900">{{ user.first_name }} {{ user.last_name }}</p>
             <p class="text-xs text-gray-500 truncate">{{ user.email }}</p>
@@ -174,6 +469,24 @@
                 </svg>
                 View Profile
             </a>
+            <a href="/settings/profile"
+                class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors">
+                <svg class="inline h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                Edit Profile
+            </a>
+            <a href="/settings/privacy"
+                class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors">
+                <svg class="inline h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+                Privacy Settings
+            </a>
             <a href="/auth/status" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors">
                 <svg class="inline h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -182,8 +495,7 @@
                 Dashboard
             </a>
             {% if user.role == 'volunteer' %}
-            <a href="/opp/applications/list"
-                class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors">
+            <a href="/applications" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors">
                 <svg class="inline h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                         d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />

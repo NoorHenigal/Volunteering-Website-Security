@@ -1,48 +1,35 @@
 {% extends "base.html" %}
+{% from "components/ui.html" import user_avatar, user_info_row, role_badge, page_card, primary_button %}
 
 {% block title %}Status{% endblock %}
 
 {% block content %}
-<div class="max-w-md mx-auto">
-    <div class="bg-white p-8 rounded-lg shadow-lg">
-        {% if user %}
-        {% from "components/ui.html" import user_avatar %}
-        <div class="text-center mb-6">
-            <div class="flex justify-center mb-4">
-                {{ user_avatar(user, 'lg') }}
-            </div>
-            <h2 class="text-3xl font-bold text-gray-900">{{ user.first_name }} {{ user.last_name }}</h2>
-            <p class="text-gray-500 mt-1">@{{ user.username }}</p>
-        </div>
-        <div class="border-t border-gray-200 pt-6 mb-6 space-y-3">
-            <div class="flex justify-between items-center">
-                <span class="text-gray-600 font-semibold">Username:</span>
-                <span class="text-gray-900">{{ user.username }}</span>
-            </div>
-            <div class="flex justify-between items-center">
-                <span class="text-gray-600 font-semibold">Email:</span>
-                <span class="text-gray-900">{{ user.email }}</span>
-            </div>
-            <div class="flex justify-between items-center">
-                <span class="text-gray-600 font-semibold">Role:</span>
-                <span class="inline-block px-3 py-1 text-sm font-semibold rounded-full bg-blue-100 text-blue-800">
-                    {{ user.role|title }}
-                </span>
-            </div>
-        </div>
-        <form action="/auth/logout" method="POST">
-            <button type="submit"
-                class="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-3 rounded-lg transition-colors duration-200">
-                Log out
-            </button>
-        </form>
-        {% else %}
-        <h2 class="text-3xl font-bold mb-6 text-center text-black">You are not logged in</h2>
-        <a href="/auth/login"
-            class="block w-full text-center bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg">
-            Log in
-        </a>
-        {% endif %}
+{% call page_card('md') %}
+{% if user %}
+<div class="text-center mb-6">
+    <div class="flex justify-center mb-4">
+        {{ user_avatar(user, 'lg') }}
+    </div>
+    <h2 class="text-3xl font-bold text-gray-900">{{ user.first_name }} {{ user.last_name }}</h2>
+    <p class="text-gray-500 mt-1">@{{ user.username }}</p>
+</div>
+<div class="border-t border-gray-200 pt-6 mb-6 space-y-3">
+    {{ user_info_row('Username', user.username) }}
+    {{ user_info_row('Email', user.email) }}
+    <div class="flex justify-between items-center">
+        <span class="text-gray-600 font-semibold">Role:</span>
+        {{ role_badge(user.role) }}
     </div>
 </div>
+<form action="/auth/logout" method="POST">
+    {{ primary_button('Log out', 'submit', 'red') }}
+</form>
+{% else %}
+<h2 class="text-3xl font-bold mb-6 text-center text-gray-900">You are not logged in</h2>
+<a href="/auth/login"
+    class="block w-full text-center bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg">
+    Log in
+</a>
+{% endif %}
+{% endcall %}
 {% endblock %}

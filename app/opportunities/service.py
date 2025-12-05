@@ -8,6 +8,8 @@ from uuid import UUID
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.exceptions import conflict, forbid, require
+from app.core.service import BaseService
 from app.db.models import Application, Opportunity, Organization, User
 from app.db.repositories import (
     ApplicationRepository,
@@ -17,22 +19,12 @@ from app.db.repositories import (
 )
 
 
-def _require_opportunity(opportunity: Opportunity | None) -> Opportunity:
-    """Require opportunity to exist or raise 404."""
-    if not opportunity:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Opportunity not found",
-        )
-    return opportunity
-
-
-class OpportunityService:
+class OpportunityService(BaseService):
     """Service for opportunity-related business logic."""
 
     def __init__(self, db: AsyncSession) -> None:
         """Initialize with database session."""
-        self.db = db
+        super().__init__(db)
         self._opp_repo = OpportunityRepository(db)
         self._org_repo = OrganizationRepository(db)
         self._role_repo = UserOrganizationRoleRepository(db)
@@ -43,7 +35,8 @@ class OpportunityService:
 
     async def get_by_id(self, opportunity_id: UUID) -> Opportunity:
         """Get opportunity by ID or raise 404."""
-        return _require_opportunity(await self._opp_repo.get_by_id(opportunity_id))
+        opp = await self._opp_repo.get_by_id_with_organization(opportunity_id)
+        return require(opp, "Opportunity not found")
 
     async def create(
         self,
@@ -96,15 +89,14 @@ class OpportunityService:
         return organizations
 
 
-class ApplicationService:
+class ApplicationService(BaseService):
     """Service for application-related business logic."""
 
     def __init__(self, db: AsyncSession) -> None:
         """Initialize with database session."""
-        self.db = db
+        super().__init__(db)
         self._app_repo = ApplicationRepository(db)
         self._opp_repo = OpportunityRepository(db)
-        self._role_repo = UserOrganizationRoleRepository(db)
 
     async def check_already_applied(self, user_id: UUID, opportunity_id: UUID) -> Application | None:
         """Check if user has already applied to an opportunity."""
@@ -113,11 +105,7 @@ class ApplicationService:
     async def require_not_applied(self, user_id: UUID, opportunity_id: UUID) -> None:
         """Raise error if user has already applied."""
         existing = await self.check_already_applied(user_id, opportunity_id)
-        if existing:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="You have already applied to this opportunity",
-            )
+        conflict(existing is not None, "You have already applied to this opportunity")
 
     async def apply(
         self,
@@ -140,7 +128,7 @@ class ApplicationService:
             HTTPException: If opportunity not found, closed, or already applied
         """
         # Verify opportunity exists and is open
-        opportunity = _require_opportunity(await self._opp_repo.get_by_id(opportunity_id))
+        opportunity = await self.get_or_404(self._opp_repo, opportunity_id, "Opportunity not found")
 
         if not opportunity.is_open:
             raise HTTPException(
@@ -193,18 +181,10 @@ class ApplicationService:
         """
         application = await self.get_by_id(application_id)
 
-        if application.volunteer_id != user.id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="You can only withdraw your own applications",
-            )
+        forbid(application.volunteer_id != user.id, "You can only withdraw your own applications")
 
         await self._app_repo.delete(application)
 
     async def get_by_opportunity_with_volunteer(self, opportunity_id: UUID) -> list[Application]:
         """Get all applications for an opportunity with volunteer details."""
         return await self._app_repo.get_by_opportunity_with_volunteer(opportunity_id)
-
-    async def is_organization_admin(self, user_id: UUID, organization_id: UUID) -> bool:
-        """Check if user is admin of organization."""
-        return await self._role_repo.is_organization_admin(user_id, organization_id)

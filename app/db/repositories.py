@@ -2,21 +2,22 @@
 
 from uuid import UUID
 
-from sqlalchemy import ColumnElement, select
+from sqlalchemy import ColumnElement, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import DeclarativeBase, selectinload
 from sqlalchemy.orm.strategy_options import _AbstractLoad
 
-from app.db.models import Application, Opportunity, Organization, RefreshToken, User, UserOrganizationRole
+from app.db.models import Application, Follow, Opportunity, Organization, RefreshToken, User, UserOrganizationRole
 
 
 class BaseRepository[T: DeclarativeBase]:
     """Generic repository providing common CRUD operations for all models."""
 
-    def __init__(self, session: AsyncSession, model: type[T]) -> None:
-        """Initialize repository with database session and model class."""
+    model: type[T]  # Set by subclass
+
+    def __init__(self, session: AsyncSession) -> None:
+        """Initialize repository with database session."""
         self.session = session
-        self.model = model
 
     async def create(self, obj: T) -> T:
         """Create a new object in the database."""
@@ -104,21 +105,21 @@ class BaseRepository[T: DeclarativeBase]:
 class UserRepository(BaseRepository[User]):
     """Repository for User model database operations."""
 
-    def __init__(self, session: AsyncSession) -> None:
-        """Initialize UserRepository."""
-        super().__init__(session, User)
+    model = User
 
     async def get_by_email(self, email: str) -> User | None:
         """Get user by email."""
         return await self.find_one(User.email == email)
 
+    async def get_by_username(self, username: str) -> User | None:
+        """Get user by username."""
+        return await self.find_one(User.username == username)
+
 
 class RefreshTokenRepository(BaseRepository[RefreshToken]):
     """Repository for RefreshToken model database operations."""
 
-    def __init__(self, session: AsyncSession) -> None:
-        """Initialize RefreshTokenRepository."""
-        super().__init__(session, RefreshToken)
+    model = RefreshToken
 
     async def get_by_token_hash(self, token_hash: str) -> RefreshToken | None:
         """Get refresh token by token hash."""
@@ -128,9 +129,7 @@ class RefreshTokenRepository(BaseRepository[RefreshToken]):
 class OrganizationRepository(BaseRepository[Organization]):
     """Repository for Organization model database operations."""
 
-    def __init__(self, session: AsyncSession) -> None:
-        """Initialize OrganizationRepository."""
-        super().__init__(session, Organization)
+    model = Organization
 
     async def get_by_id_with_opportunities(self, org_id: UUID) -> Organization | None:
         """Get organization by ID with opportunities eagerly loaded."""
@@ -152,9 +151,7 @@ class OrganizationRepository(BaseRepository[Organization]):
 class UserOrganizationRoleRepository(BaseRepository[UserOrganizationRole]):
     """Repository for UserOrganizationRole model database operations."""
 
-    def __init__(self, session: AsyncSession) -> None:
-        """Initialize UserOrganizationRoleRepository."""
-        super().__init__(session, UserOrganizationRole)
+    model = UserOrganizationRole
 
     async def get_by_user_and_org(self, user_id: UUID, organization_id: UUID) -> UserOrganizationRole | None:
         """Get user-organization role by user ID and organization ID."""
@@ -188,21 +185,27 @@ class UserOrganizationRoleRepository(BaseRepository[UserOrganizationRole]):
 class OpportunityRepository(BaseRepository[Opportunity]):
     """Repository for Opportunity model database operations."""
 
-    def __init__(self, session: AsyncSession) -> None:
-        """Initialize OpportunityRepository."""
-        super().__init__(session, Opportunity)
+    model = Opportunity
 
     async def get_all_open(self) -> list[Opportunity]:
         """Get all open opportunities."""
-        return await self.find_many(Opportunity.is_open == True)  # noqa: E712
+        return await self.find_many(
+            Opportunity.is_open.is_(True),
+            options=[selectinload(Opportunity.organization)],
+        )
+
+    async def get_by_id_with_organization(self, opportunity_id: UUID) -> Opportunity | None:
+        """Get opportunity by ID with organization eagerly loaded."""
+        return await self.find_one(
+            Opportunity.id == opportunity_id,
+            options=[selectinload(Opportunity.organization)],
+        )
 
 
 class ApplicationRepository(BaseRepository[Application]):
     """Repository for Application model database operations."""
 
-    def __init__(self, session: AsyncSession) -> None:
-        """Initialize ApplicationRepository."""
-        super().__init__(session, Application)
+    model = Application
 
     async def get_by_volunteer(self, volunteer_id: UUID) -> list[Application]:
         """Get all applications for a volunteer."""
@@ -235,8 +238,68 @@ class ApplicationRepository(BaseRepository[Application]):
         return await self.update(application)
 
 
+class FollowRepository:
+    """Repository for Follow model - uses composite primary key."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        """Initialize FollowRepository."""
+        self.session = session
+
+    async def get_follow(self, follower_id: UUID, followed_id: UUID) -> Follow | None:
+        """Get follow relationship by composite key."""
+        query = select(Follow).where(
+            Follow.follower_id == follower_id,
+            Follow.followed_id == followed_id,
+        )
+        result = await self.session.execute(query)
+        return result.scalar_one_or_none()
+
+    async def is_following(self, follower_id: UUID, followed_id: UUID) -> bool:
+        """Check if follow relationship exists."""
+        return await self.get_follow(follower_id, followed_id) is not None
+
+    async def get_followers(self, user_id: UUID) -> list[Follow]:
+        """Get all followers of a user with follower details loaded."""
+        query = select(Follow).where(Follow.followed_id == user_id).options(selectinload(Follow.follower))
+        result = await self.session.execute(query)
+        return list(result.scalars().all())
+
+    async def get_following(self, user_id: UUID) -> list[Follow]:
+        """Get all users that a user follows with followed details loaded."""
+        query = select(Follow).where(Follow.follower_id == user_id).options(selectinload(Follow.followed))
+        result = await self.session.execute(query)
+        return list(result.scalars().all())
+
+    async def get_follower_count(self, user_id: UUID) -> int:
+        """Count followers of a user."""
+        query = select(func.count()).select_from(Follow).where(Follow.followed_id == user_id)
+        result = await self.session.execute(query)
+        return result.scalar() or 0
+
+    async def get_following_count(self, user_id: UUID) -> int:
+        """Count users that a user follows."""
+        query = select(func.count()).select_from(Follow).where(Follow.follower_id == user_id)
+        result = await self.session.execute(query)
+        return result.scalar() or 0
+
+    async def create_follow(self, follower_id: UUID, followed_id: UUID) -> Follow:
+        """Create a follow relationship."""
+        follow = Follow(follower_id=follower_id, followed_id=followed_id)
+        self.session.add(follow)
+        await self.session.flush()
+        return follow
+
+    async def delete_follow(self, follower_id: UUID, followed_id: UUID) -> None:
+        """Delete a follow relationship (idempotent)."""
+        follow = await self.get_follow(follower_id, followed_id)
+        if follow:
+            await self.session.delete(follow)
+            await self.session.flush()
+
+
 __all__ = [
     "ApplicationRepository",
+    "FollowRepository",
     "OpportunityRepository",
     "OrganizationRepository",
     "RefreshTokenRepository",

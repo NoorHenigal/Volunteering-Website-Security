@@ -1,57 +1,68 @@
 {% extends "base.html" %}
-{% from "components/ui.html" import page_header, application_status_badge, datetime_display, empty_state %}
+{% from "components/ui.html" import page_header, application_status_badge, datetime_display, empty_state,
+withdraw_button, message_box %}
 
 {% block title %}My Applications{% endblock %}
 
 {% block content %}
 <div class="max-w-6xl mx-auto">
-    {{ page_header('My Applications', '/opp/list', 'Browse Opportunities', 'blue', applications|length > 0) }}
+    {{ page_header('My Applications', '/opportunities', 'Browse Opportunities', 'blue', applications|length > 0) }}
 
-    {% if applications %}
-    <div class="space-y-4">
+    <div id="application-list" class="space-y-4">
+        {% block application_cards %}
+        {% if applications %}
         {% for app in applications %}
-        <div class="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow">
-            <div class="p-6">
-                <div class="flex justify-between items-start gap-4">
-                    <div class="flex-1 min-w-0">
-                        <div class="flex items-center gap-3 mb-2">
-                            <h2 class="text-xl font-bold text-gray-800 truncate">
-                                <a href="/opp/{{ app.opportunity_id }}" class="hover:text-blue-600 transition-colors">
-                                    {% if app.opportunity %}{{ app.opportunity.title }}{% else %}Opportunity #{{ app.opportunity_id }}{% endif %}
-                                </a>
-                            </h2>
-                            {{ application_status_badge(app.status, 'sm') }}
+        <div id="application-{{ app.id }}">
+            {% block application_card scoped %}
+            <div class="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow">
+                <div class="p-6">
+                    <div class="flex justify-between items-start gap-4">
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-3 mb-2">
+                                <h2 class="text-xl font-bold text-gray-800 truncate">
+                                    <a href="/opportunities/{{ app.opportunity_id }}"
+                                        class="hover:text-blue-600 transition-colors">
+                                        {% if app.opportunity %}{{ app.opportunity.title }}{% else %}Opportunity #{{
+                                        app.opportunity_id }}{% endif %}
+                                    </a>
+                                </h2>
+                                {{ application_status_badge(app.status, 'sm') }}
+                            </div>
+                            {% if app.opportunity %}
+                            <p class="text-gray-600 mb-3 line-clamp-2">{{ app.opportunity.description[:150] }}{% if
+                                app.opportunity.description|length > 150 %}...{% endif %}</p>
+                            {% endif %}
+                            {{ datetime_display(app.created_at, 'Applied on ') }}
                         </div>
-                        {% if app.opportunity %}
-                        <p class="text-gray-600 mb-3 line-clamp-2">{{ app.opportunity.description[:150] }}{% if app.opportunity.description|length > 150 %}...{% endif %}</p>
-                        {% endif %}
-                        {{ datetime_display(app.created_at, 'Applied on ') }}
-                    </div>
-                    {% if app.status == 'pending' %}
-                    <div class="flex-shrink-0">
-                        <form action="/opp/applications/{{ app.id }}/withdraw" method="POST" class="inline">
-                            <button type="submit" class="inline-flex items-center gap-2 bg-white border border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 font-semibold py-2 px-4 rounded-lg transition-all text-sm">
+                        {% if app.status == 'pending' %}
+                        <div class="flex-shrink-0">
+                            <button hx-post="/applications/{{ app.id }}/withdraw" hx-target="#application-{{ app.id }}"
+                                hx-swap="outerHTML" hx-confirm="Are you sure you want to withdraw this application?"
+                                class="inline-flex items-center gap-2 bg-white border border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 font-semibold py-2 px-4 text-sm rounded-lg transition-all">
                                 <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M6 18L18 6M6 6l12 12" />
                                 </svg>
                                 Withdraw
                             </button>
-                        </form>
+                        </div>
+                        {% endif %}
                     </div>
-                    {% endif %}
                 </div>
+                {% if app.message %}
+                <div class="border-t border-gray-100 px-6 py-4">
+                    {{ message_box(app.message, 'Your message') }}
+                </div>
+                {% endif %}
             </div>
-            {% if app.message %}
-            <div class="bg-gray-50 border-t border-gray-100 px-6 py-4">
-                <p class="text-sm font-medium text-gray-500 mb-1">Your message</p>
-                <p class="text-gray-700">{{ app.message }}</p>
-            </div>
-            {% endif %}
+            {% endblock %}
         </div>
         {% endfor %}
+        {% else %}
+        {{ empty_state("You haven't applied to any opportunities yet", '/opportunities', 'Browse Opportunities', 'blue',
+        True) }}
+        {% endif %}
+        {% endblock %}
     </div>
-    {% else %}
-    {{ empty_state("You haven't applied to any opportunities yet", '/opp/list', 'Browse Opportunities', 'blue', True) }}
-    {% endif %}
 </div>
 {% endblock %}

@@ -5,20 +5,21 @@ This service layer consolidates logic shared between API and UI handlers.
 
 from uuid import UUID
 
-from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.exceptions import forbid, require
+from app.core.service import BaseService
 from app.db.models import Organization
 from app.db.repositories import OrganizationRepository, UserOrganizationRoleRepository
 from app.organizations.schemas import OrganizationMemberResponse
 
 
-class OrganizationService:
+class OrganizationService(BaseService):
     """Service for organization-related business logic."""
 
     def __init__(self, db: AsyncSession) -> None:
         """Initialize with database session."""
-        self.db = db
+        super().__init__(db)
         self._org_repo = OrganizationRepository(db)
         self._role_repo = UserOrganizationRoleRepository(db)
 
@@ -26,22 +27,14 @@ class OrganizationService:
         """Get all organizations."""
         return await self._org_repo.get_all()
 
-    def _require_found(self, organization: Organization | None) -> Organization:
-        """Require organization to exist or raise 404."""
-        if not organization:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Organization not found",
-            )
-        return organization
-
     async def get_by_id(self, organization_id: UUID) -> Organization:
         """Get organization by ID or raise 404."""
-        return self._require_found(await self._org_repo.get_by_id(organization_id))
+        return await self.get_or_404(self._org_repo, organization_id, "Organization not found")
 
     async def get_by_id_with_opportunities(self, organization_id: UUID) -> Organization:
         """Get organization by ID with opportunities or raise 404."""
-        return self._require_found(await self._org_repo.get_by_id_with_opportunities(organization_id))
+        org = await self._org_repo.get_by_id_with_opportunities(organization_id)
+        return require(org, "Organization not found")
 
     async def create(
         self,
@@ -93,6 +86,9 @@ class OrganizationService:
             OrganizationMemberResponse(
                 user_id=r.user.id,
                 email=r.user.email,
+                username=r.user.username,
+                first_name=r.user.first_name,
+                last_name=r.user.last_name,
                 role=r.role,
             )
             for r in member_roles
@@ -108,16 +104,8 @@ class OrganizationService:
 
     async def require_admin(self, user_id: UUID, organization_id: UUID) -> None:
         """Require user to be admin of organization."""
-        if not await self.is_admin(user_id, organization_id):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Only organization admins can perform this action",
-            )
+        forbid(not await self.is_admin(user_id, organization_id), "Only organization admins can perform this action")
 
     async def require_member(self, user_id: UUID, organization_id: UUID) -> None:
         """Require user to be member of organization."""
-        if not await self.is_member(user_id, organization_id):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Must be organization member",
-            )
+        forbid(not await self.is_member(user_id, organization_id), "Must be organization member")

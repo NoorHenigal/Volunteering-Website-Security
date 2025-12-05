@@ -155,7 +155,7 @@ class APIHelper:
         assert isinstance(result, Response)
         return result
 
-    async def no_content(
+    async def conflict(
         self,
         method: str,
         endpoint: str,
@@ -163,9 +163,22 @@ class APIHelper:
         auth: AuthenticatedUser | None = None,
         json: dict[str, Any] | None = None,
         **kwargs: Any,
+    ) -> Response:
+        """Assert 409 Conflict."""
+        result = await self(method, endpoint, expected=409, auth=auth, json=json, **kwargs)
+        assert isinstance(result, Response)
+        return result
+
+    async def no_content(
+        self,
+        method: str,
+        endpoint: str,
+        *,
+        auth: AuthenticatedUser | None = None,
+        **kwargs: Any,
     ) -> None:
         """Assert 204 No Content."""
-        await self(method, endpoint, expected=204, auth=auth, json=json, **kwargs)
+        await self(method, endpoint, expected=204, auth=auth, **kwargs)
 
     async def list_contains(
         self,
