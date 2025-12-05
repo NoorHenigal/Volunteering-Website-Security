@@ -88,7 +88,6 @@ class User(Base, FullModelMixin):
         String(50), nullable=False, server_default="public", default="public"
     )
     show_email: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="0", default=False)
-    show_applications: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="1", default=True)
     show_organizations: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="1", default=True)
     searchable: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="1", default=True)
 

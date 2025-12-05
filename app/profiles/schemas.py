@@ -45,7 +45,6 @@ class PrivacySettingsSchema(BaseUpdate):
 
     profile_visibility: ProfileVisibilityField | None = None
     show_email: bool | None = None
-    show_applications: bool | None = None
     show_organizations: bool | None = None
     searchable: bool | None = None
 

@@ -1,8 +1,8 @@
 """Initial Migration.
 
-Revision ID: 280e0ac1ba05
+Revision ID: 90b5aace4c23
 Revises:
-Create Date: 2025-12-05 02:59:16.971363+00:00
+Create Date: 2025-12-05 03:33:08.374747+00:00
 """
 
 from collections.abc import Sequence
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 from alembic import op
 
 # Revision identifiers, used by Alembic.
-revision: str = "280e0ac1ba05"
+revision: str = "90b5aace4c23"
 down_revision: str | None = None
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
@@ -44,7 +44,6 @@ def upgrade() -> None:
         sa.Column("description", sa.Text(), nullable=True),
         sa.Column("profile_visibility", sa.String(length=50), server_default="public", nullable=False),
         sa.Column("show_email", sa.Boolean(), server_default="0", nullable=False),
-        sa.Column("show_applications", sa.Boolean(), server_default="1", nullable=False),
         sa.Column("show_organizations", sa.Boolean(), server_default="1", nullable=False),
         sa.Column("searchable", sa.Boolean(), server_default="1", nullable=False),
         sa.Column("id", sa.UUID(), nullable=False),

@@ -144,7 +144,6 @@ async def update_privacy_api(ctx: ContextDep, user: User, service: ProfileServic
         {
             "profile_visibility": "profile_visibility",
             "show_email": "show_email",
-            "show_applications": "show_applications",
             "show_organizations": "show_organizations",
             "searchable": "searchable",
         },
@@ -156,7 +155,6 @@ async def update_privacy_api(ctx: ContextDep, user: User, service: ProfileServic
         content={
             "profile_visibility": updated.profile_visibility,
             "show_email": updated.show_email,
-            "show_applications": updated.show_applications,
             "show_organizations": updated.show_organizations,
             "searchable": updated.searchable,
         }
@@ -179,7 +177,6 @@ async def update_privacy_form(ctx: ContextDep, user: User, service: ProfileServi
     data = PrivacySettingsSchema(
         profile_visibility=visibility,
         show_email=form.get("show_email") == "on",
-        show_applications=form.get("show_applications") == "on",
         show_organizations=form.get("show_organizations") == "on",
         searchable=form.get("searchable") == "on",
     )

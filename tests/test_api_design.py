@@ -7,30 +7,6 @@ from httpx import AsyncClient
 from tests.fixtures.data import register_and_login
 
 
-class TestHealthEndpoint:
-    """Test health endpoint with proper response model."""
-
-    @pytest.mark.anyio
-    async def test_health_returns_structured_response(self, client: AsyncClient) -> None:
-        """Test /health returns HealthResponse schema."""
-        response = await client.get("/health", headers={"Accept": "application/json"})
-        assert response.status_code == status.HTTP_200_OK
-        data = response.json()
-        assert "status" in data
-        assert data["status"] == "healthy"
-
-    @pytest.mark.anyio
-    async def test_health_openapi_schema(self, client: AsyncClient) -> None:
-        """Test /health is documented in OpenAPI schema."""
-        response = await client.get("/openapi.json")
-        assert response.status_code == status.HTTP_200_OK
-        schema = response.json()
-        assert "/health" in schema["paths"]
-        health_get = schema["paths"]["/health"]["get"]
-        assert "responses" in health_get
-        assert "200" in health_get["responses"]
-
-
 class TestErrorResponses:
     """Test consistent error response format."""
 
@@ -139,18 +115,6 @@ class TestOpenAPIDocumentation:
         error_schema = schemas["ErrorResponse"]
         assert "detail" in error_schema.get("properties", {})
 
-    @pytest.mark.anyio
-    async def test_health_response_schema_in_openapi(self, client: AsyncClient) -> None:
-        """Test HealthResponse schema is defined in OpenAPI."""
-        response = await client.get("/openapi.json")
-        assert response.status_code == status.HTTP_200_OK
-        schema = response.json()
-
-        schemas = schema.get("components", {}).get("schemas", {})
-        assert "HealthResponse" in schemas
-        health_schema = schemas["HealthResponse"]
-        assert "status" in health_schema.get("properties", {})
-
 
 class TestExceptionHandlers:
     """Test exception handlers for RFC compliance and schema correctness."""
@@ -168,9 +132,11 @@ class TestExceptionHandlers:
     @pytest.mark.anyio
     async def test_405_includes_allow_header(self, client: AsyncClient) -> None:
         """Test 405 responses include Allow header per RFC 9110."""
-        response = await client.request("TRACE", "/health")
+        # Use an endpoint that definitely exists but doesn't support TRACE
+        response = await client.request("TRACE", "/api/auth/me")
         assert response.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
         assert "Allow" in response.headers
+        # GET is allowed on /api/auth/me
         assert "GET" in response.headers["Allow"]
 
 

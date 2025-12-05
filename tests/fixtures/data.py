@@ -141,9 +141,10 @@ async def register_and_login(
     role: RoleType = "volunteer",
     email: str | None = None,
     password: str | None = None,
+    username: str | None = None,
 ) -> AuthenticatedUser:
     """Register and login a user, returning full AuthenticatedUser."""
-    user = await register_user(client, role, email, password)
+    user = await register_user(client, role, email, password, username=username)
     user.tokens = await login_user(client, user.email, user.password)
     return user
 

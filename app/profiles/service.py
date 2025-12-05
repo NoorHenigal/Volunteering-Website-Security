@@ -53,11 +53,18 @@ class ProfileService(BaseService):
         can_view_full = await self._can_view_full_profile(profile_user, viewer)
 
         if not can_view_full:
-            # Check if profile is completely private
-            if profile_user.profile_visibility == "private" and (viewer is None or viewer.id != profile_user.id):
-                raise HTTPException(status_code=403, detail="This profile is private")
+            # Check privacy settings and raise appropriate errors
+            if profile_user.profile_visibility == "private":
+                # Hide existence of private profiles
+                raise HTTPException(status_code=404, detail="User not found")
 
-            # Return public profile only (counts calculated in _to_public_profile)
+            if profile_user.profile_visibility == "authenticated":
+                raise HTTPException(status_code=403, detail="Authentication required to view this profile")
+
+            if profile_user.profile_visibility == "followers":
+                raise HTTPException(status_code=403, detail="Must follow user to view profile")
+
+            # Fallback for any other case (shouldn't be reached if logic is consistent)
             return await self._to_public_profile(profile_user)
 
         # Build full profile - calculate counts only when needed

@@ -14,7 +14,6 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.auth.router import api_router as auth_api_router
 from app.auth.router import router as auth_router
-from app.core.base_schemas import HealthResponse
 from app.core.config import settings
 from app.core.context import ContextDep, render_template
 from app.core.exceptions import http_exception_handler, validation_exception_handler
@@ -88,16 +87,6 @@ app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="stat
 async def home(ctx: ContextDep) -> Response:
     """Home page."""
     return render_template(ctx.request, "index.html", user=ctx.user)
-
-
-@app.get("/health", response_model=HealthResponse)
-async def health() -> HealthResponse:
-    """Health check endpoint.
-
-    Returns:
-        Health status
-    """
-    return HealthResponse(status="healthy")
 
 
 app.include_router(auth_router)

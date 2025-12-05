@@ -5,9 +5,6 @@ Security features:
 - Validates file content, not just extension
 - Uses UUID filenames to prevent path traversal
 - Enforces size limits
-
-Note: Cropping is handled client-side via Canvas API. The backend receives
-pre-cropped square images and only handles validation, resizing, and storage.
 """
 
 from io import BytesIO

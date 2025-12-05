@@ -120,12 +120,6 @@ class BaseOut(TimestampSchemaMixin):
     model_config = ORM_CONFIG
 
 
-class HealthResponse(StrictModel):
-    """Health check response."""
-
-    status: str
-
-
 class ErrorResponse(StrictModel):
     """Standardized error response."""
 
@@ -201,7 +195,6 @@ __all__ = [
     "BaseOut",
     "BaseUpdate",
     "ErrorResponse",
-    "HealthResponse",
     "ListResponse",
     "PaginationMeta",
     "StrictModel",

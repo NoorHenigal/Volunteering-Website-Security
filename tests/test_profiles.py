@@ -129,14 +129,12 @@ async def test_update_privacy_settings(client: AsyncClient) -> None:
         json={
             "profile_visibility": "authenticated",
             "show_email": True,
-            "show_applications": False,
         },
     )
     assert response.status_code == 200
     data = response.json()
     assert data["profile_visibility"] == "authenticated"
     assert data["show_email"] is True
-    assert data["show_applications"] is False
 
 
 @pytest.mark.anyio
@@ -162,3 +160,72 @@ async def test_following_list(client: AsyncClient) -> None:
     response = await client.get("/listuser2/following", headers={"Accept": "text/html"})
     assert response.status_code == 200
     assert "following" in response.text.lower() or "follows" in response.text.lower()
+
+
+@pytest.mark.anyio
+async def test_profile_visibility_authenticated(client: AsyncClient) -> None:
+    """Test authenticated only visibility."""
+    target = await register_and_login(client, username="authonly", role="volunteer")
+    await client.put(
+        "/me/privacy",
+        headers=target.auth_header,
+        json={"profile_visibility": "authenticated"},
+    )
+
+    # 1. Anonymous access -> 403
+    response = await client.get("/authonly")
+    assert response.status_code == 403
+
+    # 2. Authenticated access -> 200
+    viewer = await register_and_login(client, username="viewer", role="volunteer")
+    response = await client.get("/authonly", headers=viewer.auth_header)
+    assert response.status_code == 200
+
+
+@pytest.mark.anyio
+async def test_profile_visibility_followers(client: AsyncClient) -> None:
+    """Test followers only visibility."""
+    target = await register_and_login(client, username="followonly", role="volunteer")
+    await client.put(
+        "/me/privacy",
+        headers=target.auth_header,
+        json={"profile_visibility": "followers"},
+    )
+
+    # 1. Anonymous -> 403
+    response = await client.get("/followonly")
+    assert response.status_code == 403
+
+    # 2. Non-follower -> 403
+    viewer = await register_and_login(client, username="viewer2", role="volunteer")
+    response = await client.get("/followonly", headers=viewer.auth_header)
+    assert response.status_code == 403
+
+    # 3. Follower -> 200
+    await client.post("/followonly/follow", headers=viewer.auth_header)
+    response = await client.get("/followonly", headers=viewer.auth_header)
+    assert response.status_code == 200
+
+
+@pytest.mark.anyio
+async def test_profile_visibility_private(client: AsyncClient) -> None:
+    """Test private visibility."""
+    target = await register_and_login(client, username="privateuser", role="volunteer")
+    await client.put(
+        "/me/privacy",
+        headers=target.auth_header,
+        json={"profile_visibility": "private"},
+    )
+
+    # 1. Anonymous -> 404
+    response = await client.get("/privateuser")
+    assert response.status_code == 404
+
+    # 2. Authenticated -> 404
+    viewer = await register_and_login(client, username="viewer3", role="volunteer")
+    response = await client.get("/privateuser", headers=viewer.auth_header)
+    assert response.status_code == 404
+
+    # 3. Owner -> 200
+    response = await client.get("/privateuser", headers=target.auth_header)
+    assert response.status_code == 200
