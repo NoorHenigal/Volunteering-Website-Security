@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% from "components/ui.html" import detail_header, application_status_badge, datetime_display, message_box, page_card,
-primary_button %}
+primary_button, button_solid %}
 
 {% block title %}Applicants - {{ opportunity.title }}{% endblock %}
 
@@ -52,13 +52,11 @@ primary_button %}
             {% if app.status == 'pending' %}
             <div class="ml-6 flex gap-2">
                 <form method="POST" action="/opp/{{ opportunity.id }}/applicants/{{ app.id }}/accept" class="inline">
-                    <button type="submit"
-                        class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-lg">
-                        Accept
-                    </button>
+                    {{ button_solid('Accept', color='green', size='sm') }}
                 </form>
                 <form method="POST" action="/opp/{{ opportunity.id }}/applicants/{{ app.id }}/reject" class="inline">
-                    <button type="submit" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-6 rounded-lg">
+                    <button type="submit"
+                        class="inline-flex items-center justify-center gap-2 font-semibold rounded-lg border border-red-200 bg-white text-red-600 hover:bg-red-50 hover:border-red-300 transition-colors text-sm py-2 px-4">
                         Reject
                     </button>
                 </form>

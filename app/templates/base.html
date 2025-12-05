@@ -32,8 +32,8 @@
     <nav class="sticky top-0 z-50 bg-white shadow-lg border-b border-gray-200" x-data="{ mobileMenuOpen: false }">
         <div class="container mx-auto px-4">
             <div class="flex justify-between items-center py-4">
-                <a href="/" class="text-2xl font-bold text-blue-600 hover:text-blue-700">
-                    <span class="bg-blue-600 bg-clip-text text-transparent">
+                <a href="/" class="text-2xl font-bold">
+                    <span class="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
                         <span class="hidden sm:inline">Volunteering Platform</span>
                         <span class="sm:hidden">VP</span>
                     </span>
@@ -104,7 +104,7 @@
             <!-- Mobile menu -->
             <div x-show="mobileMenuOpen" x-transition class="lg:hidden pb-4">
                 <ul class="space-y-2">
-                    <li>
+                    <li class="py-2">
                         <a href="/"
                             class="font-semibold text-sm uppercase tracking-wider pb-1 bg-left-bottom group text-black transition-all duration-300 ease-in-out block px-3">
                             <span
@@ -114,7 +114,7 @@
                         </a>
                     </li>
                     {% if user %}
-                    <li>
+                    <li class="py-2">
                         <a href="/opp/list"
                             class="font-semibold text-sm uppercase tracking-wider pb-1 bg-left-bottom group text-black transition-all duration-300 ease-in-out block px-3">
                             <span
@@ -123,7 +123,7 @@
                             </span>
                         </a>
                     </li>
-                    <li>
+                    <li class="py-2">
                         <a href="/org/list"
                             class="font-semibold text-sm uppercase tracking-wider pb-1 bg-left-bottom group text-black transition-all duration-300 ease-in-out block px-3">
                             <span
@@ -132,7 +132,7 @@
                             </span>
                         </a>
                     </li>
-                    <li>
+                    <li class="py-2">
                         <a href="/{{ user.username }}"
                             class="font-semibold text-sm uppercase tracking-wider pb-1 bg-left-bottom group text-black transition-all duration-300 ease-in-out block px-3">
                             <span
@@ -141,7 +141,7 @@
                             </span>
                         </a>
                     </li>
-                    <li>
+                    <li class="py-2">
                         <a href="/auth/status"
                             class="font-semibold text-sm uppercase tracking-wider pb-1 bg-left-bottom group text-black transition-all duration-300 ease-in-out block px-3">
                             <span
@@ -151,7 +151,7 @@
                         </a>
                     </li>
                     {% if user.role == 'volunteer' %}
-                    <li>
+                    <li class="py-2">
                         <a href="/opp/applications/list"
                             class="font-semibold text-sm uppercase tracking-wider pb-1 bg-left-bottom group text-black transition-all duration-300 ease-in-out block px-3">
                             <span
@@ -170,7 +170,7 @@
                         </form>
                     </li>
                     {% else %}
-                    <li>
+                    <li class="py-2">
                         <a href="/auth/login"
                             class="font-semibold text-sm uppercase tracking-wider pb-1 bg-left-bottom group text-black transition-all duration-300 ease-in-out block px-3">
                             <span

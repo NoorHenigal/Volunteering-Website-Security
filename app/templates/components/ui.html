@@ -37,10 +37,10 @@
 {% macro back_link(url, text) %}
 <a href="{{ url }}" class="text-blue-600 hover:text-blue-800 font-semibold">← {{ text }}</a>
 {% endmacro %}
-{% macro card(padding='p-8', max_width='', extra_classes='') %}
+{% macro card(padding='p-6', max_width='', extra_classes='') %}
 {% set width_class = 'max-w-' + max_width + ' mx-auto' if max_width else '' %}
 <div class="{{ width_class }}">
-    <div class="bg-white rounded-lg shadow-lg {{ padding }} {{ extra_classes }}">
+    <div class="bg-white rounded-lg shadow-md {{ padding }} {{ extra_classes }}">
         {{ caller() }}
     </div>
 </div>
@@ -49,7 +49,15 @@
 {% macro page_card(max_width='6xl') %}
 {# Standard page card wrapper - use for detail/form pages #}
 <div class="max-w-{{ max_width }} mx-auto">
-    <div class="bg-white rounded-lg shadow-lg p-8">
+    <div class="bg-white rounded-xl shadow-lg p-8">
+        {{ caller() }}
+    </div>
+</div>
+{% endmacro %}
+
+{% macro page_card_tight(max_width='6xl') %}
+<div class="max-w-{{ max_width }} mx-auto">
+    <div class="bg-white rounded-lg shadow-lg p-6">
         {{ caller() }}
     </div>
 </div>
@@ -113,11 +121,30 @@
     class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
     placeholder="{{ placeholder }}">{{ value }}</textarea>
 {% endmacro %}
-{% macro primary_button(text, type='submit', color='blue', full_width=True) %}
-<button type="{{ type }}"
-    class="{% if full_width %}w-full{% endif %} bg-{{ color }}-600 hover:bg-{{ color }}-700 text-white font-bold py-3 px-6 rounded-lg">
+{% macro button_solid(text, href=None, color='blue', size='md', full_width=False, icon=None) %}
+{% set size_classes = {
+'sm': 'text-sm py-2 px-3',
+'md': 'text-sm py-2.5 px-4',
+'lg': 'text-base py-3 px-6'
+} %}
+{% set base = size_classes.get(size, size_classes['md']) %}
+{% set width = 'w-full' if full_width else '' %}
+{% set classes = width ~ ' inline-flex items-center justify-center gap-2 font-semibold rounded-lg bg-' ~ color ~ '-600
+hover:bg-' ~ color ~ '-700 text-white transition-colors' %}
+
+{% if href %}
+<a href="{{ href }}" class="{{ classes }} {{ base }}">
+    {{ text }}
+</a>
+{% else %}
+<button type="submit" class="{{ classes }} {{ base }}">
     {{ text }}
 </button>
+{% endif %}
+{% endmacro %}
+
+{% macro primary_button(text, type='submit', color='blue', full_width=True) %}
+{{ button_solid(text, color=color, full_width=full_width) }}
 {% endmacro %}
 {% macro secondary_button(url, text='Cancel', full_width=False) %}
 {# Secondary/cancel button style #}
