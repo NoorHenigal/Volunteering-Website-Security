@@ -1,15 +1,21 @@
 """Integration tests."""
 
+from collections.abc import Generator
+from io import BytesIO
+from pathlib import Path
+from unittest.mock import patch
 from uuid import UUID, uuid4
 
 import pytest
 from fastapi import status
 from httpx import AsyncClient
+from pyfakefs.fake_filesystem import FakeFilesystem
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tests.fixtures.api import APIHelper
 from tests.fixtures.data import FixtureContext
 from tests.fixtures.flows import FlowHelper
+from tests.test_uploads import create_test_image
 
 FAKE_UUID = str(uuid4())
 
@@ -299,3 +305,107 @@ class TestEdgeCases:
             "/api/auth/login",
             json={"email": volunteer.email, "password": "wrong_password123!"},
         )
+
+
+class TestProfilePictureUserFlow:
+    """Test profile picture upload as part of user journey."""
+
+    @pytest.fixture
+    def mock_upload_dir(self, fs: FakeFilesystem) -> Generator[Path]:
+        """Mock get_upload_dir to use fake filesystem for integration tests."""
+        import tempfile
+
+        upload_dir = Path(tempfile.gettempdir()) / "test_uploads"
+        fs.makedirs(str(upload_dir), exist_ok=True)
+        with patch("app.uploads.service.get_upload_dir", return_value=upload_dir):
+            yield upload_dir
+
+    @pytest.mark.anyio
+    async def test_volunteer_can_upload_profile_picture(
+        self,
+        client: AsyncClient,
+        ctx: FixtureContext,
+        mock_upload_dir: Path,
+    ) -> None:
+        """Test: Volunteer can upload and update their profile picture."""
+        volunteer = await ctx.volunteer()
+        buffer = BytesIO(create_test_image())
+
+        response = await client.post(
+            "/settings/profile/picture",
+            files={"file": ("test.png", buffer, "image/png")},
+            headers=volunteer.auth_header,
+        )
+
+        assert response.status_code in (200, 303)
+
+    @pytest.mark.anyio
+    async def test_upload_profile_picture_requires_auth(
+        self,
+        client: AsyncClient,
+        mock_upload_dir: Path,
+    ) -> None:
+        """Test: Profile picture upload requires authentication."""
+        buffer = BytesIO(create_test_image())
+
+        response = await client.post(
+            "/settings/profile/picture",
+            files={"file": ("test.png", buffer, "image/png")},
+        )
+
+        assert response.status_code == 303
+
+    @pytest.mark.anyio
+    async def test_upload_rejects_non_image_file(
+        self,
+        client: AsyncClient,
+        ctx: FixtureContext,
+        mock_upload_dir: Path,
+    ) -> None:
+        """Test: Non-image files are rejected during upload."""
+        volunteer = await ctx.volunteer()
+
+        response = await client.post(
+            "/settings/profile/picture",
+            files={"file": ("test.txt", b"not an image", "text/plain")},
+            headers=volunteer.auth_header,
+        )
+
+        assert response.status_code == 400
+
+    @pytest.mark.anyio
+    async def test_volunteer_profile_picture_cleanup_on_update(
+        self,
+        client: AsyncClient,
+        ctx: FixtureContext,
+        mock_upload_dir: Path,
+    ) -> None:
+        """Test: Old profile pictures are cleaned up when user uploads new one."""
+        volunteer = await ctx.volunteer()
+
+        # Upload first picture
+        buffer1 = BytesIO(create_test_image())
+        response1 = await client.post(
+            "/settings/profile/picture",
+            files={"file": ("test1.png", buffer1, "image/png")},
+            headers=volunteer.auth_header,
+        )
+        assert response1.status_code in (200, 303)
+
+        # Get list of files after first upload
+        files_after_first = list(mock_upload_dir.glob("*.webp"))
+        assert len(files_after_first) == 1
+
+        # Upload second picture
+        buffer2 = BytesIO(create_test_image())
+        response2 = await client.post(
+            "/settings/profile/picture",
+            files={"file": ("test2.png", buffer2, "image/png")},
+            headers=volunteer.auth_header,
+        )
+        assert response2.status_code in (200, 303)
+
+        # Verify old picture was cleaned up
+        files_after_second = list(mock_upload_dir.glob("*.webp"))
+        assert len(files_after_second) == 1
+        assert files_after_first[0].name != files_after_second[0].name

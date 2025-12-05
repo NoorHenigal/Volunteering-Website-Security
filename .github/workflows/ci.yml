@@ -11,9 +11,43 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  PYTHON_VERSION: '3.14.1'
+
 jobs:
-  test:
-    name: Test & Lint
+  lint:
+    name: Lint & Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - &checkout-step
+        name: Checkout code
+        uses: actions/checkout@v6
+
+      - &setup-python-step
+        name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - &install-uv-step
+        name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - &install-deps-step
+        name: Install dependencies
+        run: uv sync --extra dev
+
+      - name: Run linting (ruff check)
+        run: uv run ruff check
+
+      - name: Run type checking (mypy)
+        run: uv run mypy --strict .
+
+  unit-tests:
+    name: Unit & Integration Tests
     runs-on: ubuntu-latest
 
     services:
@@ -42,38 +76,97 @@ jobs:
       ENVIRONMENT: test
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
-
-      - name: Set up Python 3.14
-        uses: actions/setup-python@v6
-        with:
-          python-version: '3.14'
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v7
-        with:
-          enable-cache: true
-          cache-dependency-glob: "uv.lock"
+      - *checkout-step
+      - *setup-python-step
+      - *install-uv-step
 
       - name: Initialize PostgreSQL extensions
         run: |
           PGPASSWORD=${{ secrets.POSTGRES_TEST_DB_PASSWORD }} psql -h localhost -U user -d volunteeringapp -f Docker/init-postgres-extensions.sql
 
-      - name: Install dependencies
-        run: uv sync --extra dev
-
-      - name: Run linting (ruff check)
-        run: uv run ruff check
-
-      - name: Run type checking (mypy)
-        run: uv run mypy --strict .
-
-      - name: Run tests (pytest)
-        run: uv run pytest -xvs
+      - *install-deps-step
 
       - name: Run database migrations
         run: uv run alembic upgrade head
 
-      - name: Run smoke test (server startup)
-        run: TEST_RUN_DURATION=5 uv run python run.py
+      - name: Run tests (pytest)
+        run: uv run pytest -xvs
+
+  contract-tests:
+    name: Contract Tests (Schemathesis)
+    runs-on: ubuntu-latest
+    needs:
+      - lint
+      - unit-tests
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: user
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_TEST_DB_PASSWORD }}
+          POSTGRES_DB: volunteeringapp
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    env:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: ${{ secrets.POSTGRES_TEST_DB_PASSWORD }}
+      POSTGRES_DB: volunteeringapp
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: 5432
+      SECRET_KEY: ${{ secrets.APP_TEST_KEY }}
+      JWT_ALGORITHM: HS256
+      ENVIRONMENT: test
+
+    steps:
+      - *checkout-step
+      - *setup-python-step
+      - *install-uv-step
+
+      - name: Initialize PostgreSQL extensions
+        run: |
+          PGPASSWORD=${{ secrets.POSTGRES_TEST_DB_PASSWORD }} psql -h localhost -U user -d volunteeringapp -f Docker/init-postgres-extensions.sql
+
+      - *install-deps-step
+
+      - name: Run database migrations
+        run: uv run alembic upgrade head
+
+      - name: Start Application Server
+        run: |
+          uv run python run.py &
+          SERVER_PID=$!
+          echo "SERVER_PID=$SERVER_PID" >> $GITHUB_ENV
+
+      - name: Wait for server to be ready
+        run: |
+          max_attempts=30
+          attempt=0
+          while [ $attempt -lt $max_attempts ]; do
+            if curl -s http://localhost:8000/openapi.json > /dev/null; then
+              echo "Server is ready!"
+              exit 0
+            fi
+            attempt=$((attempt + 1))
+            echo "Waiting for server... (attempt $attempt/$max_attempts)"
+            sleep 1
+          done
+          echo "Server failed to start within timeout"
+          exit 1
+
+      - name: Run Schemathesis tests
+        run: uv run schemathesis run http://localhost:8000/openapi.json
+
+      - name: Cleanup - Stop API server
+        if: always()
+        run: |
+          if [ ! -z "$SERVER_PID" ]; then
+            kill $SERVER_PID || true
+            wait $SERVER_PID 2>/dev/null || true
+          fi

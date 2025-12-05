@@ -73,7 +73,7 @@ class TestOpportunityAPI:
         assert UUID(data["id"]) == test_opp.opportunity.id
 
     @pytest.mark.anyio
-    async def test_create_opportunity_with_nonexistent_organization_fails(
+    async def test_create_opp_nonexistent_org_fails(
         self,
         api: APIHelper,
         flows: FlowHelper,

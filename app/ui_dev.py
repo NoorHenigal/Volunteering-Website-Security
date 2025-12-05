@@ -127,13 +127,3 @@ async def status_page(request: Request) -> Response:
         "status.html",
         {"request": request, "user": mock_user},
     )
-
-
-@app.get("/health")
-async def health() -> dict[str, str]:
-    """Health check endpoint.
-
-    Returns:
-        Health status
-    """
-    return {"status": "healthy", "mode": "ui-dev"}

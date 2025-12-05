@@ -1,32 +1,26 @@
 {% extends "base.html" %}
 {% from "components/auth_form.html" import render_auth_form %}
+{% from "components/ui.html" import form_label, form_input, form_select %}
 
 {% block title %}Register{% endblock %}
 
 {% block content %}
 {% set extra_fields_content %}
 <div class="mb-4">
-    <label class="block text-black font-semibold mb-2">First Name</label>
-    <input type="text" class="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-green-600" name="first_name"
-        required placeholder="John">
+    {{ form_label('First Name', 'first_name', True) }}
+    {{ form_input('first_name', 'text', 'John', True) }}
 </div>
 <div class="mb-4">
-    <label class="block text-black font-semibold mb-2">Last Name</label>
-    <input type="text" class="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-green-600" name="last_name"
-        required placeholder="Doe">
+    {{ form_label('Last Name', 'last_name', True) }}
+    {{ form_input('last_name', 'text', 'Doe', True) }}
 </div>
 <div class="mb-4">
-    <label class="block text-black font-semibold mb-2">Username</label>
-    <input type="text" class="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-green-600" name="username"
-        required placeholder="johndoe">
+    {{ form_label('Username', 'username', True) }}
+    {{ form_input('username', 'text', 'johndoe', True) }}
 </div>
 <div>
-    <label class="block text-black font-semibold mb-2">Role</label>
-    <select class="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-green-600" name="role" required>
-        <option value="volunteer">Volunteer</option>
-        <option value="organization">Organization</option>
-        <option value="admin">Admin</option>
-    </select>
+    {{ form_label('Role', 'role', True) }}
+    {{ form_select('role', [('volunteer', 'Volunteer'), ('organization', 'Organization'), ('admin', 'Admin')], 'Select a role', True, 'volunteer') }}
 </div>
 {% endset %}
 

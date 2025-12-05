@@ -9,12 +9,12 @@ from uuid import UUID
 
 from fastapi import Depends, Header, HTTPException, Request, Response, status
 from fastapi.responses import JSONResponse, RedirectResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.templating import Jinja2Templates
 
+from app.core.exceptions import serialize_validation_errors
 from app.core.security import get_user_from_cookie, get_user_from_token
-from app.db.repositories import UserOrganizationRoleRepository
 from app.db.session import get_db
 
 if TYPE_CHECKING:
@@ -61,6 +61,21 @@ _DB_DEPENDENCY = Depends(get_db)
 _AUTH_HEADER = Header(default=None)
 
 
+def validation_error_response(e: ValidationError) -> JSONResponse:
+    """Convert Pydantic ValidationError to JSON response.
+
+    Args:
+        e: Pydantic ValidationError
+
+    Returns:
+        JSONResponse with 422 status code and error details
+    """
+    return JSONResponse(
+        status_code=422,
+        content={"detail": serialize_validation_errors(e.errors()), "status_code": 422},
+    )
+
+
 def require_role(user: User, role: str, action: str) -> None:
     """Require user to have a specific role.
 
@@ -77,6 +92,30 @@ def require_role(user: User, role: str, action: str) -> None:
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"Only {role}s can {action}",
         )
+
+
+def require_organization_role(user: User) -> None:
+    """Require user to have organization role.
+
+    Args:
+        user: Authenticated user
+
+    Raises:
+        HTTPException: 403 if user is not an organization user
+    """
+    require_role(user, "organization", "perform this action")
+
+
+def require_volunteer_role(user: User) -> None:
+    """Require user to have volunteer role.
+
+    Args:
+        user: Authenticated user
+
+    Raises:
+        HTTPException: 403 if user is not a volunteer
+    """
+    require_role(user, "volunteer", "perform this action")
 
 
 class _UIRouteHandler(Protocol):
@@ -241,6 +280,19 @@ class RequestContext:
 
         if "application/json" in content_type:
             body = await self.request.json()
+            # Ensure body is a dict, not an array or primitive
+            if not isinstance(body, dict):
+                title = "parse_body"
+                raise ValidationError.from_exception_data(
+                    title,
+                    [
+                        {
+                            "type": "dict_type",
+                            "loc": ("body",),
+                            "input": body,
+                        }
+                    ],
+                )
             return schema(**body)
 
         if "application/x-www-form-urlencoded" in content_type or "multipart/form-data" in content_type:
@@ -249,6 +301,24 @@ class RequestContext:
             return schema(**form_data)
 
         return None
+
+    async def parse_body_or_400[T: BaseModel](self, schema: type[T], form_fields: dict[str, str]) -> T:
+        """Parse request body or raise 400 if invalid.
+
+        Args:
+            schema: Pydantic schema to validate against
+            form_fields: Mapping of schema field names to form field names
+
+        Returns:
+            Validated schema instance
+
+        Raises:
+            HTTPException: 400 if body is invalid or missing
+        """
+        result = await self.parse_body(schema, form_fields)
+        if result is None:
+            raise HTTPException(status_code=400, detail="Invalid request body")
+        return result
 
     async def get_or_404[T](
         self,
@@ -262,30 +332,6 @@ class RequestContext:
         if entity is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"{resource_name} not found")
         return entity
-
-    async def require_organization_admin(self, org_id: UUID) -> User:
-        """Require user to be admin of organization."""
-        user = self.require_authenticated()
-        role_repo = UserOrganizationRoleRepository(self.db)
-        is_admin = await role_repo.is_organization_admin(user.id, org_id)
-        if not is_admin:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Only organization admins can perform this action",
-            )
-        return user
-
-    async def require_organization_member(self, org_id: UUID) -> User:
-        """Require user to be member of organization."""
-        user = self.require_authenticated()
-        role_repo = UserOrganizationRoleRepository(self.db)
-        is_member = await role_repo.is_organization_member(user.id, org_id)
-        if not is_member:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Must be organization member",
-            )
-        return user
 
 
 async def get_context(
@@ -313,6 +359,9 @@ __all__ = [
     "get_context",
     "handle_form_error",
     "render_template",
+    "require_organization_role",
     "require_role",
+    "require_volunteer_role",
     "ui_auth_required",
+    "validation_error_response",
 ]

@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% from "components/ui.html" import back_link, action_buttons %}
+{% block title %}Privacy Settings{% endblock %}
+{% block content %}
+<div class="max-w-2xl mx-auto py-8 px-4">
+  {{ back_link('/' + user.username, 'Back to profile') }}
+
+  <div class="mt-6 bg-white shadow-lg rounded-lg overflow-hidden">
+    <div class="p-6 border-b border-gray-200">
+      <h1 class="text-2xl font-bold text-gray-900">Privacy Settings</h1>
+      <p class="text-gray-600 mt-1">Control who can see your profile and information</p>
+    </div>
+
+    <form action="/settings/privacy" method="POST" class="p-6 space-y-8">
+      <!-- Profile Visibility -->
+      <div>
+        <h2 class="text-lg font-semibold text-gray-900 mb-4">Profile Visibility</h2>
+        <p class="text-sm text-gray-600 mb-4">Choose who can see your full profile information</p>
+
+        <div class="space-y-3">
+          <label class="flex items-start p-4 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+            <input type="radio" name="profile_visibility" value="public" {% if user.profile_visibility=='public'
+              %}checked{% endif %} class="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500">
+            <div class="ml-3">
+              <span class="block font-medium text-gray-900">🌐 Public</span>
+              <span class="block text-sm text-gray-500">Anyone can see your full profile, including anonymous
+                visitors</span>
+            </div>
+          </label>
+
+          <label class="flex items-start p-4 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+            <input type="radio" name="profile_visibility" value="authenticated" {% if
+              user.profile_visibility=='authenticated' %}checked{% endif %}
+              class="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500">
+            <div class="ml-3">
+              <span class="block font-medium text-gray-900">👤 Authenticated Users Only</span>
+              <span class="block text-sm text-gray-500">Only logged-in users can see your full profile</span>
+            </div>
+          </label>
+
+          <label class="flex items-start p-4 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+            <input type="radio" name="profile_visibility" value="followers" {% if user.profile_visibility=='followers'
+              %}checked{% endif %} class="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500">
+            <div class="ml-3">
+              <span class="block font-medium text-gray-900">👥 Followers Only</span>
+              <span class="block text-sm text-gray-500">Only people who follow you can see your full profile</span>
+            </div>
+          </label>
+
+          <label class="flex items-start p-4 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+            <input type="radio" name="profile_visibility" value="private" {% if user.profile_visibility=='private'
+              %}checked{% endif %} class="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500">
+            <div class="ml-3">
+              <span class="block font-medium text-gray-900">🔒 Private</span>
+              <span class="block text-sm text-gray-500">Only you can see your full profile</span>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <!-- Field Visibility -->
+      <div class="border-t border-gray-200 pt-8">
+        <h2 class="text-lg font-semibold text-gray-900 mb-4">Information Visibility</h2>
+        <p class="text-sm text-gray-600 mb-4">Choose which information to display on your profile</p>
+
+        <div class="space-y-4">
+          <label
+            class="flex items-center justify-between p-4 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+            <div>
+              <span class="block font-medium text-gray-900">Show Email Address</span>
+              <span class="block text-sm text-gray-500">Display your email on your public profile</span>
+            </div>
+            <input type="checkbox" name="show_email" value="on" {% if user.show_email %}checked{% endif %}
+              class="h-5 w-5 text-blue-600 focus:ring-blue-500 rounded">
+          </label>
+
+          <label
+            class="flex items-center justify-between p-4 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+            <div>
+              <span class="block font-medium text-gray-900">Show Organizations</span>
+              <span class="block text-sm text-gray-500">Display organizations you're a member of</span>
+            </div>
+            <input type="checkbox" name="show_organizations" value="on" {% if user.show_organizations %}checked{% endif
+              %} class="h-5 w-5 text-blue-600 focus:ring-blue-500 rounded">
+          </label>
+        </div>
+      </div>
+
+      <!-- Search & Discovery -->
+      <div class="border-t border-gray-200 pt-8">
+        <h2 class="text-lg font-semibold text-gray-900 mb-4">Search & Discovery</h2>
+        <p class="text-sm text-gray-600 mb-4">Control how others can find you</p>
+
+        <div class="space-y-4">
+          <label
+            class="flex items-center justify-between p-4 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+            <div>
+              <span class="block font-medium text-gray-900">Appear in Search Results</span>
+              <span class="block text-sm text-gray-500">Allow your profile to appear when others search for users</span>
+            </div>
+            <input type="checkbox" name="searchable" value="on" {% if user.searchable %}checked{% endif %}
+              class="h-5 w-5 text-blue-600 focus:ring-blue-500 rounded">
+          </label>
+        </div>
+      </div>
+
+      <!-- Submit Button -->
+      <div class="border-t border-gray-200 pt-6">
+        {{ action_buttons('Save Settings', '/' + user.username, 'blue') }}
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

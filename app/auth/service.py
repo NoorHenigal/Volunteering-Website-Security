@@ -12,6 +12,7 @@ from jose import jwt
 
 from app.auth.schemas import RegisterSchema, TokenResponse, UserResponse
 from app.core.config import settings
+from app.core.exceptions import require
 from app.db.models import RefreshToken, User
 from app.db.repositories import RefreshTokenRepository, UserRepository
 
@@ -122,25 +123,6 @@ async def _get_token_by_cookie(
     return token_repo, db_token
 
 
-def require[T](entity: T | None, message: str, code: int = 401) -> T:
-    """Require entity to exist, otherwise raise error.
-
-    Args:
-        entity: Entity to check
-        message: Error message
-        code: HTTP status code
-
-    Returns:
-        Entity if it exists
-
-    Raises:
-        HTTPException: If entity is None
-    """
-    if not entity:
-        raise HTTPException(status_code=code, detail=message)
-    return entity
-
-
 async def verify_user_exists(db: AsyncSession, user_id: UUID) -> User:
     """Verifies a user exists by ID.
 
@@ -156,7 +138,7 @@ async def verify_user_exists(db: AsyncSession, user_id: UUID) -> User:
     """
     user_repo = UserRepository(db)
     user = await user_repo.get_by_id(user_id)
-    return require(user, "User not found")
+    return require(user, "User not found", status.HTTP_401_UNAUTHORIZED)
 
 
 async def validate_refresh_token(refresh_cookie: str, db: AsyncSession) -> tuple[User, object]:
@@ -172,10 +154,10 @@ async def validate_refresh_token(refresh_cookie: str, db: AsyncSession) -> tuple
     Raises:
         HTTPException: If token is invalid or expired
     """
-    require(refresh_cookie, "Refresh token not found")
+    require(refresh_cookie, "Refresh token not found", status.HTTP_401_UNAUTHORIZED)
 
     token_repo, db_token = await _get_token_by_cookie(refresh_cookie, db)
-    validated_token = require(db_token, "Invalid refresh token")
+    validated_token = require(db_token, "Invalid refresh token", status.HTTP_401_UNAUTHORIZED)
 
     if validated_token.expires_at < datetime.now(UTC):
         await token_repo.delete(validated_token)
@@ -207,8 +189,16 @@ async def register_user(data: RegisterSchema, db: AsyncSession) -> UserResponse:
 
     if existing_user:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+            status_code=status.HTTP_409_CONFLICT,
             detail="Email already registered",
+        )
+
+    # Check if username already exists
+    existing_username = await user_repo.get_by_username(data.username)
+    if existing_username:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Username already taken",
         )
 
     # Create new user
@@ -316,7 +306,7 @@ async def logout(refresh_cookie: str, db: AsyncSession) -> None:
     Raises:
         HTTPException: If refresh token is invalid
     """
-    require(refresh_cookie, "Refresh token not found")
+    require(refresh_cookie, "Refresh token not found", status.HTTP_401_UNAUTHORIZED)
 
     token_repo, db_token = await _get_token_by_cookie(refresh_cookie, db)
     if db_token:

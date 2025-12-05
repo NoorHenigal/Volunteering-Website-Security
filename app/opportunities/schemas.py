@@ -3,7 +3,7 @@
 from uuid import UUID
 
 from app.core.base_schemas import BaseCreate, BaseOut, BaseUpdate
-from app.core.types import LocationField, TitleField
+from app.core.types import LocationField, LongDescriptionField, TitleField
 from app.db.models import ApplicationStatusType
 
 
@@ -11,7 +11,7 @@ class OpportunityCreate(BaseCreate):
     """Opportunity creation data."""
 
     title: TitleField
-    description: str
+    description: str  # Required field, matches database NOT NULL constraint
     location: LocationField
     organization_id: UUID
 
@@ -30,7 +30,7 @@ class OpportunityResponse(BaseOut):
 class ApplicationCreate(BaseCreate):
     """Application creation data."""
 
-    message: str | None = None
+    message: LongDescriptionField = None
 
 
 class ApplicationResponse(BaseOut):
