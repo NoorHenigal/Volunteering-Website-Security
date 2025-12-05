@@ -2,7 +2,7 @@
 {% from "components/ui.html" import user_avatar, follow_button, follower_stats, bio_section, privacy_badge, htmx_form %}
 {% block title %}{{ profile_user.first_name }} {{ profile_user.last_name }} (@{{ profile_user.username }}){% endblock %}
 {% block content %}
-<div class="max-w-4xl mx-auto py-8" {% if user and user.id==profile_user.id %}x-data="avatarCropper()" {% endif %}>
+<div class="max-w-4xl mx-auto" {% if user and user.id==profile_user.id %}x-data="avatarCropper()" {% endif %}>
   <!-- Crop Modal -->
   <div x-show="show" x-transition.opacity class="fixed inset-0 bg-black/70 flex items-center justify-center z-50"
     style="display: none;">
