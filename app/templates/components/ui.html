@@ -1,5 +1,36 @@
 {# Reusable UI Component Macros #}
 
+{# HTMX-enabled form wrapper #}
+{% macro htmx_form(action, target="#main-content", swap="outerHTML") %}
+<form hx-post="{{ action }}" hx-target="{{ target }}" hx-swap="{{ swap }}" hx-indicator=".htmx-indicator">
+    {{ caller() }}
+</form>
+{% endmacro %}
+
+{# HTMX button with loading state #}
+{% macro htmx_button(text, action, method="post", target="this", color="blue") %}
+<button hx-{{ method }}="{{ action }}" hx-target="{{ target }}" hx-swap="outerHTML"
+    class="bg-{{ color }}-600 hover:bg-{{ color }}-700 text-white font-bold py-2 px-4 rounded inline-flex items-center gap-2">
+    {{ text }}
+    <span class="htmx-indicator hidden">
+        <svg class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+            </path>
+        </svg>
+    </span>
+</button>
+{% endmacro %}
+
+{# Alert that auto-dismisses #}
+{% macro alert_fragment(type, message) %}
+<div id="alert" class="bg-{{ type }}-100 border border-{{ type }}-400 text-{{ type }}-700 px-4 py-3 rounded mb-6"
+    x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 3000)">
+    {{ message }}
+</div>
+{% endmacro %}
+
 {% macro application_status_badge(status, size='md') %}
 {% set size_classes = {
 'sm': 'px-3 py-1 text-sm',
@@ -37,10 +68,10 @@
 {% macro back_link(url, text) %}
 <a href="{{ url }}" class="text-blue-600 hover:text-blue-800 font-semibold">← {{ text }}</a>
 {% endmacro %}
-{% macro card(padding='p-8', max_width='', extra_classes='') %}
+{% macro card(padding='p-6', max_width='', extra_classes='') %}
 {% set width_class = 'max-w-' + max_width + ' mx-auto' if max_width else '' %}
 <div class="{{ width_class }}">
-    <div class="bg-white rounded-lg shadow-lg {{ padding }} {{ extra_classes }}">
+    <div class="bg-white rounded-lg shadow-md {{ padding }} {{ extra_classes }}">
         {{ caller() }}
     </div>
 </div>
@@ -49,7 +80,15 @@
 {% macro page_card(max_width='6xl') %}
 {# Standard page card wrapper - use for detail/form pages #}
 <div class="max-w-{{ max_width }} mx-auto">
-    <div class="bg-white rounded-lg shadow-lg p-8">
+    <div class="bg-white rounded-xl shadow-lg p-8">
+        {{ caller() }}
+    </div>
+</div>
+{% endmacro %}
+
+{% macro page_card_tight(max_width='6xl') %}
+<div class="max-w-{{ max_width }} mx-auto">
+    <div class="bg-white rounded-lg shadow-lg p-6">
         {{ caller() }}
     </div>
 </div>
@@ -113,11 +152,39 @@
     class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
     placeholder="{{ placeholder }}">{{ value }}</textarea>
 {% endmacro %}
-{% macro primary_button(text, type='submit', color='blue', full_width=True) %}
-<button type="{{ type }}"
-    class="{% if full_width %}w-full{% endif %} bg-{{ color }}-600 hover:bg-{{ color }}-700 text-white font-bold py-3 px-6 rounded-lg">
+{% macro button_solid(text, href=None, color='blue', size='md', full_width=False, icon=None) %}
+{% set size_classes = {
+'sm': 'text-sm py-2 px-3',
+'md': 'text-sm py-2.5 px-4',
+'lg': 'text-base py-3 px-6'
+} %}
+{% set base = size_classes.get(size, size_classes['md']) %}
+{% set width = 'w-full' if full_width else '' %}
+{% set classes = width ~ ' inline-flex items-center justify-center gap-2 font-semibold rounded-lg bg-' ~ color ~ '-600
+hover:bg-' ~ color ~ '-700 text-white transition-colors' %}
+
+{% if href %}
+<a href="{{ href }}" class="{{ classes }} {{ base }}">
     {{ text }}
+</a>
+{% else %}
+<button type="submit" class="{{ classes }} {{ base }}">
+    {{ text }}
+    <span class="htmx-indicator">
+        <svg class="animate-spin h-4 w-4 text-white ml-2" xmlns="http://www.w3.org/2000/svg" fill="none"
+            viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+            </path>
+        </svg>
+    </span>
 </button>
+{% endif %}
+{% endmacro %}
+
+{% macro primary_button(text, type='submit', color='blue', full_width=True) %}
+{{ button_solid(text, color=color, full_width=full_width) }}
 {% endmacro %}
 {% macro secondary_button(url, text='Cancel', full_width=False) %}
 {# Secondary/cancel button style #}
@@ -166,7 +233,8 @@
     <div class="flex">
         <div class="flex-shrink-0">
             <svg class="h-6 w-6 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
         </div>
         <div class="ml-3">
@@ -192,12 +260,13 @@
     class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
     <option value="">{{ placeholder }}</option>
     {% for value, label in options %}
-    <option value="{{ value }}" {% if selected_value == value %}selected{% endif %}>{{ label }}</option>
+    <option value="{{ value }}" {% if selected_value==value %}selected{% endif %}>{{ label }}</option>
     {% endfor %}
 </select>
 {% endmacro %}
 
-{% macro list_grid(items, item_template, empty_message, empty_action_url=None, empty_action_text=None, empty_action_color='blue', show_empty_action=True, cols='md:grid-cols-2 lg:grid-cols-3') %}
+{% macro list_grid(items, item_template, empty_message, empty_action_url=None, empty_action_text=None,
+empty_action_color='blue', show_empty_action=True, cols='md:grid-cols-2 lg:grid-cols-3') %}
 {# Grid layout with empty state handling - requires caller to define item rendering #}
 {% if items %}
 <div class="grid gap-6 {{ cols }}">
@@ -313,7 +382,8 @@
     </div>
     {% endif %}
     {% if can_edit and not bio and not description %}
-    <p class="text-gray-400 italic text-sm">No bio yet. <a href="/settings/profile" class="text-blue-600 hover:underline">Add one</a></p>
+    <p class="text-gray-400 italic text-sm">No bio yet. <a href="/settings/profile"
+            class="text-blue-600 hover:underline">Add one</a></p>
     {% endif %}
 </div>
 {% endif %}
@@ -337,7 +407,8 @@
 'followers': '👥',
 'private': '🔒'
 } %}
-<span class="{{ size_classes.get(size, size_classes['sm']) }} {{ visibility_classes.get(visibility_level, 'bg-gray-100 text-gray-800') }} rounded-full font-medium inline-flex items-center gap-1">
+<span
+    class="{{ size_classes.get(size, size_classes['sm']) }} {{ visibility_classes.get(visibility_level, 'bg-gray-100 text-gray-800') }} rounded-full font-medium inline-flex items-center gap-1">
     <span>{{ visibility_icons.get(visibility_level, '🔒') }}</span>
     <span>{{ visibility_level|title }}</span>
 </span>
@@ -348,8 +419,9 @@
 'sm': 'py-2 px-4 text-sm',
 'md': 'py-2 px-4 text-base'
 } %}
-<form action="/opp/applications/{{ application_id }}/withdraw" method="POST" class="inline">
-    <button type="submit" class="inline-flex items-center gap-2 bg-white border border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 font-semibold {{ size_classes.get(size, size_classes['md']) }} rounded-lg transition-all">
+<form action="/applications/{{ application_id }}/withdraw" method="POST" class="inline">
+    <button type="submit"
+        class="inline-flex items-center gap-2 bg-white border border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 font-semibold {{ size_classes.get(size, size_classes['md']) }} rounded-lg transition-all">
         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
         </svg>
@@ -360,27 +432,24 @@
 
 {% macro user_dropdown(user) %}
 <div class="relative" x-data="{ open: false }" @click.outside="open = false">
-    <button type="button"
-        @click="open = !open"
-        class="flex items-center space-x-3 hover:bg-blue-700 px-3 py-2 rounded-lg transition-colors duration-200"
+    <button type="button" @click="open = !open"
+        class="flex items-center space-x-3 hover:bg-gray-100 px-3 py-2 rounded-lg transition-colors duration-200"
         :aria-expanded="open" aria-haspopup="true">
         {{ user_avatar(user, 'sm') }}
         <div class="hidden md:block text-left">
-            <div class="text-sm font-semibold">{{ user.first_name }}</div>
-            <div class="text-xs text-blue-200">{{ user.role|title }}</div>
+            <div class="text-sm font-semibold text-gray-800">{{ user.first_name }}</div>
+            <div class="text-xs text-gray-500">{{ user.role|title }}</div>
         </div>
-        <svg class="h-4 w-4 text-blue-200 transition-transform duration-200" :class="{ 'rotate-180': open }" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg class="h-4 w-4 text-gray-500 transition-transform duration-200" :class="{ 'rotate-180': open }" fill="none"
+            viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
         </svg>
     </button>
 
     <!-- Dropdown Menu -->
-    <div x-show="open"
-        x-transition:enter="transition ease-out duration-200"
-        x-transition:enter-start="opacity-0 scale-95"
-        x-transition:enter-end="opacity-100 scale-100"
-        x-transition:leave="transition ease-in duration-150"
-        x-transition:leave-start="opacity-100 scale-100"
+    <div x-show="open" x-transition:enter="transition ease-out duration-200"
+        x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
+        x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100 scale-100"
         x-transition:leave-end="opacity-0 scale-95"
         class="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-xl z-50 border border-gray-100"
         style="display: none;">
@@ -426,8 +495,7 @@
                 Dashboard
             </a>
             {% if user.role == 'volunteer' %}
-            <a href="/opp/applications/list"
-                class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors">
+            <a href="/applications" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors">
                 <svg class="inline h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                         d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />

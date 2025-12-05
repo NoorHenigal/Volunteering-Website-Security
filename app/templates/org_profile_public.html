@@ -5,14 +5,34 @@
 
 {% block content %}
 {% call page_card('4xl') %}
-    <h1 class="text-3xl font-bold text-gray-900 mb-2">{{ organization.name }}</h1>
-    {% if organization.description %}
-    <p class="text-lg text-gray-600 mb-6">{{ organization.description }}</p>
-    {% endif %}
-
-    {{ section_title('About', True) }}
-    <p class="text-gray-600">
+<div class="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-6">
+    <div>
+        <h1 class="text-3xl font-bold text-gray-900 mb-2">{{ organization.name }}</h1>
+        {% if organization.description %}
+        <p class="text-lg text-gray-600">{{ organization.description }}</p>
+        {% endif %}
+    </div>
+    <div class="text-sm text-gray-500 whitespace-nowrap">
         Organization since {{ organization.created_at.strftime('%B %Y') }}
-    </p>
+    </div>
+</div>
+
+{{ section_title('Opportunities', True) }}
+<div class="mt-4">
+    {% if organization.opportunities %}
+    <div class="space-y-3">
+        {% for opp in organization.opportunities %}
+        <div class="bg-gray-50 p-4 rounded-lg hover:bg-gray-100 transition">
+            <a href="/opportunities/{{ opp.id }}" class="block">
+                <h3 class="text-lg font-bold text-gray-800 mb-2">{{ opp.title }}</h3>
+                <p class="text-gray-600 line-clamp-2">{{ opp.description }}</p>
+            </a>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-gray-500 italic">No opportunities posted yet</p>
+    {% endif %}
+</div>
 {% endcall %}
 {% endblock %}

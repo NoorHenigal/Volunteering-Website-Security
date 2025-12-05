@@ -86,6 +86,9 @@ class OrganizationService(BaseService):
             OrganizationMemberResponse(
                 user_id=r.user.id,
                 email=r.user.email,
+                username=r.user.username,
+                first_name=r.user.first_name,
+                last_name=r.user.last_name,
                 role=r.role,
             )
             for r in member_roles

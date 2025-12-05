@@ -1,80 +1,78 @@
 {% extends "base.html" %}
-{% from "components/ui.html" import detail_header, application_status_badge, datetime_display, message_box, page_card, primary_button %}
+{% from "components/ui.html" import detail_header, application_status_badge, datetime_display, message_box, page_card,
+primary_button, button_solid %}
 
 {% block title %}Applicants - {{ opportunity.title }}{% endblock %}
 
 {% block content %}
 {% call page_card('6xl') %}
-    {{ detail_header('/opp/' ~ opportunity.id, 'Back to Opportunity', 'Applicants', opportunity.title) }}
+{{ detail_header('/opportunities/' ~ opportunity.id, 'Back to Opportunity', 'Applicants', opportunity.title) }}
 
-    {% if applications %}
-    <div class="mb-4">
-        <p class="text-gray-600">
-            <span class="font-semibold">Total Applications:</span> {{ applications|length }}
-        </p>
-    </div>
+{% if applications %}
+<div class="mb-4">
+    <p class="text-gray-600">
+        <span class="font-semibold">Total Applications:</span> {{ applications|length }}
+    </p>
+</div>
 
-    <div class="space-y-4">
-        {% for app in applications %}
-        <div class="border rounded-lg p-6 hover:shadow-md transition-shadow">
-            <div class="flex justify-between items-start">
-                <div class="flex-1">
-                    <div class="flex items-center gap-3 mb-3">
-                        <a href="/{{ app.volunteer.username }}"
-                            class="text-xl font-bold text-blue-600 hover:text-blue-800 transition-colors">
-                            {{ app.volunteer.first_name }} {{ app.volunteer.last_name }}
-                        </a>
-                        {{ application_status_badge(app.status, 'sm') }}
-                    </div>
-                    <p class="text-sm text-gray-600 mb-2">
-                        <span class="font-semibold">@{{ app.volunteer.username }}</span>
-                        {% if app.volunteer.email and app.volunteer.username %}
-                        • {{ app.volunteer.email }}
-                        {% endif %}
-                    </p>
-
-                    <p class="mb-3">
-                        {{ datetime_display(app.created_at, 'Applied on ') }}
-                    </p>
-
-                    {% if app.message %}
-                    {{ message_box(app.message, 'Application Message') }}
-                    {% else %}
-                    <p class="text-gray-400 italic mb-3">No message provided</p>
+<div class="space-y-4">
+    {% for app in applications %}
+    <div class="border rounded-lg p-6 hover:shadow-md transition-shadow">
+        <div class="flex justify-between items-start">
+            <div class="flex-1">
+                <div class="flex items-center gap-3 mb-3">
+                    <a href="/{{ app.volunteer.username }}"
+                        class="text-xl font-bold text-blue-600 hover:text-blue-800 transition-colors">
+                        {{ app.volunteer.first_name }} {{ app.volunteer.last_name }}
+                    </a>
+                    {{ application_status_badge(app.status, 'sm') }}
+                </div>
+                <p class="text-sm text-gray-600 mb-2">
+                    <span class="font-semibold">@{{ app.volunteer.username }}</span>
+                    {% if app.volunteer.email and app.volunteer.username %}
+                    • {{ app.volunteer.email }}
                     {% endif %}
+                </p>
 
-                    <p class="text-sm text-gray-600 mt-3">
-                        <span class="font-semibold">Volunteer ID:</span> {{ app.volunteer_id }}
-                    </p>
-                </div>
+                <p class="mb-3">
+                    {{ datetime_display(app.created_at, 'Applied on ') }}
+                </p>
 
-                {% if app.status == 'pending' %}
-                <div class="ml-6 flex gap-2">
-                    <form method="POST" action="/opp/{{ opportunity.id }}/applicants/{{ app.id }}/accept"
-                        class="inline">
-                        <button type="submit"
-                            class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-lg">
-                            Accept
-                        </button>
-                    </form>
-                    <form method="POST" action="/opp/{{ opportunity.id }}/applicants/{{ app.id }}/reject"
-                        class="inline">
-                        <button type="submit"
-                            class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-6 rounded-lg">
-                            Reject
-                        </button>
-                    </form>
-                </div>
+                {% if app.message %}
+                {{ message_box(app.message, 'Application Message') }}
+                {% else %}
+                <p class="text-gray-400 italic mb-3">No message provided</p>
                 {% endif %}
+
+                <p class="text-sm text-gray-600 mt-3">
+                    <span class="font-semibold">Volunteer ID:</span> {{ app.volunteer_id }}
+                </p>
             </div>
+
+            {% if app.status == 'pending' %}
+            <div class="ml-6 flex gap-2">
+                <form method="POST" action="/opportunities/{{ opportunity.id }}/applicants/{{ app.id }}/accept"
+                    class="inline">
+                    {{ button_solid('Accept', color='green', size='sm') }}
+                </form>
+                <form method="POST" action="/opportunities/{{ opportunity.id }}/applicants/{{ app.id }}/reject"
+                    class="inline">
+                    <button type="submit"
+                        class="inline-flex items-center justify-center gap-2 font-semibold rounded-lg border border-red-200 bg-white text-red-600 hover:bg-red-50 hover:border-red-300 transition-colors text-sm py-2 px-4">
+                        Reject
+                    </button>
+                </form>
+            </div>
+            {% endif %}
         </div>
-        {% endfor %}
     </div>
-    {% else %}
-    <div class="text-center py-12">
-        <p class="text-xl text-gray-600">No applications yet</p>
-        <p class="text-gray-500 mt-2">Applications will appear here when volunteers apply to this opportunity</p>
-    </div>
-    {% endif %}
+    {% endfor %}
+</div>
+{% else %}
+<div class="text-center py-12">
+    <p class="text-xl text-gray-600">No applications yet</p>
+    <p class="text-gray-500 mt-2">Applications will appear here when volunteers apply to this opportunity</p>
+</div>
+{% endif %}
 {% endcall %}
 {% endblock %}

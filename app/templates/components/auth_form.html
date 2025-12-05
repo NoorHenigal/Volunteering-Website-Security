@@ -1,20 +1,24 @@
-{% macro render_auth_form(title, action, button_text, extra_fields="", footer_text="", footer_link="", footer_link_text="") %}
+{% macro render_auth_form(title, action, button_text, extra_fields="", footer_text="", footer_link="",
+footer_link_text="", subtitle="Access your volunteering account") %}
 <div class="max-w-md mx-auto">
     <div class="bg-white p-8 rounded-lg shadow-lg">
-        <h2 class="text-3xl font-bold mb-6 text-center text-black">{{ title }}</h2>
+        <h2 class="text-3xl font-bold text-center text-gray-900">{{ title }}</h2>
+        {% if subtitle %}
+        <p class="text-center text-gray-600 mb-6 mt-2">{{ subtitle }}</p>
+        {% endif %}
 
         {% include "components/alert.html" %}
 
         <form method="POST" action="{{ action }}" class="space-y-6">
             <div>
-                <label for="email" class="block text-black font-semibold mb-2">Email</label>
+                <label for="email" class="block text-gray-900 font-semibold mb-2">Email</label>
                 <input type="email" id="email" name="email" autocomplete="email" required
-                       class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
             </div>
             <div>
-                <label for="password" class="block text-black font-semibold mb-2">Password</label>
+                <label for="password" class="block text-gray-900 font-semibold mb-2">Password</label>
                 <input type="password" id="password" name="password" autocomplete="current-password" required
-                       class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
             </div>
             {{ extra_fields | safe }}
             <button type="submit" class="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700">
@@ -23,7 +27,8 @@
         </form>
         {% if footer_text %}
         <p class="mt-6 text-center text-gray-600">
-            {{ footer_text }} <a href="{{ footer_link }}" class="text-blue-600 font-semibold hover:text-blue-800">{{ footer_link_text }}</a>
+            {{ footer_text }} <a href="{{ footer_link }}" class="text-blue-600 font-semibold hover:text-blue-800">{{
+                footer_link_text }}</a>
         </p>
         {% endif %}
     </div>

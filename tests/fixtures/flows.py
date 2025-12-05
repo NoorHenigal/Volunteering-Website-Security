@@ -31,7 +31,7 @@ class FlowHelper:
         """Create and login a new user (self-contained, no conftest dependency)."""
         data = RegisterSchemaFactory.build(role=role)
         resp = await self.api.client.post(
-            "/api/auth/register",
+            "/auth/register",
             json={
                 "email": data.email,
                 "password": data.password,
@@ -44,7 +44,7 @@ class FlowHelper:
         assert 200 <= resp.status_code < 300, f"Registration failed: {resp.text}"
 
         tokens_resp = await self.api.client.post(
-            "/api/auth/login",
+            "/auth/login",
             json={"email": data.email, "password": data.password},
         )
         assert tokens_resp.status_code == 200, f"Login failed: {tokens_resp.text}"
@@ -62,7 +62,7 @@ class FlowHelper:
         opp_id = opp.opportunity.id if isinstance(opp, OpportunityContext) else opp
         data = ApplicationCreateFactory.build()
         return await self.api.created(
-            f"/api/opportunities/{opp_id}/apply",
+            f"/opportunities/{opp_id}/apply",
             auth=volunteer,
             json={"message": message or data.message or "I would like to volunteer!"},
         )
@@ -75,7 +75,7 @@ class FlowHelper:
         """Accept an application."""
         return await self.api.ok(
             "PUT",
-            f"/api/applications/{app_id}/status",
+            f"/applications/{app_id}/status",
             auth=admin,
             json={"status": "accepted"},
         )
@@ -88,7 +88,7 @@ class FlowHelper:
         """Reject an application."""
         return await self.api.ok(
             "PUT",
-            f"/api/applications/{app_id}/status",
+            f"/applications/{app_id}/status",
             auth=admin,
             json={"status": "rejected"},
         )
@@ -101,7 +101,7 @@ class FlowHelper:
         """Withdraw an application (deletes it)."""
         await self.api.no_content(
             "DELETE",
-            f"/api/applications/{app_id}/withdraw",
+            f"/applications/{app_id}",
             auth=volunteer,
         )
 
@@ -114,7 +114,7 @@ class FlowHelper:
         """Create an organization."""
         data = OrganizationCreateFactory.build()
         return await self.api.created(
-            "/api/organizations",
+            "/organizations",
             auth=user,
             json={
                 "name": name or data.name,
@@ -133,7 +133,7 @@ class FlowHelper:
         """Create an opportunity."""
         data = OpportunityCreateFactory.build()
         return await self.api.created(
-            "/api/opportunities",
+            "/opportunities",
             auth=user,
             json={
                 "title": title or data.title,

@@ -3,17 +3,17 @@
 import inspect
 from collections.abc import Awaitable, Callable
 from functools import wraps
-from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Protocol, cast, runtime_checkable
 from uuid import UUID
 
 from fastapi import Depends, Header, HTTPException, Request, Response, status
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import BaseModel, ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
-from starlette.templating import Jinja2Templates
 
 from app.core.exceptions import serialize_validation_errors
+from app.core.htmx import htmx_redirect, is_htmx, render_block
 from app.core.security import get_user_from_cookie, get_user_from_token
 from app.db.session import get_db
 
@@ -21,8 +21,7 @@ if TYPE_CHECKING:
     from app.db.models import User
 
 
-BASE_DIR = Path(__file__).resolve().parent.parent
-templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
+from app.core.templates import templates
 
 
 def render_template(
@@ -143,7 +142,7 @@ def ui_auth_required(func: Callable[..., Awaitable[Response]]) -> _UIRouteHandle
     """
     # Get original signature and remove 'user' param (we inject it)
     original_sig = inspect.signature(func)
-    params = [p for p in original_sig.parameters.values() if p.name != "user"]
+    params = [p for p in original_sig.parameters.values() if p.name not in ("user", "_user")]
     new_sig = original_sig.replace(parameters=params)
 
     @wraps(func)
@@ -200,20 +199,33 @@ class RequestContext:
         self.db = db
         self.user = user
         self.authorization = authorization
-        self.is_ui = not authorization and "text/html" in request.headers.get("accept", "")
+        self.is_htmx = is_htmx(request)
+        self.is_ui = self.is_htmx or (not authorization and "text/html" in request.headers.get("accept", ""))
 
     def success_response(
         self,
         data: BaseModel | None = None,
         redirect_url: str | None = None,
         template: str | None = None,
+        block: str | None = None,
         status_code: int = 200,
         **template_ctx: object,
     ) -> Response:
         """Return appropriate success response based on request type."""
         if self.is_ui:
             if redirect_url:
+                if self.is_htmx:
+                    return htmx_redirect(redirect_url)
                 return RedirectResponse(url=redirect_url, status_code=303)
+
+            if template and block and self.is_htmx:
+                return render_block(
+                    self.request,
+                    template,
+                    block,
+                    user=self.user,
+                    **template_ctx,
+                )
 
             if not template:
                 raise ValueError(TEMPLATE_REQUIRED_ERROR)
@@ -234,6 +246,7 @@ class RequestContext:
         error: str | Exception,
         status_code: int = 400,
         template: str | None = None,
+        block: str | None = None,
         **template_ctx: object,
     ) -> Response:
         """Return appropriate error response based on request type."""
@@ -241,6 +254,15 @@ class RequestContext:
 
         if self.is_ui:
             if template:
+                if block and self.is_htmx:
+                    return render_block(
+                        self.request,
+                        template,
+                        block,
+                        error=error_msg,
+                        user=self.user,
+                        **template_ctx,
+                    )
                 return render_template(
                     self.request,
                     template,
@@ -278,27 +300,30 @@ class RequestContext:
         """Parse request body as JSON or form data into a Pydantic schema."""
         content_type = self.request.headers.get("content-type", "")
 
-        if "application/json" in content_type:
-            body = await self.request.json()
-            # Ensure body is a dict, not an array or primitive
-            if not isinstance(body, dict):
-                title = "parse_body"
-                raise ValidationError.from_exception_data(
-                    title,
-                    [
-                        {
-                            "type": "dict_type",
-                            "loc": ("body",),
-                            "input": body,
-                        }
-                    ],
-                )
-            return schema(**body)
+        try:
+            if "application/json" in content_type:
+                body = await self.request.json()
+                # Ensure body is a dict, not an array or primitive
+                if not isinstance(body, dict):
+                    title = "parse_body"
+                    raise ValidationError.from_exception_data(
+                        title,
+                        [
+                            {
+                                "type": "dict_type",
+                                "loc": ("body",),
+                                "input": body,
+                            }
+                        ],
+                    )
+                return schema(**body)
 
-        if "application/x-www-form-urlencoded" in content_type or "multipart/form-data" in content_type:
-            form = await self.request.form()
-            form_data = {field: str(form.get(form_name)) for field, form_name in form_fields.items()}
-            return schema(**form_data)
+            if "application/x-www-form-urlencoded" in content_type or "multipart/form-data" in content_type:
+                form = await self.request.form()
+                form_data = {field: str(form.get(form_name)) for field, form_name in form_fields.items()}
+                return schema(**form_data)
+        except ValidationError as e:
+            raise RequestValidationError(e.errors()) from e
 
         return None
 

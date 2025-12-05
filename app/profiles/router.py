@@ -4,13 +4,16 @@ from typing import Annotated
 
 from fastapi import APIRouter, File, HTTPException, Response, UploadFile, status
 from fastapi.responses import JSONResponse
+from sqlalchemy.orm import selectinload
 
 from app.core.base_schemas import ListResponse, error_responses, request_body_from_model
 from app.core.context import ContextDep, render_template, ui_auth_required
 from app.core.dependencies import ProfileServiceDep
+from app.core.htmx import htmx_redirect, trigger_toast
 from app.core.types import ProfileVisibilityType, SlugPath, UsernamePath
 from app.db.models import Organization, User
 from app.db.repositories import OrganizationRepository, UserRepository
+from app.organizations.schemas import OrganizationResponse
 from app.profiles.schemas import (
     FollowResponseSchema,
     PrivacySettingsSchema,
@@ -67,25 +70,31 @@ async def privacy_settings_page(ctx: ContextDep, user: User) -> Response:
     return render_template(ctx.request, "privacy_settings.html", user=user)
 
 
-@router.get("/{username}/followers", response_model=None, responses=error_responses(not_found=True))
+@router.get(
+    "/{username}/followers",
+    response_model=ListResponse[PublicProfileSchema],
+    responses=error_responses(not_found=True),
+)
 async def get_followers(username: UsernamePath, ctx: ContextDep, service: ProfileServiceDep) -> Response:
     """Get user's followers."""
     return await _get_follow_list(ctx, service, username, "followers")
 
 
-@router.get("/{username}/following", response_model=None, responses=error_responses(not_found=True))
+@router.get(
+    "/{username}/following",
+    response_model=ListResponse[PublicProfileSchema],
+    responses=error_responses(not_found=True),
+)
 async def get_following(username: UsernamePath, ctx: ContextDep, service: ProfileServiceDep) -> Response:
     """Get users that this user follows."""
     return await _get_follow_list(ctx, service, username, "following")
 
 
-@router.api_route("/me", methods=["GET"], include_in_schema=False)
-async def me_get_not_allowed() -> Response:
-    """Return 405 for GET /me - only PUT is supported."""
-    raise HTTPException(status_code=405, detail="Method Not Allowed")
-
-
-@router.get("/{slug}", response_model=None, responses=error_responses(not_found=True))
+@router.get(
+    "/{slug}",
+    response_model=PublicProfileSchema | OrganizationResponse | None,
+    responses=error_responses(not_found=True),
+)
 async def view_profile(slug: SlugPath, ctx: ContextDep, service: ProfileServiceDep) -> Response:
     """Show user or organization profile."""
     # Check User first
@@ -102,15 +111,20 @@ async def view_profile(slug: SlugPath, ctx: ContextDep, service: ProfileServiceD
 
     # Check Organization
     org_repo = OrganizationRepository(ctx.db)
-    org = await org_repo.find_one(Organization.name == slug)
+    org = await org_repo.find_one(
+        Organization.name == slug,
+        options=[selectinload(Organization.opportunities)],
+    )
     if org:
-        return render_template(ctx.request, "org_profile_public.html", user=ctx.user, organization=org)
+        if ctx.is_ui:
+            return render_template(ctx.request, "org_profile_public.html", user=ctx.user, organization=org)
+        return JSONResponse(content=OrganizationResponse.model_validate(org).model_dump(mode="json"))
 
     return ctx.error_response("Profile not found", status_code=404)
 
 
 @router.put(
-    "/me",
+    "/settings/profile",
     response_model=None,
     responses=error_responses(auth=True, bad_request=True),
     openapi_extra=request_body_from_model(ProfileUpdateSchema),
@@ -127,11 +141,13 @@ async def update_profile_api(ctx: ContextDep, user: User, service: ProfileServic
 async def update_profile_form(ctx: ContextDep, user: User, service: ProfileServiceDep) -> Response:
     """Update own profile bio/description (UI form)."""
     await _update_profile_core(ctx, service, user)
+    if ctx.is_htmx:
+        return htmx_redirect(f"/{user.username}")
     return ctx.success_response(redirect_url=f"/{user.username}")
 
 
 @router.put(
-    "/me/privacy",
+    "/settings/privacy",
     response_model=None,
     responses=error_responses(auth=True, bad_request=True),
     openapi_extra=request_body_from_model(PrivacySettingsSchema),
@@ -183,11 +199,18 @@ async def update_privacy_form(ctx: ContextDep, user: User, service: ProfileServi
 
     await service.update_privacy_settings(user, data)
 
+    if ctx.is_htmx:
+        # Re-render the form to show updated state (and keep user on page)
+        response = ctx.success_response(template="privacy_settings.html", block="content", user=user)
+        return trigger_toast(response, "Privacy settings updated")
     return ctx.success_response(redirect_url="/settings/privacy")
 
 
 @router.post(
-    "/{username}/follow", response_model=None, responses=error_responses(auth=True, not_found=True, conflict=True)
+    "/{username}/follow",
+    response_model=FollowResponseSchema,
+    status_code=status.HTTP_201_CREATED,
+    responses={**error_responses(auth=True, not_found=True, conflict=True), 200: {"description": "UI Success"}},
 )
 @ui_auth_required
 async def follow_user(ctx: ContextDep, user: User, service: ProfileServiceDep, username: UsernamePath) -> Response:
@@ -195,15 +218,28 @@ async def follow_user(ctx: ContextDep, user: User, service: ProfileServiceDep, u
     follow = await service.follow_user(user, username)
 
     if ctx.is_ui:
+        if ctx.is_htmx:
+            # Re-render the follow button block
+            response = ctx.success_response(
+                template="profile.html",
+                block="follow_button",
+                profile_user=await UserRepository(ctx.db).get_by_username(username),
+                profile={"is_following": True},
+            )
+            return trigger_toast(response, f"You are now following {username}")
         return ctx.success_response(redirect_url=f"/{username}")
-    return JSONResponse(content=FollowResponseSchema.model_validate(follow).model_dump(mode="json"))
+    return JSONResponse(content=FollowResponseSchema.model_validate(follow).model_dump(mode="json"), status_code=201)
 
 
 @router.delete(
     "/{username}/follow",
     response_model=None,
     status_code=204,
-    responses={**error_responses(auth=True, not_found=True), 204: {"description": "Successfully unfollowed"}},
+    responses={
+        **error_responses(auth=True, not_found=True),
+        204: {"description": "Successfully unfollowed"},
+        200: {"description": "UI Success"},
+    },
 )
 @ui_auth_required
 async def unfollow_user_api(
@@ -225,10 +261,24 @@ async def unfollow_user_form(
     """Unfollow a user (UI form)."""
     await service.unfollow_user(user, username)
 
+    if ctx.is_htmx:
+        # Re-render the follow button block
+        response = ctx.success_response(
+            template="profile.html",
+            block="follow_button",
+            profile_user=await UserRepository(ctx.db).get_by_username(username),
+            profile={"is_following": False},
+        )
+        return trigger_toast(response, f"Unfollowed {username}", "info")
+
     return ctx.success_response(redirect_url=f"/{username}")
 
 
-@router.post("/settings/profile/picture", response_model=None, include_in_schema=False)
+@router.post(
+    "/settings/profile/picture",
+    response_model=None,
+    responses=error_responses(auth=True, bad_request=True),
+)
 @ui_auth_required
 async def upload_profile_picture(
     ctx: ContextDep,
@@ -255,6 +305,8 @@ async def upload_profile_picture(
     await user_repo.update(user)
 
     if ctx.is_ui:
+        if ctx.is_htmx:
+            return htmx_redirect(f"/{user.username}")
         return ctx.success_response(redirect_url=f"/{user.username}")
 
     return ctx.success_response(data=None)

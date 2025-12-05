@@ -114,7 +114,7 @@ async def register_user(
     username = username or data.username
 
     response = await client.post(
-        "/api/auth/register",
+        "/auth/register",
         json={
             "email": email,
             "password": password,
@@ -130,7 +130,7 @@ async def register_user(
 
 async def login_user(client: AsyncClient, email: str, password: str) -> dict[str, str]:
     """Login a user and return tokens."""
-    response = await client.post("/api/auth/login", json={"email": email, "password": password})
+    response = await client.post("/auth/login", json={"email": email, "password": password})
     assert response.status_code == 200, f"Login failed: {response.text}"
     result: dict[str, str] = response.json()
     return result

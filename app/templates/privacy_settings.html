@@ -2,7 +2,7 @@
 {% from "components/ui.html" import back_link, action_buttons %}
 {% block title %}Privacy Settings{% endblock %}
 {% block content %}
-<div class="max-w-2xl mx-auto py-8 px-4">
+<div class="max-w-2xl mx-auto py-8">
   {{ back_link('/' + user.username, 'Back to profile') }}
 
   <div class="mt-6 bg-white shadow-lg rounded-lg overflow-hidden">
@@ -18,7 +18,8 @@
         <p class="text-sm text-gray-600 mb-4">Choose who can see your full profile information</p>
 
         <div class="space-y-3">
-          <label class="flex items-start p-4 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+          <label
+            class="flex items-start p-4 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors {% if user.profile_visibility == 'public' %}bg-gray-50 border-blue-200{% endif %}">
             <input type="radio" name="profile_visibility" value="public" {% if user.profile_visibility=='public'
               %}checked{% endif %} class="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500">
             <div class="ml-3">
@@ -28,7 +29,8 @@
             </div>
           </label>
 
-          <label class="flex items-start p-4 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+          <label
+            class="flex items-start p-4 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors {% if user.profile_visibility == 'authenticated' %}bg-gray-50 border-blue-200{% endif %}">
             <input type="radio" name="profile_visibility" value="authenticated" {% if
               user.profile_visibility=='authenticated' %}checked{% endif %}
               class="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500">
@@ -38,7 +40,8 @@
             </div>
           </label>
 
-          <label class="flex items-start p-4 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+          <label
+            class="flex items-start p-4 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors {% if user.profile_visibility == 'followers' %}bg-gray-50 border-blue-200{% endif %}">
             <input type="radio" name="profile_visibility" value="followers" {% if user.profile_visibility=='followers'
               %}checked{% endif %} class="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500">
             <div class="ml-3">
@@ -47,7 +50,8 @@
             </div>
           </label>
 
-          <label class="flex items-start p-4 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+          <label
+            class="flex items-start p-4 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors {% if user.profile_visibility == 'private' %}bg-gray-50 border-blue-200{% endif %}">
             <input type="radio" name="profile_visibility" value="private" {% if user.profile_visibility=='private'
               %}checked{% endif %} class="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500">
             <div class="ml-3">

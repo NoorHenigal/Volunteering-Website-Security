@@ -12,17 +12,13 @@ from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from app.auth.router import api_router as auth_api_router
 from app.auth.router import router as auth_router
 from app.core.config import settings
 from app.core.context import ContextDep, render_template
 from app.core.exceptions import http_exception_handler, validation_exception_handler
 from app.core.lifecycle import StartupCheckError, cleanup_shutdown_task, manage_test_shutdown, run_preflight_checks
-from app.opportunities.router import api_router as opp_api_router
-from app.opportunities.router import app_api_router
-from app.opportunities.router import ui_router as opp_ui_router
-from app.organizations.router import api_router as org_api_router
-from app.organizations.router import ui_router as org_ui_router
+from app.opportunities.router import router as opp_router
+from app.organizations.router import router as org_router
 from app.profiles.router import router as profiles_router
 
 if TYPE_CHECKING:
@@ -90,10 +86,6 @@ async def home(ctx: ContextDep) -> Response:
 
 
 app.include_router(auth_router)
-app.include_router(auth_api_router)
-app.include_router(opp_api_router)
-app.include_router(app_api_router)
-app.include_router(opp_ui_router)
-app.include_router(org_api_router)
-app.include_router(org_ui_router)
+app.include_router(opp_router)
+app.include_router(org_router)
 app.include_router(profiles_router)
