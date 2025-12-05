@@ -1,10 +1,7 @@
 """UI Development mode FastAPI application."""
 
-import asyncio
-import os
-import signal
 from collections.abc import AsyncGenerator
-from contextlib import asynccontextmanager, suppress
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -13,25 +10,12 @@ from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
 from starlette.templating import Jinja2Templates
 
-from app.core.log import log
+from app.core.lifecycle import cleanup_shutdown_task, manage_test_shutdown
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
     from fastapi.responses import Response
-
-
-async def auto_shutdown(duration: int) -> None:
-    """Automatically shutdown the application after specified duration.
-
-    Args:
-        duration: Number of seconds to wait before shutdown
-    """
-    log.warning("TEST MODE: Server will shutdown in %d seconds", duration)
-    await asyncio.sleep(duration)
-    log.warning("TEST MODE: %d seconds elapsed, shutting down gracefully", duration)
-    # Send SIGTERM to granian main for graceful shutdown
-    os.kill(os.getppid(), signal.SIGTERM)
 
 
 @asynccontextmanager
@@ -45,17 +29,12 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None]:
         None
     """
     # If TEST_RUN_DURATION is set, schedule automatic shutdown
-    shutdown_task = None
-    if test_duration := os.getenv("TEST_RUN_DURATION"):
-        shutdown_task = asyncio.create_task(auto_shutdown(int(test_duration)))
+    shutdown_task = await manage_test_shutdown()
 
     yield
 
     # Shutdown: Cancel auto-shutdown task if it's still running
-    if shutdown_task and not shutdown_task.done():
-        shutdown_task.cancel()
-        with suppress(asyncio.CancelledError):
-            await shutdown_task
+    await cleanup_shutdown_task(shutdown_task)
 
 
 # Create FastAPI app for UI development

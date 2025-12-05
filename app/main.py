@@ -1,45 +1,29 @@
 """Main FastAPI application."""
 
-import asyncio
 import os
-import signal
-from contextlib import asynccontextmanager, suppress
+from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated
+from typing import TYPE_CHECKING
 
-from fastapi import Depends, FastAPI, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
-from sqlalchemy.ext.asyncio import AsyncSession
-from starlette.templating import Jinja2Templates
 
 from app.auth.router import api_router as auth_api_router
-from app.auth.router import ui_router as auth_ui_router
+from app.auth.router import router as auth_router
 from app.core.config import settings
-from app.core.log import log
-from app.core.security import get_user_from_cookie
-from app.core.startup import StartupCheckError, run_preflight_checks
-from app.db.session import get_db
+from app.core.context import ContextDep, render_template
+from app.core.lifecycle import StartupCheckError, cleanup_shutdown_task, manage_test_shutdown, run_preflight_checks
+from app.opportunities.router import api_router as opp_api_router
+from app.opportunities.router import app_api_router
+from app.opportunities.router import ui_router as opp_ui_router
+from app.organizations.router import api_router as org_api_router
+from app.organizations.router import ui_router as org_ui_router
+from app.profiles.router import router as profiles_router
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
-
-    from fastapi.responses import Response
-    from sqlalchemy.ext.asyncio import AsyncSession
-
-
-async def auto_shutdown(duration: int) -> None:
-    """Automatically shutdown the application after specified duration.
-
-    Args:
-        duration: Number of seconds to wait before shutdown
-    """
-    log.warning("TEST MODE: Server will shutdown in %d seconds", duration)
-    await asyncio.sleep(duration)
-    log.warning("TEST MODE: %d seconds elapsed, shutting down gracefully", duration)
-    # Send SIGTERM to granian main for graceful shutdown
-    os.kill(os.getppid(), signal.SIGTERM)
 
 
 @asynccontextmanager
@@ -56,23 +40,18 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None]:
     """
     # Startup: Run pre-flight checks
     try:
-        run_preflight_checks()
+        await run_preflight_checks()
     except StartupCheckError:
         # Error already logged, exit immediately without traceback
         os._exit(1)
 
     # If TEST_RUN_DURATION is set, schedule automatic shutdown
-    shutdown_task = None
-    if test_duration := os.getenv("TEST_RUN_DURATION"):
-        shutdown_task = asyncio.create_task(auto_shutdown(int(test_duration)))
+    shutdown_task = await manage_test_shutdown()
 
     yield
 
     # Shutdown: Cancel auto-shutdown task if it's still running
-    if shutdown_task and not shutdown_task.done():
-        shutdown_task.cancel()
-        with suppress(asyncio.CancelledError):
-            await shutdown_task
+    await cleanup_shutdown_task(shutdown_task)
 
 
 # Create FastAPI app
@@ -96,34 +75,21 @@ app.add_middleware(
 BASE_DIR = Path(__file__).resolve().parent
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 
-# Setup templates
-templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
-
 # Include routers
+app.include_router(auth_router)
 app.include_router(auth_api_router)
-app.include_router(auth_ui_router)
+app.include_router(opp_api_router)
+app.include_router(app_api_router)
+app.include_router(opp_ui_router)
+app.include_router(org_api_router)
+app.include_router(org_ui_router)
+app.include_router(profiles_router)
 
 
 @app.get("/")
-async def home(
-    request: Request,
-    db: Annotated[AsyncSession, Depends(get_db)],
-) -> Response:
-    """Home page.
-
-    Args:
-        request: FastAPI request object
-        db: Database session
-
-    Returns:
-        Rendered home page template
-    """
-    user = await get_user_from_cookie(request, db)
-    return templates.TemplateResponse(
-        request,
-        "index.html",
-        {"request": request, "user": user},
-    )
+async def home(ctx: ContextDep) -> Response:
+    """Home page."""
+    return render_template(ctx.request, "index.html", user=ctx.user)
 
 
 @app.get("/health")

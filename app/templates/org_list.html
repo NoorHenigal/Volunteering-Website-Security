@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% from "components/ui.html" import page_header, empty_state %}
+
+{% block title %}Organizations{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto">
+    {{ page_header('Organizations', '/org/new', 'Create Organization', 'blue', user.role == 'organization' and
+    organizations|length > 0) }}
+
+    {% if organizations %}
+    <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {% for org in organizations %}
+        <div class="bg-white rounded-lg shadow-lg p-6 hover:shadow-xl transition-shadow">
+            <h2 class="text-2xl font-bold text-gray-800 mb-3">{{ org.name }}</h2>
+            {% if org.description %}
+            <p class="text-gray-600 mb-4 line-clamp-3">{{ org.description }}</p>
+            {% else %}
+            <p class="text-gray-400 italic mb-4">No description provided</p>
+            {% endif %}
+            <a href="/org/{{ org.id }}" class="text-blue-600 hover:text-blue-800 font-semibold">
+                View Details →
+            </a>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    {{ empty_state('No organizations found', '/org/new', 'Create the First Organization', 'blue', user.role ==
+    'organization') }}
+    {% endif %}
+</div>
+{% endblock %}

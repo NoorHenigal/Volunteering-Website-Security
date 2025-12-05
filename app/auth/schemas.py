@@ -2,21 +2,23 @@
 
 from typing import Literal
 
-from pydantic import BaseModel, EmailStr
+from pydantic import EmailStr, Field
+
+from app.core.base_schemas import BaseCreate, BaseOut, StrictModel
+from app.db.models import RoleType
+
+__all__ = ["LoginSchema", "RegisterSchema", "TokenResponse", "UserResponse"]
 
 
-class StrictModel(BaseModel):
-    """Base model with strict validation."""
-
-    model_config = {"strict": True, "extra": "forbid"}
-
-
-class RegisterSchema(StrictModel):
+class RegisterSchema(BaseCreate):
     """User registration data."""
 
     email: EmailStr
-    password: str
-    role: Literal["admin", "volunteer", "organization"]
+    password: str = Field(min_length=8)
+    role: RoleType
+    first_name: str = Field(min_length=1)
+    last_name: str = Field(min_length=1)
+    username: str = Field(min_length=3, pattern=r"^[a-zA-Z0-9_-]+$")
 
 
 class LoginSchema(StrictModel):
@@ -33,15 +35,12 @@ class TokenResponse(StrictModel):
     token_type: Literal["bearer"] = "bearer"  # noqa: S105
 
 
-class UserResponse(StrictModel):
+class UserResponse(BaseOut):
     """User information response."""
 
-    id: int
     email: EmailStr
-    role: str
-
-
-class MessageResponse(StrictModel):
-    """Simple message response."""
-
-    message: str
+    role: RoleType
+    first_name: str
+    last_name: str
+    username: str
+    profile_picture: str | None

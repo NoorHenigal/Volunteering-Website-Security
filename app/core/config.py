@@ -1,5 +1,6 @@
-"""Strict typed configuration settings."""
+"""Strict typed configuration settings and logging."""
 
+import logging
 from datetime import timedelta
 from pathlib import Path
 from typing import Literal
@@ -48,17 +49,12 @@ class Settings(BaseSettings):
     # Logging
     log_level: str = Field(default="normal", alias="LOG_LEVEL")
 
-    @property
-    def async_database_url(self) -> str:
-        """Generate async database URL."""
-        return (
-            f"postgresql+psycopg://{self.postgres_user}:{self.postgres_password}"
-            f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
-        )
+    # Demo Data
+    demo_data: bool = Field(default=False, alias="DEMO_DATA")
 
     @property
-    def sync_database_url(self) -> str:
-        """Generate sync database URL for Alembic migrations."""
+    def database_url(self) -> str:
+        """Generate database URL (psycopg driver works for both sync and async)."""
         return (
             f"postgresql+psycopg://{self.postgres_user}:{self.postgres_password}"
             f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
@@ -87,3 +83,14 @@ def _create_settings() -> Settings:
 
 
 settings: Settings = _create_settings()
+
+
+# Logging Configuration
+def _configure_logging() -> logging.Logger:
+    """Configure and return the application logger."""
+    level = logging.DEBUG if settings.log_level == "debug" else logging.WARNING
+    logging.basicConfig(level=level, format="[%(levelname)s] %(message)s", force=True)
+    return logging.getLogger("app")
+
+
+log: logging.Logger = _configure_logging()

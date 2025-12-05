@@ -31,10 +31,10 @@ test:
 	uv run pytest -xvs
 
 run-hold:
-	TEST_RUN_DURATION=5 uv run  python run_server.py
+	TEST_RUN_DURATION=5 uv run python run.py
 
 run-ui:
-	uv run python run_ui_dev.py
+	uv run python run.py --ui-dev
 
 run:
-	uv run python run_server.py
+	uv run python run.py

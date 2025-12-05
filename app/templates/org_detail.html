@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% from "components/ui.html" import back_link, member_role_badge, open_status_badge %}
+
+{% block title %}{{ organization.name }}{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto">
+    <div class="bg-white rounded-lg shadow-lg p-8">
+        <div class="mb-6">
+            {{ back_link('/org/list', 'Back to Organizations') }}
+        </div>
+
+        <div class="flex justify-between items-start mb-6">
+            <div>
+                <h1 class="text-4xl font-bold text-gray-800 mb-4">{{ organization.name }}</h1>
+                {% if organization.description %}
+                <p class="text-gray-700 text-lg leading-relaxed">{{ organization.description }}</p>
+                {% else %}
+                <p class="text-gray-400 italic">No description provided</p>
+                {% endif %}
+            </div>
+            {% if is_admin %}
+            <a href="/org/{{ organization.id }}/edit"
+                class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg">
+                Edit Organization
+            </a>
+            {% endif %}
+        </div>
+
+        <div class="border-t pt-6 mt-6">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4">Members</h2>
+            {% if members %}
+            <div class="space-y-3">
+                {% for member in members %}
+                <div class="flex justify-between items-center bg-gray-50 p-4 rounded-lg">
+                    <div>
+                        <a href="/{{ member.username }}"
+                            class="font-semibold text-blue-600 hover:text-blue-800 transition-colors">
+                            {{ member.first_name }} {{ member.last_name }}
+                        </a>
+                        <p class="text-sm text-gray-600">@{{ member.username }}</p>
+                    </div>
+                    {{ member_role_badge(member.role) }}
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-gray-500 italic">No members yet</p>
+            {% endif %}
+        </div>
+
+        <div class="border-t pt-6 mt-6">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4">Opportunities</h2>
+            {% if organization.opportunities %}
+            <div class="space-y-3">
+                {% for opp in organization.opportunities %}
+                <div class="bg-gray-50 p-4 rounded-lg hover:bg-gray-100 transition">
+                    <a href="/opp/{{ opp.id }}" class="block">
+                        <h3 class="text-lg font-bold text-gray-800 mb-2">{{ opp.title }}</h3>
+                        <p class="text-gray-600 line-clamp-2">{{ opp.description }}</p>
+                        <div class="mt-2">
+                            {{ open_status_badge(opp.is_open, 'sm') }}
+                        </div>
+                    </a>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-gray-500 italic">No opportunities posted yet</p>
+            {% if is_admin %}
+            <a href="/opp/new"
+                class="mt-4 inline-block bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-lg">
+                Post an Opportunity
+            </a>
+            {% endif %}
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

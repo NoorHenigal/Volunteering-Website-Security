@@ -31,7 +31,6 @@ htmlcov/
 .ruff_cache/
 
 # IDE
-.vscode/
 .idea/
 
 # Byte compiled

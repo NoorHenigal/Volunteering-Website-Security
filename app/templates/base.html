@@ -1,33 +1,105 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Volunteering App{% endblock %}</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
+
 <body class="bg-gray-50 min-h-screen flex flex-col">
-    <nav class="bg-blue-600 text-white shadow-lg">
-        <div class="container mx-auto px-4 py-4">
+    {% from "components/ui.html" import user_dropdown %}
+    <nav class="bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg sticky top-0 z-40 backdrop-blur-sm">
+        <div class="container mx-auto px-4 py-3">
             <div class="flex justify-between items-center">
-                <a href="/" class="text-2xl font-bold hover:text-gray-200">Volunteering Platform</a>
-                <ul class="flex space-x-6 items-center">
-                    <li><a href="/" class="hover:text-gray-200">Home</a></li>
+                <a href="/" class="text-2xl font-bold hover:text-blue-100 transition-colors duration-200">
+                    <span class="hidden sm:inline">Volunteering Platform</span>
+                    <span class="sm:hidden">VP</span>
+                </a>
+
+                <!-- Mobile menu button -->
+                <button id="mobile-menu-btn" class="lg:hidden p-2 rounded-lg hover:bg-blue-700 transition-colors"
+                    aria-label="Toggle menu">
+                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M4 6h16M4 12h16M4 18h16" />
+                    </svg>
+                </button>
+
+                <!-- Desktop menu -->
+                <ul class="hidden lg:flex space-x-6 items-center">
+                    <li><a href="/"
+                            class="hover:text-blue-100 transition-colors duration-200 font-medium {% if request.path == '/' %}text-white border-b-2 border-white{% endif %}">Home</a>
+                    </li>
                     {% if user %}
-                        <li><a href="/auth/status" class="hover:text-gray-200">Dashboard</a></li>
-                        <li class="text-gray-200">
-                            <span class="font-semibold">{{ user.email }}</span>
-                            <span class="text-xs bg-blue-800 px-2 py-1 rounded ml-2">{{ user.role }}</span>
-                        </li>
-                        <li><a href="/auth/logout" class="bg-red-500 hover:bg-red-600 px-4 py-2 rounded">Logout</a></li>
+                    <li><a href="/opp/list"
+                            class="hover:text-blue-100 transition-colors duration-200 font-medium {% if request.path.startswith('/opp') %}text-white border-b-2 border-white{% endif %}">Opportunities</a>
+                    </li>
+                    <li><a href="/org/list"
+                            class="hover:text-blue-100 transition-colors duration-200 font-medium {% if request.path.startswith('/org') %}text-white border-b-2 border-white{% endif %}">Organizations</a>
+                    </li>
+                    <li>
+                        {{ user_dropdown(user) }}
+                    </li>
                     {% else %}
-                        <li><a href="/auth/login" class="hover:text-gray-200">Login</a></li>
-                        <li><a href="/auth/register" class="bg-green-500 hover:bg-green-600 px-4 py-2 rounded">Register</a></li>
+                    <li><a href="/auth/login"
+                            class="hover:text-blue-100 transition-colors duration-200 font-medium">Login</a></li>
+                    <li>
+                        <a href="/auth/register"
+                            class="bg-green-500 hover:bg-green-600 px-4 py-2 rounded-lg font-semibold transition-all duration-200 shadow-md hover:shadow-lg">
+                            Register
+                        </a>
+                    </li>
                     {% endif %}
                 </ul>
             </div>
+
+            <!-- Mobile menu -->
+            <div id="mobile-menu" class="hidden lg:hidden mt-4 pb-4 space-y-2">
+                <a href="/"
+                    class="block py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors font-medium {% if request.path == '/' %}bg-blue-700{% endif %}">Home</a>
+                {% if user %}
+                <a href="/opp/list"
+                    class="block py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors font-medium {% if request.path.startswith('/opp') %}bg-blue-700{% endif %}">Opportunities</a>
+                <a href="/org/list"
+                    class="block py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors font-medium {% if request.path.startswith('/org') %}bg-blue-700{% endif %}">Organizations</a>
+                <a href="/{{ user.username }}"
+                    class="block py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors font-medium {% if request.path == '/' + user.username %}bg-blue-700{% endif %}">Profile</a>
+                <a href="/auth/status"
+                    class="block py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors font-medium {% if request.path == '/auth/status' %}bg-blue-700{% endif %}">Dashboard</a>
+                {% if user.role == 'volunteer' %}
+                <a href="/opp/applications/list"
+                    class="block py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors font-medium {% if request.path == '/opp/applications/list' %}bg-blue-700{% endif %}">My
+                    Applications</a>
+                {% endif %}
+                <form action="/auth/logout" method="POST" class="pt-2 border-t border-blue-500">
+                    <button type="submit"
+                        class="w-full text-left py-2 px-4 rounded-lg hover:bg-red-600 transition-colors font-medium bg-red-500">
+                        Logout
+                    </button>
+                </form>
+                {% else %}
+                <a href="/auth/login"
+                    class="block py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors font-medium">Login</a>
+                <a href="/auth/register"
+                    class="block py-2 px-4 rounded-lg bg-green-500 hover:bg-green-600 transition-colors font-medium text-center">Register</a>
+                {% endif %}
+            </div>
         </div>
     </nav>
+
+    <script>
+        // Mobile menu toggle
+        const mobileMenuBtn = document.getElementById('mobile-menu-btn');
+        const mobileMenu = document.getElementById('mobile-menu');
+
+        if (mobileMenuBtn && mobileMenu) {
+            mobileMenuBtn.addEventListener('click', () => {
+                mobileMenu.classList.toggle('hidden');
+            });
+        }
+    </script>
 
     <main class="container mx-auto px-4 py-8 flex-1">
         {% block content %}{% endblock %}
@@ -37,4 +109,5 @@
         <p>&copy; 2025 Volunteering Platform</p>
     </footer>
 </body>
+
 </html>

@@ -13,18 +13,14 @@ from alembic import context
 from app.core.config import settings
 from app.db.models import Base
 
-# Configure logging
+# Get logger (configured via alembic.ini)
 logger = logging.getLogger("alembic")
-logger.setLevel(logging.INFO)
-handler = logging.StreamHandler()
-handler.setFormatter(logging.Formatter("%(levelname)-5.5s [%(name)s] %(message)s"))
-logger.addHandler(handler)
 
 # Alembic configuration
 config = context.config
 
-# Apply sync database URL to alembic.ini
-db_url = settings.sync_database_url.replace("%", "%%")
+# Apply database URL to alembic.ini
+db_url = settings.database_url.replace("%", "%%")
 config.set_main_option("sqlalchemy.url", db_url)
 
 logger.info("Starting Alembic migrations")

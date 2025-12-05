@@ -4,7 +4,22 @@
 {% block title %}Register{% endblock %}
 
 {% block content %}
-{% set role_field %}
+{% set extra_fields_content %}
+<div class="mb-4">
+    <label class="block text-black font-semibold mb-2">First Name</label>
+    <input type="text" class="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-green-600" name="first_name"
+        required placeholder="John">
+</div>
+<div class="mb-4">
+    <label class="block text-black font-semibold mb-2">Last Name</label>
+    <input type="text" class="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-green-600" name="last_name"
+        required placeholder="Doe">
+</div>
+<div class="mb-4">
+    <label class="block text-black font-semibold mb-2">Username</label>
+    <input type="text" class="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-green-600" name="username"
+        required placeholder="johndoe">
+</div>
 <div>
     <label class="block text-black font-semibold mb-2">Role</label>
     <select class="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-green-600" name="role" required>
@@ -16,12 +31,12 @@
 {% endset %}
 
 {{ render_auth_form(
-    title="Register",
-    action="/auth/register",
-    button_text="Register",
-    extra_fields=role_field,
-    footer_text="Already have an account?",
-    footer_link="/auth/login",
-    footer_link_text="Login"
+title="Register",
+action="/auth/register",
+button_text="Register",
+extra_fields=extra_fields_content,
+footer_text="Already have an account?",
+footer_link="/auth/login",
+footer_link_text="Login"
 ) }}
 {% endblock %}
