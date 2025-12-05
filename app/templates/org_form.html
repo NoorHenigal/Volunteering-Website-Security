@@ -5,22 +5,25 @@
 
 {% block content %}
 {% call page_card('2xl') %}
-    {{ form_header('/org/list', 'Back to Organizations', 'Edit Organization' if organization else 'Create New Organization') }}
+{{ form_header('/org/list', 'Back to Organizations', 'Edit Organization' if organization else 'Create New Organization')
+}}
 
-    {% include "components/alert.html" %}
+{% include "components/alert.html" %}
 
-    <form method="POST" action="{% if organization %}/org/{{ organization.id }}/edit{% else %}/org/new{% endif %}" class="space-y-6">
-        <div>
-            {{ form_label('Organization Name', 'name', True) }}
-            {{ form_input('name', 'text', 'Enter organization name', True, organization.name if organization else '') }}
-        </div>
+<form method="POST" action="{% if organization %}/org/{{ organization.id }}/edit{% else %}/org/new{% endif %}"
+    class="space-y-6">
+    <div>
+        {{ form_label('Organization Name', 'name', True) }}
+        {{ form_input('name', 'text', 'Enter organization name', True, organization.name if organization else '') }}
+    </div>
 
-        <div>
-            {{ form_label('Description', 'description') }}
-            {{ form_textarea('description', 6, 'Describe your organization, its mission, and goals', False, organization.description if organization and organization.description else '') }}
-        </div>
+    <div>
+        {{ form_label('Description', 'description') }}
+        {{ form_textarea('description', 6, 'Describe your organization, its mission, and goals', False,
+        organization.description if organization and organization.description else '') }}
+    </div>
 
-        {{ action_buttons('Update Organization' if organization else 'Create Organization', '/org/list', 'blue') }}
-    </form>
+    {{ action_buttons('Update Organization' if organization else 'Create Organization', '/org/list', 'blue') }}
+</form>
 {% endcall %}
 {% endblock %}

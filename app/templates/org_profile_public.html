@@ -5,14 +5,14 @@
 
 {% block content %}
 {% call page_card('4xl') %}
-    <h1 class="text-3xl font-bold text-gray-900 mb-2">{{ organization.name }}</h1>
-    {% if organization.description %}
-    <p class="text-lg text-gray-600 mb-6">{{ organization.description }}</p>
-    {% endif %}
+<h1 class="text-3xl font-bold text-gray-900 mb-2">{{ organization.name }}</h1>
+{% if organization.description %}
+<p class="text-lg text-gray-600 mb-6">{{ organization.description }}</p>
+{% endif %}
 
-    {{ section_title('About', True) }}
-    <p class="text-gray-600">
-        Organization since {{ organization.created_at.strftime('%B %Y') }}
-    </p>
+{{ section_title('About', True) }}
+<p class="text-gray-600">
+    Organization since {{ organization.created_at.strftime('%B %Y') }}
+</p>
 {% endcall %}
 {% endblock %}

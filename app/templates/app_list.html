@@ -1,5 +1,6 @@
 {% extends "base.html" %}
-{% from "components/ui.html" import page_header, application_status_badge, datetime_display, empty_state, withdraw_button, message_box %}
+{% from "components/ui.html" import page_header, application_status_badge, datetime_display, empty_state,
+withdraw_button, message_box %}
 
 {% block title %}My Applications{% endblock %}
 
@@ -17,13 +18,15 @@
                         <div class="flex items-center gap-3 mb-2">
                             <h2 class="text-xl font-bold text-gray-800 truncate">
                                 <a href="/opp/{{ app.opportunity_id }}" class="hover:text-blue-600 transition-colors">
-                                    {% if app.opportunity %}{{ app.opportunity.title }}{% else %}Opportunity #{{ app.opportunity_id }}{% endif %}
+                                    {% if app.opportunity %}{{ app.opportunity.title }}{% else %}Opportunity #{{
+                                    app.opportunity_id }}{% endif %}
                                 </a>
                             </h2>
                             {{ application_status_badge(app.status, 'sm') }}
                         </div>
                         {% if app.opportunity %}
-                        <p class="text-gray-600 mb-3 line-clamp-2">{{ app.opportunity.description[:150] }}{% if app.opportunity.description|length > 150 %}...{% endif %}</p>
+                        <p class="text-gray-600 mb-3 line-clamp-2">{{ app.opportunity.description[:150] }}{% if
+                            app.opportunity.description|length > 150 %}...{% endif %}</p>
                         {% endif %}
                         {{ datetime_display(app.created_at, 'Applied on ') }}
                     </div>
