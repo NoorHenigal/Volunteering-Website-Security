@@ -35,11 +35,11 @@ class TestVolunteerJourney:
         volunteer = await ctx.volunteer()
 
         # List opportunities
-        opps = await api.ok("GET", "/api/opportunities", auth=volunteer)
+        opps = await api.ok("GET", "/opportunities", auth=volunteer)
         assert "items" in opps
 
         # View opportunity details
-        detail = await api.ok("GET", f"/api/opportunities/{test_opp.opportunity.id}", auth=volunteer)
+        detail = await api.ok("GET", f"/opportunities/{test_opp.opportunity.id}", auth=volunteer)
         assert detail["id"] == str(test_opp.opportunity.id)
 
         # Apply to opportunity
@@ -47,7 +47,7 @@ class TestVolunteerJourney:
         assert app["status"] == "pending"
 
         # View applications
-        apps = await api.ok("GET", "/api/applications", auth=volunteer)
+        apps = await api.ok("GET", "/applications", auth=volunteer)
         assert len(apps["items"]) == 1
         assert UUID(apps["items"][0]["opportunity_id"]) == test_opp.opportunity.id
 
@@ -55,7 +55,7 @@ class TestVolunteerJourney:
         await flows.withdraw(app["id"], volunteer)
 
         # Verify application is gone
-        apps_after = await api.ok("GET", "/api/applications", auth=volunteer)
+        apps_after = await api.ok("GET", "/applications", auth=volunteer)
         assert len(apps_after["items"]) == 0
 
 
@@ -84,7 +84,7 @@ class TestOrganizationJourney:
         # Volunteer applies
         volunteer = await flows.create_user("volunteer")
         app = await api.created(
-            f"/api/opportunities/{opp['id']}/apply",
+            f"/opportunities/{opp['id']}/apply",
             auth=volunteer,
             json={"message": "I'd love to help with this!"},
         )
@@ -126,7 +126,7 @@ class TestMultiUserScenarios:
         for i, opp in enumerate(opportunities):
             await flows.apply(opp.id, volunteer, message=f"Applying to opportunity {i + 1}")
 
-        await api.list_contains("/api/applications", auth=volunteer, expected_count=3)
+        await api.list_contains("/applications", auth=volunteer, expected_count=3)
 
 
 class TestAuthorizationBoundaries:
@@ -143,7 +143,7 @@ class TestAuthorizationBoundaries:
         volunteer = await ctx.volunteer()
         await api.forbidden(
             "POST",
-            "/api/opportunities",
+            "/opportunities",
             auth=volunteer,
             json={
                 "title": "Unauthorized",
@@ -158,7 +158,7 @@ class TestAuthorizationBoundaries:
         volunteer = await ctx.volunteer()
         await api.forbidden(
             "POST",
-            "/api/organizations",
+            "/organizations",
             auth=volunteer,
             json={"name": "Unauthorized Org", "description": "Should fail"},
         )
@@ -174,7 +174,7 @@ class TestAuthorizationBoundaries:
         org = await ctx.organization(key="other")
         await api.forbidden(
             "POST",
-            f"/api/opportunities/{test_opp.opportunity.id}/apply",
+            f"/opportunities/{test_opp.opportunity.id}/apply",
             auth=org.admin,
             json={"message": "Orgs can't apply"},
         )
@@ -192,7 +192,7 @@ class TestAuthorizationBoundaries:
         app_data = await flows.apply(test_opp, vol1)
 
         vol2 = await ctx.volunteer(key="vol2")
-        await api.forbidden("DELETE", f"/api/applications/{app_data['id']}/withdraw", auth=vol2)
+        await api.forbidden("DELETE", f"/applications/{app_data['id']}", auth=vol2)
 
 
 class TestOrganizationMembership:
@@ -211,7 +211,7 @@ class TestOrganizationMembership:
 
         await api.forbidden(
             "POST",
-            "/api/opportunities",
+            "/opportunities",
             auth=other_org_user,
             json={
                 "title": "Unauthorized Post",
@@ -234,7 +234,7 @@ class TestOrganizationMembership:
         await flows.add_member(test_db, member, test_org, role="member")
 
         await api.created(
-            "/api/opportunities",
+            "/opportunities",
             auth=member,
             json={
                 "title": "Member Posted Opportunity",
@@ -256,7 +256,7 @@ class TestUIFlows:
         """Test: Organization user can access opportunity creation form."""
         org_user = await flows.create_user("organization")
         await flows.login_via_ui(org_user.email, org_user.password)
-        response = await client.get("/opp/new", headers={"Accept": "text/html"})
+        response = await client.get("/opportunities/new", headers={"Accept": "text/html"})
         assert response.status_code == status.HTTP_200_OK
         assert b"Create" in response.content
 
@@ -270,7 +270,7 @@ class TestUIFlows:
         """Test: Volunteer cannot access opportunity creation form."""
         volunteer = await ctx.volunteer()
         await flows.login_via_ui(volunteer.email, volunteer.password)
-        response = await client.get("/opp/new", headers={"Accept": "text/html"})
+        response = await client.get("/opportunities/new", headers={"Accept": "text/html"})
         assert response.status_code == status.HTTP_403_FORBIDDEN
 
 
@@ -290,7 +290,7 @@ class TestEdgeCases:
         app_data = await flows.apply(test_opp, volunteer)
         await api(
             "PUT",
-            f"/api/applications/{app_data['id']}/status",
+            f"/applications/{app_data['id']}/status",
             expected=status.HTTP_422_UNPROCESSABLE_CONTENT,
             auth=test_opp.organization.admin,
             json={"status": "invalid_status"},
@@ -302,7 +302,7 @@ class TestEdgeCases:
         volunteer = await ctx.volunteer()
         await api.unauthorized(
             "POST",
-            "/api/auth/login",
+            "/auth/login",
             json={"email": volunteer.email, "password": "wrong_password123!"},
         )
 

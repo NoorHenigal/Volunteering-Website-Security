@@ -8,7 +8,7 @@ from uuid import UUID
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.exceptions import conflict, forbid
+from app.core.exceptions import conflict, forbid, require
 from app.core.service import BaseService
 from app.db.models import Application, Opportunity, Organization, User
 from app.db.repositories import (
@@ -35,7 +35,8 @@ class OpportunityService(BaseService):
 
     async def get_by_id(self, opportunity_id: UUID) -> Opportunity:
         """Get opportunity by ID or raise 404."""
-        return await self.get_or_404(self._opp_repo, opportunity_id, "Opportunity not found")
+        opp = await self._opp_repo.get_by_id_with_organization(opportunity_id)
+        return require(opp, "Opportunity not found")
 
     async def create(
         self,

@@ -20,7 +20,7 @@ class TestErrorResponses:
         user = await register_and_login(client, role="volunteer")
         # Send invalid UUID to trigger FastAPI's path validation
         response = await client.get(
-            "/api/opportunities/not-a-uuid",
+            "/opportunities/not-a-uuid",
             headers=user.auth_header,
         )
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
@@ -32,7 +32,7 @@ class TestErrorResponses:
     @pytest.mark.anyio
     async def test_http_exception_returns_structured_response(self, client: AsyncClient) -> None:
         """Test HTTP exceptions return ErrorResponse schema."""
-        response = await client.get("/api/auth/me")  # No auth = 401
+        response = await client.get("/auth/me")  # No auth = 401
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
         data = response.json()
         assert "detail" in data
@@ -44,7 +44,7 @@ class TestErrorResponses:
         """Test 404 errors return ErrorResponse schema."""
         user = await register_and_login(client, role="volunteer")
         response = await client.get(
-            "/api/opportunities/00000000-0000-0000-0000-000000000000",
+            "/opportunities/00000000-0000-0000-0000-000000000000",
             headers=user.auth_header,
         )
         assert response.status_code == status.HTTP_404_NOT_FOUND
@@ -97,8 +97,8 @@ class TestOpenAPIDocumentation:
         assert response.status_code == status.HTTP_200_OK
         schema = response.json()
 
-        # Check /api/auth/register has responses documented
-        register_path = schema["paths"].get("/api/auth/register", {}).get("post", {})
+        # Check /auth/register has responses documented
+        register_path = schema["paths"].get("/auth/register", {}).get("post", {})
         assert "responses" in register_path
         assert "201" in register_path["responses"] or "200" in register_path["responses"]
 
@@ -123,7 +123,7 @@ class TestExceptionHandlers:
     async def test_validation_error_returns_array_detail(self, client: AsyncClient) -> None:
         """Test 422 responses have detail as array per OpenAPI schema."""
         user = await register_and_login(client, role="volunteer")
-        response = await client.get("/api/opportunities/invalid-uuid", headers=user.auth_header)
+        response = await client.get("/opportunities/invalid-uuid", headers=user.auth_header)
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
         data = response.json()
         assert isinstance(data["detail"], list)  # Not string
@@ -133,10 +133,10 @@ class TestExceptionHandlers:
     async def test_405_includes_allow_header(self, client: AsyncClient) -> None:
         """Test 405 responses include Allow header per RFC 9110."""
         # Use an endpoint that definitely exists but doesn't support TRACE
-        response = await client.request("TRACE", "/api/auth/me")
+        response = await client.request("TRACE", "/auth/me")
         assert response.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
         assert "Allow" in response.headers
-        # GET is allowed on /api/auth/me
+        # GET is allowed on /auth/me
         assert "GET" in response.headers["Allow"]
 
 

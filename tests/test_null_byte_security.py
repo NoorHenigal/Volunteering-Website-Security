@@ -31,7 +31,7 @@ class TestNullByteRejection:
         """Test that registration rejects null bytes in email field."""
         for null_string in self.NULL_BYTE_STRINGS:
             response = await api.client.post(
-                "/api/auth/register",
+                "/auth/register",
                 json={
                     "email": f"test{null_string}@example.com",
                     "password": "TestPass123!",
@@ -52,7 +52,7 @@ class TestNullByteRejection:
         """Test that registration rejects null bytes in password field."""
         for null_string in self.NULL_BYTE_STRINGS:
             response = await api.client.post(
-                "/api/auth/register",
+                "/auth/register",
                 json={
                     "email": "test@example.com",
                     "password": f"TestPass{null_string}123!",
@@ -73,7 +73,7 @@ class TestNullByteRejection:
         for null_string in self.NULL_BYTE_STRINGS:
             # Test first_name
             response = await api.client.post(
-                "/api/auth/register",
+                "/auth/register",
                 json={
                     "email": "test@example.com",
                     "password": "TestPass123!",
@@ -90,7 +90,7 @@ class TestNullByteRejection:
 
             # Test last_name
             response = await api.client.post(
-                "/api/auth/register",
+                "/auth/register",
                 json={
                     "email": "test@example.com",
                     "password": "TestPass123!",
@@ -110,7 +110,7 @@ class TestNullByteRejection:
         """Test that registration rejects null bytes in username field."""
         for null_string in self.NULL_BYTE_STRINGS:
             response = await api.client.post(
-                "/api/auth/register",
+                "/auth/register",
                 json={
                     "email": "test@example.com",
                     "password": "TestPass123!",
@@ -133,7 +133,7 @@ class TestNullByteRejection:
         for null_string in self.NULL_BYTE_STRINGS:
             # Test name field
             response = await api.client.post(
-                "/api/organizations",
+                "/organizations",
                 json={
                     "name": f"TestOrg{null_string}",
                     "description": "Test description",
@@ -147,7 +147,7 @@ class TestNullByteRejection:
 
             # Test description field
             response = await api.client.post(
-                "/api/organizations",
+                "/organizations",
                 json={
                     "name": "TestOrg",
                     "description": f"Test{null_string}",
@@ -168,7 +168,7 @@ class TestNullByteRejection:
         for null_string in self.NULL_BYTE_STRINGS:
             # Test title field
             response = await api.client.post(
-                "/api/opportunities",
+                "/opportunities",
                 json={
                     "title": f"TestOpp{null_string}",
                     "description": "Test description",
@@ -183,7 +183,7 @@ class TestNullByteRejection:
 
             # Test description field
             response = await api.client.post(
-                "/api/opportunities",
+                "/opportunities",
                 json={
                     "title": "TestOpp",
                     "description": f"Test{null_string}",

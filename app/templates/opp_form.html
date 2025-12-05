@@ -1,66 +1,78 @@
 {% extends "base.html" %}
 {% from "components/ui.html" import back_link, form_label, form_input, form_textarea, form_select, primary_button,
-page_card, warning_box %}
+page_card, warning_box, htmx_form, alert_fragment %}
 
 {% block title %}Create Opportunity{% endblock %}
 
 {% block content %}
 {% call page_card('2xl') %}
-<h2 class="text-3xl font-bold mb-6 text-center text-black">Create New Opportunity</h2>
+<div id="form-container">
+    {% block form_content %}
+    <h2 class="text-3xl font-bold mb-6 text-center text-black">Create New Opportunity</h2>
 
-{% include "components/alert.html" %}
+    <div id="alert-container">
+        {% include "components/alert.html" %}
+        {% if error %}
+        {{ alert_fragment('red', error) }}
+        {% endif %}
+    </div>
 
-{% if organizations|length == 0 %}
-{% call warning_box() %}
-<h3 class="text-lg font-semibold text-yellow-800">Organization Required</h3>
-<p class="mt-2 text-sm text-yellow-700">
-    Before you can create an opportunity, you need to create an organization first.
-    Organizations are used to group and manage volunteering opportunities.
-</p>
-<div class="mt-4">
-    <a href="/org/new"
-        class="inline-flex items-center px-4 py-2 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 transition-colors">
-        <svg class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-        </svg>
-        Create Your First Organization
-    </a>
+    {% if organizations|length == 0 %}
+    {% call warning_box() %}
+    <h3 class="text-lg font-semibold text-yellow-800">Organization Required</h3>
+    <p class="mt-2 text-sm text-yellow-700">
+        Before you can create an opportunity, you need to create an organization first.
+        Organizations are used to group and manage volunteering opportunities.
+    </p>
+    <div class="mt-4">
+        <a href="/organizations/new"
+            class="inline-flex items-center px-4 py-2 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 transition-colors">
+            <svg class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+            </svg>
+            Create Your First Organization
+        </a>
+    </div>
+    {% endcall %}
+
+    <p class="mt-6 text-center text-gray-600">
+        {{ back_link('/opportunities', 'Back to Opportunities') }}
+    </p>
+    {% else %}
+    {% call htmx_form('/opportunities', '#form-container') %}
+    <div class="space-y-6">
+        <div>
+            {{ form_label('Title', 'title', True) }}
+            {{ form_input('title', 'text', 'e.g., Community Garden Helper', True) }}
+        </div>
+
+        <div>
+            {{ form_label('Description', 'description', True) }}
+            {{ form_textarea('description', 6, 'Describe the volunteering opportunity...', True) }}
+        </div>
+
+        <div>
+            {{ form_label('Location (Optional)', 'location') }}
+            {{ form_input('location', 'text', 'e.g., Central Station') }}
+        </div>
+
+        <div>
+            {{ form_label('Organization', 'organization_id', True) }}
+            {{ form_select('organization_id',
+            organizations|map(attribute='id')|zip(organizations|map(attribute='name'))|list, 'Select an organization',
+            True)
+            }}
+        </div>
+
+        {{ primary_button('Create Opportunity', 'submit', 'green') }}
+    </div>
+    {% endcall %}
+
+    <p class="mt-6 text-center text-gray-600">
+        {{ back_link('/opportunities', 'Back to Opportunities') }}
+    </p>
+    {% endif %}
+    {% endblock %}
 </div>
-{% endcall %}
-
-<p class="mt-6 text-center text-gray-600">
-    {{ back_link('/opp/list', 'Back to Opportunities') }}
-</p>
-{% else %}
-<form method="POST" action="/opp/new" class="space-y-6">
-    <div>
-        {{ form_label('Title', 'title', True) }}
-        {{ form_input('title', 'text', 'e.g., Community Garden Helper', True) }}
-    </div>
-
-    <div>
-        {{ form_label('Description', 'description', True) }}
-        {{ form_textarea('description', 6, 'Describe the volunteering opportunity...', True) }}
-    </div>
-
-    <div>
-        {{ form_label('Location (Optional)', 'location') }}
-        {{ form_input('location', 'text', 'e.g., Central Station') }}
-    </div>
-
-    <div>
-        {{ form_label('Organization', 'organization_id', True) }}
-        {{ form_select('organization_id',
-        organizations|map(attribute='id')|zip(organizations|map(attribute='name'))|list, 'Select an organization', True)
-        }}
-    </div>
-
-    {{ primary_button('Create Opportunity', 'submit', 'green') }}
-</form>
-
-<p class="mt-6 text-center text-gray-600">
-    {{ back_link('/opp/list', 'Back to Opportunities') }}
-</p>
-{% endif %}
 {% endcall %}
 {% endblock %}

@@ -77,7 +77,7 @@ async def http_exception_handler(request: Request, exc: Exception) -> Response:
     """
     status_code = getattr(exc, "status_code", 500)
     detail = getattr(exc, "detail", str(exc))
-    headers: dict[str, str] = {}
+    headers: dict[str, str] = getattr(exc, "headers", None) or {}
 
     if status_code == HTTP_405_METHOD_NOT_ALLOWED:
         # Compute allowed methods for RFC 9110 compliance

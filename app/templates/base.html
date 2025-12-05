@@ -6,6 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Volunteering App{% endblock %}</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/htmx.org@2.0.8/dist/htmx.min.js"></script>
+    <script src="https://unpkg.com/htmx.org@2.0.8/dist/ext/response-targets.js"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <style>
         @keyframes fadeIn {
@@ -22,6 +24,18 @@
 
         .animate-fade-in {
             animation: fadeIn 0.5s ease-out;
+        }
+
+        .htmx-indicator {
+            display: none;
+        }
+
+        .htmx-request .htmx-indicator {
+            display: inline;
+        }
+
+        .htmx-request.htmx-indicator {
+            display: inline;
         }
     </style>
 </head>
@@ -61,19 +75,19 @@
                     </li>
                     {% if user %}
                     <li>
-                        <a href="/opp/list"
+                        <a href="/opportunities"
                             class="font-semibold text-sm uppercase tracking-wider pb-1 bg-left-bottom group text-black transition-all duration-300 ease-in-out">
                             <span
-                                class="pb-1 bg-left-bottom bg-gradient-to-r from-blue-600 to-blue-600 bg-[length:0%_2px] bg-no-repeat group-hover:bg-[length:100%_2px] transition-all duration-500 ease-out {% if request.path.startswith('/opp') %}bg-[length:100%_2px]{% endif %}">
+                                class="pb-1 bg-left-bottom bg-gradient-to-r from-blue-600 to-blue-600 bg-[length:0%_2px] bg-no-repeat group-hover:bg-[length:100%_2px] transition-all duration-500 ease-out {% if request.path.startswith('/opportunities') %}bg-[length:100%_2px]{% endif %}">
                                 Opportunities
                             </span>
                         </a>
                     </li>
                     <li>
-                        <a href="/org/list"
+                        <a href="/organizations"
                             class="font-semibold text-sm uppercase tracking-wider pb-1 bg-left-bottom group text-black transition-all duration-300 ease-in-out">
                             <span
-                                class="pb-1 bg-left-bottom bg-gradient-to-r from-blue-600 to-blue-600 bg-[length:0%_2px] bg-no-repeat group-hover:bg-[length:100%_2px] transition-all duration-500 ease-out {% if request.path.startswith('/org') %}bg-[length:100%_2px]{% endif %}">
+                                class="pb-1 bg-left-bottom bg-gradient-to-r from-blue-600 to-blue-600 bg-[length:0%_2px] bg-no-repeat group-hover:bg-[length:100%_2px] transition-all duration-500 ease-out {% if request.path.startswith('/organizations') %}bg-[length:100%_2px]{% endif %}">
                                 Organizations
                             </span>
                         </a>
@@ -115,7 +129,7 @@
                     </li>
                     {% if user %}
                     <li class="py-2">
-                        <a href="/opp/list"
+                        <a href="/opportunities"
                             class="font-semibold text-sm uppercase tracking-wider pb-1 bg-left-bottom group text-black transition-all duration-300 ease-in-out block px-3">
                             <span
                                 class="pb-1 bg-left-bottom bg-gradient-to-r from-blue-600 to-blue-600 bg-[length:0%_2px] bg-no-repeat group-hover:bg-[length:100%_2px] transition-all duration-500 ease-out">
@@ -124,7 +138,7 @@
                         </a>
                     </li>
                     <li class="py-2">
-                        <a href="/org/list"
+                        <a href="/organizations"
                             class="font-semibold text-sm uppercase tracking-wider pb-1 bg-left-bottom group text-black transition-all duration-300 ease-in-out block px-3">
                             <span
                                 class="pb-1 bg-left-bottom bg-gradient-to-r from-blue-600 to-blue-600 bg-[length:0%_2px] bg-no-repeat group-hover:bg-[length:100%_2px] transition-all duration-500 ease-out">
@@ -152,7 +166,7 @@
                     </li>
                     {% if user.role == 'volunteer' %}
                     <li class="py-2">
-                        <a href="/opp/applications/list"
+                        <a href="/applications"
                             class="font-semibold text-sm uppercase tracking-wider pb-1 bg-left-bottom group text-black transition-all duration-300 ease-in-out block px-3">
                             <span
                                 class="pb-1 bg-left-bottom bg-gradient-to-r from-blue-600 to-blue-600 bg-[length:0%_2px] bg-no-repeat group-hover:bg-[length:100%_2px] transition-all duration-500 ease-out">
@@ -215,8 +229,9 @@
                 <div>
                     <h4 class="text-lg font-semibold mb-4">Quick Links</h4>
                     <ul class="space-y-2 text-sm">
-                        <li><a href="/opp/list" class="text-gray-300 hover:text-white">Find Opportunities</a></li>
-                        <li><a href="/org/list" class="text-gray-300 hover:text-white">Browse Organizations</a></li>
+                        <li><a href="/opportunities" class="text-gray-300 hover:text-white">Find Opportunities</a></li>
+                        <li><a href="/organizations" class="text-gray-300 hover:text-white">Browse Organizations</a>
+                        </li>
                         <li><a href="/about" class="text-gray-300 hover:text-white">About Us</a></li>
                         <li><a href="/contact" class="text-gray-300 hover:text-white">Contact</a></li>
                     </ul>
@@ -269,6 +284,34 @@
             </div>
         </div>
     </footer>
+    <div id="toast-container" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none"
+        x-data="{ toasts: [] }"
+        @show-toast.window="toasts.push({id: Date.now(), ...$event.detail}); setTimeout(() => { toasts.shift() }, 3000)">
+        <template x-for="toast in toasts" :key="toast.id">
+            <div class="bg-white border-l-4 p-4 rounded shadow-lg flex items-center justify-between min-w-[300px] animate-fade-in pointer-events-auto"
+                :class="{
+                    'border-green-500': toast.type === 'success',
+                    'border-red-500': toast.type === 'error',
+                    'border-blue-500': toast.type === 'info',
+                    'border-yellow-500': toast.type === 'warning'
+                }">
+                <div class="flex items-center">
+                    <div class="ml-3">
+                        <p class="text-sm font-medium text-gray-900" x-text="toast.message"></p>
+                    </div>
+                </div>
+                <button @click="toasts = toasts.filter(t => t.id !== toast.id)"
+                    class="ml-4 text-gray-400 hover:text-gray-500">
+                    <span class="sr-only">Close</span>
+                    <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd"
+                            d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                            clip-rule="evenodd" />
+                    </svg>
+                </button>
+            </div>
+        </template>
+    </div>
 </body>
 
 </html>

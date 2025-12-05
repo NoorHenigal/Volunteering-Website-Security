@@ -23,7 +23,7 @@
     <div class="space-y-3">
         {% for opp in organization.opportunities %}
         <div class="bg-gray-50 p-4 rounded-lg hover:bg-gray-100 transition">
-            <a href="/opp/{{ opp.id }}" class="block">
+            <a href="/opportunities/{{ opp.id }}" class="block">
                 <h3 class="text-lg font-bold text-gray-800 mb-2">{{ opp.title }}</h3>
                 <p class="text-gray-600 line-clamp-2">{{ opp.description }}</p>
             </a>

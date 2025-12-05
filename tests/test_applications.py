@@ -17,7 +17,7 @@ class TestApplicationAPI:
         test_opp = await ctx.opportunity()
 
         data = await api.created(
-            f"/api/opportunities/{test_opp.opportunity.id}/apply",
+            f"/opportunities/{test_opp.opportunity.id}/apply",
             auth=volunteer,
             json={"message": "I would love to help!"},
         )
@@ -35,7 +35,7 @@ class TestApplicationAPI:
 
         await api.conflict(
             "POST",
-            f"/api/opportunities/{test_opp.opportunity.id}/apply",
+            f"/opportunities/{test_opp.opportunity.id}/apply",
             auth=volunteer,
             json={"message": "Second application"},
         )
@@ -48,7 +48,7 @@ class TestApplicationAPI:
 
         await flows.apply(test_opp, volunteer)
 
-        await api.list_contains("/api/applications", auth=volunteer, expected_count=1)
+        await api.list_contains("/applications", auth=volunteer, expected_count=1)
 
     @pytest.mark.anyio
     async def test_volunteer_can_withdraw_application(
@@ -61,10 +61,10 @@ class TestApplicationAPI:
         app_data = await flows.apply(test_opp, volunteer)
 
         # Withdraw should delete the application
-        await api.no_content("DELETE", f"/api/applications/{app_data['id']}/withdraw", auth=volunteer)
+        await api.no_content("DELETE", f"/applications/{app_data['id']}", auth=volunteer)
 
         # Verify application is gone
-        await api.list_contains("/api/applications", auth=volunteer, expected_count=0)
+        await api.list_contains("/applications", auth=volunteer, expected_count=0)
 
     @pytest.mark.anyio
     async def test_org_admin_can_update_application_status(
@@ -92,7 +92,7 @@ class TestApplicationAPI:
 
         await api.forbidden(
             "PUT",
-            f"/api/applications/{app_data['id']}/status",
+            f"/applications/{app_data['id']}/status",
             auth=non_admin,
             json={"status": "accepted"},
         )
@@ -105,7 +105,7 @@ class TestApplicationAPI:
 
         await api.bad_request(
             "POST",
-            f"/api/opportunities/{closed_opp.opportunity.id}/apply",
+            f"/opportunities/{closed_opp.opportunity.id}/apply",
             auth=volunteer,
             json={"message": "Application"},
         )

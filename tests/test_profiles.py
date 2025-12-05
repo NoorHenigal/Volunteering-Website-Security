@@ -27,7 +27,7 @@ async def test_user_profile_access(client: AsyncClient) -> None:
 async def test_organization_profile_access(client: AsyncClient, test_db: AsyncSession) -> None:
     """Test accessing an organization profile."""
     await create_organization_with_admin(client, test_db, org_name="TestOrg")
-    response = await client.get("/TestOrg")
+    response = await client.get("/TestOrg", headers={"Accept": "text/html"})
     assert response.status_code == 200
     assert "TestOrg" in response.text
 
@@ -60,7 +60,7 @@ async def test_follow_user(client: AsyncClient, test_db: AsyncSession) -> None:
         headers=user1.auth_header,
         follow_redirects=False,
     )
-    assert response.status_code in (200, 303)
+    assert response.status_code in (200, 201, 303)
 
     user1_db = await get_user_from_db(test_db, user1.email)
     result = await test_db.execute(Follow.__table__.select().where(Follow.follower_id == user1_db.id))
@@ -108,7 +108,7 @@ async def test_update_profile_bio(client: AsyncClient) -> None:
     user = await register_and_login(client, role="volunteer")
 
     response = await client.put(
-        "/me",
+        "/settings/profile",
         headers=user.auth_header,
         json={"bio": "This is my test bio", "description": "A longer description"},
     )
@@ -124,7 +124,7 @@ async def test_update_privacy_settings(client: AsyncClient) -> None:
     user = await register_and_login(client, role="volunteer")
 
     response = await client.put(
-        "/me/privacy",
+        "/settings/privacy",
         headers=user.auth_header,
         json={
             "profile_visibility": "authenticated",
@@ -167,7 +167,7 @@ async def test_profile_visibility_authenticated(client: AsyncClient) -> None:
     """Test authenticated only visibility."""
     target = await register_and_login(client, username="authonly", role="volunteer")
     await client.put(
-        "/me/privacy",
+        "/settings/privacy",
         headers=target.auth_header,
         json={"profile_visibility": "authenticated"},
     )
@@ -187,7 +187,7 @@ async def test_profile_visibility_followers(client: AsyncClient) -> None:
     """Test followers only visibility."""
     target = await register_and_login(client, username="followonly", role="volunteer")
     await client.put(
-        "/me/privacy",
+        "/settings/privacy",
         headers=target.auth_header,
         json={"profile_visibility": "followers"},
     )
@@ -212,7 +212,7 @@ async def test_profile_visibility_private(client: AsyncClient) -> None:
     """Test private visibility."""
     target = await register_and_login(client, username="privateuser", role="volunteer")
     await client.put(
-        "/me/privacy",
+        "/settings/privacy",
         headers=target.auth_header,
         json={"profile_visibility": "private"},
     )

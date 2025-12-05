@@ -189,7 +189,17 @@ class OpportunityRepository(BaseRepository[Opportunity]):
 
     async def get_all_open(self) -> list[Opportunity]:
         """Get all open opportunities."""
-        return await self.find_many(Opportunity.is_open == True)  # noqa: E712
+        return await self.find_many(
+            Opportunity.is_open.is_(True),
+            options=[selectinload(Opportunity.organization)],
+        )
+
+    async def get_by_id_with_organization(self, opportunity_id: UUID) -> Opportunity | None:
+        """Get opportunity by ID with organization eagerly loaded."""
+        return await self.find_one(
+            Opportunity.id == opportunity_id,
+            options=[selectinload(Opportunity.organization)],
+        )
 
 
 class ApplicationRepository(BaseRepository[Application]):

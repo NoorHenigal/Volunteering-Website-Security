@@ -17,8 +17,6 @@ from app.db.session import AsyncSessionLocal
 
 log = logging.getLogger(__name__)
 
-# Marker organization name to check if demo data already exists
-DEMO_MARKER = "Demo Data Marker Org"
 
 # Seed for reproducible data
 FAKER_SEED = 42
@@ -32,8 +30,8 @@ async def seed_demo_data() -> None:
     All data is dynamically generated using Faker.
     """
     async with AsyncSessionLocal() as session:
-        # Check if demo data already exists
-        result = await session.execute(select(Organization).where(Organization.name == DEMO_MARKER))
+        # Check if any data already exists
+        result = await session.execute(select(Organization).limit(1))
         if result.scalar_one_or_none():
             log.info("✓ Demo data already exists, skipping seeding")
             return
@@ -80,13 +78,7 @@ async def _create_organizations(session: AsyncSession, fake: Faker) -> list[Orga
     Returns:
         List of created organizations
     """
-    organizations = [
-        # Marker organization for idempotency check
-        Organization(
-            name=DEMO_MARKER,
-            description="Internal marker - do not delete",
-        ),
-    ]
+    organizations = []
 
     # Create 4-6 organizations with dynamic names and descriptions
     num_orgs = fake.random_int(min=4, max=6)
@@ -136,7 +128,6 @@ def _create_user(
         description=fake.paragraph(nb_sentences=3) if fake.boolean(chance_of_getting_true=50) else None,
         profile_visibility=fake.random_element(elements=visibility_options),
         show_email=fake.boolean(chance_of_getting_true=show_email_chance),
-        show_applications=fake.boolean(chance_of_getting_true=80),
         show_organizations=fake.boolean(chance_of_getting_true=show_orgs_chance),
         searchable=fake.boolean(chance_of_getting_true=searchable_chance),
     )
@@ -210,7 +201,7 @@ async def _create_user_org_roles(
     org_users = [u for u in users if u.role == "organization"]
 
     # Skip the marker org (first one)
-    real_orgs = orgs[1:]
+    real_orgs = orgs
 
     roles = []
 
@@ -260,7 +251,7 @@ async def _create_opportunities(
         List of created opportunities
     """
     org_users = [u for u in users if u.role == "organization"]
-    real_orgs = orgs[1:]  # Skip marker org
+    real_orgs = orgs
 
     opportunities = []
 

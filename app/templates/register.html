@@ -1,37 +1,61 @@
 {% extends "base.html" %}
-{% from "components/auth_form.html" import render_auth_form %}
-{% from "components/ui.html" import form_label, form_input, form_select %}
+{% from "components/ui.html" import form_label, form_input, form_select, htmx_form, primary_button, alert_fragment %}
 
 {% block title %}Register{% endblock %}
 
 {% block content %}
-{% set extra_fields_content %}
-<div class="mb-4">
-    {{ form_label('First Name', 'first_name', True) }}
-    {{ form_input('first_name', 'text', 'John', True) }}
-</div>
-<div class="mb-4">
-    {{ form_label('Last Name', 'last_name', True) }}
-    {{ form_input('last_name', 'text', 'Doe', True) }}
-</div>
-<div class="mb-4">
-    {{ form_label('Username', 'username', True) }}
-    {{ form_input('username', 'text', 'johndoe', True) }}
-</div>
-<div>
-    {{ form_label('Role', 'role', True) }}
-    {{ form_select('role', [('volunteer', 'Volunteer'), ('organization', 'Organization'), ('admin', 'Admin')], 'Select a
-    role', True, 'volunteer') }}
-</div>
-{% endset %}
+<div class="max-w-md mx-auto">
+    <div id="register-container">
+        {% block register_form %}
+        <div class="bg-white p-8 rounded-lg shadow-lg">
+            <h2 class="text-3xl font-bold text-center text-gray-900">Register</h2>
+            <p class="text-center text-gray-600 mb-6 mt-2">Create your volunteering account</p>
 
-{{ render_auth_form(
-title="Register",
-action="/auth/register",
-button_text="Register",
-extra_fields=extra_fields_content,
-footer_text="Already have an account?",
-footer_link="/auth/login",
-footer_link_text="Login"
-) }}
+            <div id="alert-container">
+                {% include "components/alert.html" %}
+                {% if error %}
+                {{ alert_fragment('red', error) }}
+                {% endif %}
+            </div>
+
+            {% call htmx_form('/auth/register', '#register-container') %}
+            <div class="space-y-6">
+                <div>
+                    {{ form_label('First Name', 'first_name', True) }}
+                    {{ form_input('first_name', 'text', 'John', True) }}
+                </div>
+                <div>
+                    {{ form_label('Last Name', 'last_name', True) }}
+                    {{ form_input('last_name', 'text', 'Doe', True) }}
+                </div>
+                <div>
+                    {{ form_label('Username', 'username', True) }}
+                    {{ form_input('username', 'text', 'johndoe', True) }}
+                </div>
+                <div>
+                    {{ form_label('Email', 'email', True) }}
+                    {{ form_input('email', 'email', 'john@example.com', True) }}
+                </div>
+                <div>
+                    {{ form_label('Password', 'password', True) }}
+                    {{ form_input('password', 'password', '', True) }}
+                </div>
+                <div>
+                    {{ form_label('Role', 'role', True) }}
+                    {{ form_select('role', [('volunteer', 'Volunteer'), ('organization', 'Organization')], 'Select a
+                    role', True, 'volunteer') }}
+                </div>
+
+                {{ primary_button('Register', 'submit', 'blue') }}
+            </div>
+            {% endcall %}
+
+            <p class="mt-6 text-center text-gray-600">
+                Already have an account? <a href="/auth/login"
+                    class="text-blue-600 font-semibold hover:text-blue-800">Login</a>
+            </p>
+        </div>
+        {% endblock %}
+    </div>
+</div>
 {% endblock %}

@@ -7,7 +7,7 @@ withdraw_button, section_title, page_card, date_display %}
 {% block content %}
 {% call page_card('4xl') %}
 <div class="mb-6">
-    {{ back_link('/opp/list', 'Back to Opportunities') }}
+    {{ back_link('/opportunities', 'Back to Opportunities') }}
 </div>
 
 <div class="mb-6">
@@ -32,7 +32,8 @@ withdraw_button, section_title, page_card, date_display %}
     </div>
     <div>
         <p class="text-gray-600">
-            <span class="font-semibold">Organization ID:</span> {{ opportunity.organization_id }}
+            <span class="font-semibold">Organization:</span> <a href="/organizations/{{ opportunity.organization.id }}"
+                class="text-blue-600 hover:underline">{{ opportunity.organization.name }}</a>
         </p>
     </div>
 </div>
@@ -41,7 +42,7 @@ withdraw_button, section_title, page_card, date_display %}
 <div class="border-t pt-6 mt-6">
     <div class="flex justify-between items-center">
         <h2 class="text-xl font-bold text-gray-800">Manage Applications</h2>
-        <a href="/opp/{{ opportunity.id }}/applicants"
+        <a href="/opportunities/{{ opportunity.id }}/applicants"
             class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-6 rounded-lg">
             View Applicants
         </a>
@@ -51,7 +52,8 @@ withdraw_button, section_title, page_card, date_display %}
 {% endif %}
 
 {% if user.role == 'volunteer' %}
-<div class="border-t pt-6 mt-6">
+<div class="border-t pt-6 mt-6" id="application-status-section">
+    {% block user_application_status scoped %}
     {% if user_application %}
     <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-xl p-6">
         <div class="flex items-center justify-between flex-wrap gap-4">
@@ -72,7 +74,14 @@ withdraw_button, section_title, page_card, date_display %}
                 </div>
             </div>
             {% if user_application.status == 'pending' %}
-            {{ withdraw_button(user_application.id) }}
+            <button hx-post="/applications/{{ user_application.id }}/withdraw" hx-target="#application-status-section"
+                hx-swap="innerHTML" hx-confirm="Are you sure you want to withdraw this application?"
+                class="inline-flex items-center gap-2 bg-white border border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 font-semibold py-2 px-4 text-sm rounded-lg transition-all">
+                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+                Withdraw
+            </button>
             {% endif %}
         </div>
         {% if user_application.message %}
@@ -84,7 +93,7 @@ withdraw_button, section_title, page_card, date_display %}
     </div>
     {% elif opportunity.is_open %}
     <div class="text-center">
-        <a href="/opp/{{ opportunity.id }}/apply"
+        <a href="/opportunities/{{ opportunity.id }}/apply"
             class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg text-lg transition-colors">
             <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -94,6 +103,7 @@ withdraw_button, section_title, page_card, date_display %}
         </a>
     </div>
     {% endif %}
+    {% endblock %}
 </div>
 {% endif %}
 {% endcall %}

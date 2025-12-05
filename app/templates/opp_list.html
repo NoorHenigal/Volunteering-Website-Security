@@ -5,35 +5,45 @@
 
 {% block content %}
 <div class="max-w-6xl mx-auto">
-    {{ page_header('Volunteering Opportunities', '/opp/new', 'Create Opportunity', 'green', user.role == 'organization'
+    {{ page_header('Volunteering Opportunities', '/opportunities/new', 'Create Opportunity', 'green', user.role ==
+    'organization'
     and opportunities|length > 0) }}
 
-    {% if opportunities %}
-    <div class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {% for opp in opportunities %}
-        <div class="bg-white rounded-lg shadow-lg p-6 hover:shadow-xl transition-shadow">
-            <h2 class="text-xl font-bold text-gray-800 mb-3">{{ opp.title }}</h2>
-            <p class="text-gray-600 mb-4 line-clamp-3">{{ opp.description }}</p>
-            {% if opp.location %}
-            <p class="text-sm text-gray-500 mb-4">
-                <span class="font-semibold">Location:</span> {{ opp.location }}
-            </p>
-            {% endif %}
-            <div class="flex justify-between items-center text-xs text-gray-500 mt-4">
-                <span>Posted {{ opp.created_at.strftime('%b %d, %Y') }}</span>
-                {{ open_status_badge(opp.is_open, 'xs') }}
+    <div id="opportunity-list">
+        {% block opportunity_cards %}
+        {% if opportunities %}
+        <div class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {% for opp in opportunities %}
+            {% block opportunity_card scoped %}
+            <div class="bg-white rounded-lg shadow-lg p-6 hover:shadow-xl transition-shadow">
+                <h2 class="text-xl font-bold text-gray-800 mb-1">{{ opp.title }}</h2>
+                <p class="text-sm text-blue-600 font-semibold mb-3">{{ opp.organization.name }}</p>
+                <p class="text-gray-600 mb-4 line-clamp-3">{{ opp.description }}</p>
+                {% if opp.location %}
+                <p class="text-sm text-gray-500 mb-4">
+                    <span class="font-semibold">Location:</span> {{ opp.location }}
+                </p>
+                {% endif %}
+                <div class="flex justify-between items-center text-xs text-gray-500 mt-4">
+                    <span>Posted {{ opp.created_at.strftime('%b %d, %Y') }}</span>
+                    {{ open_status_badge(opp.is_open, 'xs') }}
+                </div>
+                <div class="mt-4 text-right">
+                    <a href="/opportunities/{{ opp.id }}"
+                        class="text-sm font-semibold text-blue-600 hover:text-blue-800">
+                        View Details →
+                    </a>
+                </div>
             </div>
-            <div class="mt-4 text-right">
-                <a href="/opp/{{ opp.id }}" class="text-sm font-semibold text-blue-600 hover:text-blue-800">
-                    View Details →
-                </a>
-            </div>
+            {% endblock %}
+            {% endfor %}
         </div>
-        {% endfor %}
+        {% else %}
+        {{ empty_state('No opportunities available at the moment.', '/opportunities/new', 'Create the First
+        Opportunity', 'green',
+        user.role == 'organization') }}
+        {% endif %}
+        {% endblock %}
     </div>
-    {% else %}
-    {{ empty_state('No opportunities available at the moment.', '/opp/new', 'Create the First Opportunity', 'green',
-    user.role == 'organization') }}
-    {% endif %}
 </div>
 {% endblock %}

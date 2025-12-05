@@ -22,8 +22,8 @@ class TestAuthRoundtrip:
     ) -> None:
         """Test complete authentication flow: register -> login -> status -> logout."""
         volunteer = await flows.create_user("volunteer")
-        await api("GET", "/api/auth/me", expected=status.HTTP_200_OK, auth=volunteer)
-        await api("POST", "/api/auth/logout", expected=status.HTTP_200_OK)
+        await api("GET", "/auth/me", expected=status.HTTP_200_OK, auth=volunteer)
+        await api("POST", "/auth/logout", expected=status.HTTP_200_OK)
 
     @pytest.mark.anyio
     async def test_register_duplicate_email_fails(self, api: APIHelper, flows: FlowHelper) -> None:
@@ -31,7 +31,7 @@ class TestAuthRoundtrip:
         volunteer = await flows.create_user("volunteer")
         RegisterSchemaFactory.build()
         await api.client.post(
-            "/api/auth/register",
+            "/auth/register",
             json={
                 "email": volunteer.email,
                 "password": "password123",
@@ -46,12 +46,12 @@ class TestAuthRoundtrip:
     async def test_login_nonexistent_user_fails(self, api: APIHelper) -> None:
         """Test login with non-existent user fails."""
         data = RegisterSchemaFactory.build()
-        await api.unauthorized("POST", "/api/auth/login", json={"email": data.email, "password": data.password})
+        await api.unauthorized("POST", "/auth/login", json={"email": data.email, "password": data.password})
 
     @pytest.mark.anyio
     async def test_status_unauthenticated_fails(self, api: APIHelper) -> None:
         """Test getting current user without authentication fails."""
-        await api.unauthorized("GET", "/api/auth/me")
+        await api.unauthorized("GET", "/auth/me")
 
     @pytest.mark.anyio
     async def test_user_persists_in_database(self, api: APIHelper, test_db: AsyncSession, flows: FlowHelper) -> None:

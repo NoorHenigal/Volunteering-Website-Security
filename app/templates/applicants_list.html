@@ -6,7 +6,7 @@ primary_button, button_solid %}
 
 {% block content %}
 {% call page_card('6xl') %}
-{{ detail_header('/opp/' ~ opportunity.id, 'Back to Opportunity', 'Applicants', opportunity.title) }}
+{{ detail_header('/opportunities/' ~ opportunity.id, 'Back to Opportunity', 'Applicants', opportunity.title) }}
 
 {% if applications %}
 <div class="mb-4">
@@ -51,10 +51,12 @@ primary_button, button_solid %}
 
             {% if app.status == 'pending' %}
             <div class="ml-6 flex gap-2">
-                <form method="POST" action="/opp/{{ opportunity.id }}/applicants/{{ app.id }}/accept" class="inline">
+                <form method="POST" action="/opportunities/{{ opportunity.id }}/applicants/{{ app.id }}/accept"
+                    class="inline">
                     {{ button_solid('Accept', color='green', size='sm') }}
                 </form>
-                <form method="POST" action="/opp/{{ opportunity.id }}/applicants/{{ app.id }}/reject" class="inline">
+                <form method="POST" action="/opportunities/{{ opportunity.id }}/applicants/{{ app.id }}/reject"
+                    class="inline">
                     <button type="submit"
                         class="inline-flex items-center justify-center gap-2 font-semibold rounded-lg border border-red-200 bg-white text-red-600 hover:bg-red-50 hover:border-red-300 transition-colors text-sm py-2 px-4">
                         Reject

@@ -5,28 +5,35 @@
 
 {% block content %}
 <div class="max-w-6xl mx-auto">
-    {{ page_header('Organizations', '/org/new', 'Create Organization', 'blue', user.role == 'organization' and
+    {{ page_header('Organizations', '/organizations/new', 'Create Organization', 'blue', user.role == 'organization' and
     organizations|length > 0) }}
 
-    {% if organizations %}
-    <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {% for org in organizations %}
-        <div class="bg-white rounded-lg shadow-lg p-6 hover:shadow-xl transition-shadow">
-            <h2 class="text-xl font-bold text-gray-800 mb-3">{{ org.name }}</h2>
-            {% if org.description %}
-            <p class="text-gray-600 mb-4 line-clamp-3">{{ org.description }}</p>
-            {% else %}
-            <p class="text-gray-400 italic mb-4">No description provided</p>
-            {% endif %}
-            <a href="/org/{{ org.id }}" class="text-blue-600 hover:text-blue-800 font-semibold">
-                View Details →
-            </a>
+    <div id="organization-list">
+        {% block organization_cards %}
+        {% if organizations %}
+        <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {% for org in organizations %}
+            {% block organization_card scoped %}
+            <div class="bg-white rounded-lg shadow-lg p-6 hover:shadow-xl transition-shadow">
+                <h2 class="text-xl font-bold text-gray-800 mb-3">{{ org.name }}</h2>
+                {% if org.description %}
+                <p class="text-gray-600 mb-4 line-clamp-3">{{ org.description }}</p>
+                {% else %}
+                <p class="text-gray-400 italic mb-4">No description provided</p>
+                {% endif %}
+                <a href="/organizations/{{ org.id }}" class="text-blue-600 hover:text-blue-800 font-semibold">
+                    View Details →
+                </a>
+            </div>
+            {% endblock %}
+            {% endfor %}
         </div>
-        {% endfor %}
+        {% else %}
+        {{ empty_state('No organizations found', '/organizations/new', 'Create the First Organization', 'blue',
+        user.role ==
+        'organization') }}
+        {% endif %}
+        {% endblock %}
     </div>
-    {% else %}
-    {{ empty_state('No organizations found', '/org/new', 'Create the First Organization', 'blue', user.role ==
-    'organization') }}
-    {% endif %}
 </div>
 {% endblock %}
