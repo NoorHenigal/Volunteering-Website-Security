@@ -1,9 +1,4 @@
-"""Tests for profile picture upload functionality.
-
-This module provides unit tests for the ImageProcessor service and helper functions
-for testing image processing functionality. The helper functions (create_test_image,
-assert_image_valid) are exported for use in integration tests in test_user_flows.py.
-"""
+"""Tests for profile picture upload functionality."""
 
 import tempfile
 from collections.abc import Generator
@@ -97,13 +92,6 @@ class TestImageProcessor:
         """Test square cropping for various aspect ratios."""
         user_id = uuid4()
         filename = processor.process_and_save(create_test_image(size=size), user_id)
-        assert_image_valid(processor.upload_dir / filename)
-
-    def test_process_with_crop_data(self, processor: ImageProcessor) -> None:
-        """Test processing with crop data."""
-        user_id = uuid4()
-        crop_data = {"x": 0.1, "y": 0.1, "width": 0.5, "height": 0.5}
-        filename = processor.process_and_save(create_test_image(), user_id, crop_data=crop_data)
         assert_image_valid(processor.upload_dir / filename)
 
     def test_reject_oversized_file(self, processor: ImageProcessor) -> None:

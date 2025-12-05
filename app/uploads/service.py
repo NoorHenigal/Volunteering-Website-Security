@@ -5,6 +5,9 @@ Security features:
 - Validates file content, not just extension
 - Uses UUID filenames to prevent path traversal
 - Enforces size limits
+
+Note: Cropping is handled client-side via Canvas API. The backend receives
+pre-cropped square images and only handles validation, resizing, and storage.
 """
 
 from io import BytesIO
@@ -36,19 +39,15 @@ class ImageProcessor:
         self.upload_dir = upload_dir
         self.upload_dir.mkdir(parents=True, exist_ok=True)
 
-    def process_and_save(
-        self,
-        file_content: bytes,
-        user_id: UUID,
-        *,
-        crop_data: dict[str, float] | None = None,
-    ) -> str:
+    def process_and_save(self, file_content: bytes, user_id: UUID) -> str:
         """Process uploaded image and save as WebP.
 
+        Expects a pre-cropped square image from the client. If the image is not
+        square, it will be center-cropped to square before resizing.
+
         Args:
-            file_content: Raw file bytes
+            file_content: Raw file bytes (should be pre-cropped square from client)
             user_id: User ID for filename generation
-            crop_data: Optional crop coordinates {x, y, width, height} as percentages (0-1)
 
         Returns:
             Filename of saved image (not full path)
@@ -56,28 +55,21 @@ class ImageProcessor:
         Raises:
             ImageProcessingError: If processing fails
         """
-        # Validate size
         if len(file_content) > MAX_FILE_SIZE:
             msg = f"File too large. Maximum size is {MAX_FILE_SIZE // (1024 * 1024)}MB"
             raise ImageProcessingError(msg)
 
-        # Load and validate image
         try:
             img: PILImage = Image.open(BytesIO(file_content))
         except Exception as e:
             msg = "Invalid image file"
             raise ImageProcessingError(msg) from e
 
-        # Validate format (content-based, not extension)
         if img.format not in ALLOWED_FORMATS:
             msg = f"Unsupported image format. Allowed: {', '.join(ALLOWED_FORMATS)}"
             raise ImageProcessingError(msg)
 
-        # Apply crop if provided
-        if crop_data:
-            img = self._apply_crop(img, crop_data)
-
-        # Create square crop from center if not already square
+        # Ensure square (handles edge cases where client sends non-square)
         img = self._make_square(img)
 
         # Resize to target dimensions
@@ -109,34 +101,6 @@ class ImageProcessor:
         self._cleanup_old_pictures(user_id, filename)
 
         return filename
-
-    def _apply_crop(self, img: Image.Image, crop_data: dict[str, float]) -> Image.Image:
-        """Apply crop based on percentage coordinates.
-
-        Args:
-            img: PIL Image
-            crop_data: {x, y, width, height} as percentages (0-1 range)
-                      These are normalized coordinates from the frontend cropper
-
-        Returns:
-            Cropped image
-        """
-        width, height = img.size
-
-        # Convert percentage coordinates to pixel coordinates
-        x = int(crop_data.get("x", 0) * width)
-        y = int(crop_data.get("y", 0) * height)
-        crop_width = int(crop_data.get("width", 1) * width)
-        crop_height = int(crop_data.get("height", 1) * height)
-
-        # Ensure bounds are valid and within image dimensions
-        x = max(0, min(x, width - 1))
-        y = max(0, min(y, height - 1))
-        crop_width = max(1, min(crop_width, width - x))
-        crop_height = max(1, min(crop_height, height - y))
-
-        # Crop the image: (left, top, right, bottom)
-        return img.crop((x, y, x + crop_width, y + crop_height))
 
     def _make_square(self, img: Image.Image) -> Image.Image:
         """Crop image to square from center.
@@ -184,21 +148,15 @@ def get_upload_dir() -> Path:
     return Path(__file__).resolve().parent.parent / "static" / "uploads" / "avatars"
 
 
-def process_profile_picture(
-    file_content: bytes,
-    user_id: UUID,
-    *,
-    crop_data: dict[str, float] | None = None,
-) -> str:
+def process_profile_picture(file_content: bytes, user_id: UUID) -> str:
     """Convenience function to process a profile picture.
 
     Args:
-        file_content: Raw file bytes
+        file_content: Raw file bytes (should be pre-cropped square from client)
         user_id: User ID
-        crop_data: Optional crop coordinates
 
     Returns:
         Filename of saved image
     """
     processor = ImageProcessor(get_upload_dir())
-    return processor.process_and_save(file_content, user_id, crop_data=crop_data)
+    return processor.process_and_save(file_content, user_id)

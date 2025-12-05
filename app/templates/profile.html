@@ -115,15 +115,11 @@
       </div>
 
       {% if user and user.id == profile_user.id %}
-      <form x-ref="profileForm" action="/settings/profile/picture" method="POST" enctype="multipart/form-data" class="hidden">
-        <input type="hidden" x-ref="cropDataInput" name="crop_data" value="" />
-        <input type="file"
-               id="profile-picture-input"
-               name="file"
-               accept="image/*"
-               class="hidden"
-               @change="handleFileSelect($event)" />
-      </form>
+      <input type="file"
+             id="profile-picture-input"
+             accept="image/*"
+             class="hidden"
+             @change="handleFileSelect($event)" />
       {% endif %}
 
       <!-- Edit Profile Section (for own profile) -->
@@ -205,6 +201,7 @@
   document.addEventListener("alpine:init", () => {
     Alpine.data("avatarCropper", () => ({
       show: false,
+      saving: false,
       imageSrc: '',
       imageX: 0,
       imageY: 0,
@@ -214,96 +211,55 @@
       dragStartY: 0,
       imageStartX: 0,
       imageStartY: 0,
-      originalWidth: 0,
-      originalHeight: 0,
-      currentFile: null,
-
+      sourceImage: null,
 
       handleFileSelect(event) {
         const file = event.target.files[0];
-        if (file && file.type.startsWith('image/')) {
-          this.currentFile = file;
-          const reader = new FileReader();
-          reader.onload = (e) => {
+        if (!file || !file.type.startsWith('image/')) return;
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const img = new Image();
+          img.onload = () => {
+            this.sourceImage = img;
             this.imageSrc = e.target.result;
+            this.resetPosition();
             this.show = true;
-
-            // Wait for image to load to get dimensions
-            this.$nextTick(() => {
-              const img = this.$refs.cropImage;
-
-              // Check if image is already loaded (cached)
-              if (img.complete && img.naturalWidth > 0) {
-                this.originalWidth = img.naturalWidth;
-                this.originalHeight = img.naturalHeight;
-                this.resetPosition();
-              } else {
-                // Wait for image to load
-                img.onload = () => {
-                  this.originalWidth = img.naturalWidth;
-                  this.originalHeight = img.naturalHeight;
-                  this.resetPosition();
-                };
-              }
-            });
           };
-          reader.readAsDataURL(file);
-        }
+          img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
       },
 
       resetPosition() {
         this.imageX = 0;
         this.imageY = 0;
+        if (!this.sourceImage) return;
 
         const cropSize = 250;
-        const img = this.$refs.cropImage;
-
-        if (img) {
-          const imgWidth = img.naturalWidth;
-          const imgHeight = img.naturalHeight;
-
-          // Calculate minimum scale needed to cover the crop circle
-          const scaleToFitCrop = Math.max(cropSize / imgWidth, cropSize / imgHeight);
-
-          // Set default scale based on image size
-          if (scaleToFitCrop > 1) {
-            // Small image - scale up to fit crop area
-            this.scale = scaleToFitCrop;
-          } else {
-            // Large image - use default scale of 0.37 (zoomed out to show full image with crop circle)
-            this.scale = 0.37;
-          }
-        }
+        const minScale = Math.max(cropSize / this.sourceImage.width, cropSize / this.sourceImage.height);
+        this.scale = Math.max(minScale, 0.5);
       },
 
       startDrag(event) {
         this.isDragging = true;
         const clientX = event.touches ? event.touches[0].clientX : event.clientX;
         const clientY = event.touches ? event.touches[0].clientY : event.clientY;
-
         this.dragStartX = clientX;
         this.dragStartY = clientY;
         this.imageStartX = this.imageX;
         this.imageStartY = this.imageY;
-
         event.preventDefault();
       },
 
       drag(event) {
         if (!this.isDragging) return;
-
         const clientX = event.touches ? event.touches[0].clientX : event.clientX;
         const clientY = event.touches ? event.touches[0].clientY : event.clientY;
-
-        const deltaX = clientX - this.dragStartX;
-        const deltaY = clientY - this.dragStartY;
-
-        this.imageX = this.imageStartX + deltaX;
-        this.imageY = this.imageStartY + deltaY;
-
+        this.imageX = this.imageStartX + (clientX - this.dragStartX);
+        this.imageY = this.imageStartY + (clientY - this.dragStartY);
         event.preventDefault();
       },
-
 
       endDrag() {
         this.isDragging = false;
@@ -312,62 +268,70 @@
       close() {
         this.show = false;
         this.imageSrc = '';
-        this.resetPosition();
-        // Reset file input
-        const fileInput = document.getElementById('profile-picture-input');
-        if (fileInput) fileInput.value = '';
+        this.sourceImage = null;
+        document.getElementById('profile-picture-input').value = '';
       },
 
-      save() {
-        const cropData = this.calculateCropData();
-        this.$refs.cropDataInput.value = JSON.stringify(cropData);
-        this.$refs.profileForm.submit();
-        this.show = false;
+      async save() {
+        if (!this.sourceImage || this.saving) return;
+        this.saving = true;
+
+        try {
+          const blob = await this.cropToBlob();
+          const formData = new FormData();
+          formData.append('file', blob, 'avatar.png');
+
+          const response = await fetch('/settings/profile/picture', {
+            method: 'POST',
+            body: formData
+          });
+
+          if (response.ok) {
+            window.location.reload();
+          } else {
+            const data = await response.json().catch(() => ({}));
+            alert(data.detail || 'Failed to upload image');
+          }
+        } catch (err) {
+          alert('Failed to upload image');
+        } finally {
+          this.saving = false;
+          this.close();
+        }
       },
 
-      calculateCropData() {
-        const img = this.$refs.cropImage;
-        if (!img) return {};
+      cropToBlob() {
+        return new Promise((resolve) => {
+          const cropSize = 250;
+          const outputSize = 512;
+          const canvas = document.createElement('canvas');
+          canvas.width = outputSize;
+          canvas.height = outputSize;
+          const ctx = canvas.getContext('2d');
 
-        const cropSize = 250; // Size of the crop circle
-        const containerRect = img.parentElement.getBoundingClientRect();
+          const displayedWidth = this.sourceImage.width * this.scale;
+          const displayedHeight = this.sourceImage.height * this.scale;
+          const containerCenterX = 200;
+          const containerCenterY = 200;
 
-        // Center of the crop circle in container coordinates
-        const cropCenterX = containerRect.width / 2;
-        const cropCenterY = containerRect.height / 2;
+          const imageLeft = containerCenterX + this.imageX - displayedWidth / 2;
+          const imageTop = containerCenterY + this.imageY - displayedHeight / 2;
 
-        // Get the displayed image dimensions
-        const displayedWidth = img.naturalWidth * this.scale;
-        const displayedHeight = img.naturalHeight * this.scale;
+          const cropLeft = containerCenterX - cropSize / 2;
+          const cropTop = containerCenterY - cropSize / 2;
 
-        // Calculate the top-left corner of the displayed image in container coordinates
-        const imageLeft = cropCenterX + this.imageX - (displayedWidth / 2);
-        const imageTop = cropCenterY + this.imageY - (displayedHeight / 2);
+          const srcX = (cropLeft - imageLeft) / this.scale;
+          const srcY = (cropTop - imageTop) / this.scale;
+          const srcSize = cropSize / this.scale;
 
-        // Calculate crop area in displayed image coordinates
-        const cropLeft = cropCenterX - (cropSize / 2) - imageLeft;
-        const cropTop = cropCenterY - (cropSize / 2) - imageTop;
+          ctx.drawImage(
+            this.sourceImage,
+            srcX, srcY, srcSize, srcSize,
+            0, 0, outputSize, outputSize
+          );
 
-        // Convert to original image coordinates
-        const scaleRatio = 1 / this.scale;
-        const x = Math.round(cropLeft * scaleRatio);
-        const y = Math.round(cropTop * scaleRatio);
-        const width = Math.round(cropSize * scaleRatio);
-        const height = Math.round(cropSize * scaleRatio);
-
-        // Clamp values to valid pixel ranges
-        const clampedX = Math.max(0, Math.min(x, this.originalWidth - 1));
-        const clampedY = Math.max(0, Math.min(y, this.originalHeight - 1));
-        const clampedWidth = Math.max(1, Math.min(width, this.originalWidth - clampedX));
-        const clampedHeight = Math.max(1, Math.min(height, this.originalHeight - clampedY));
-
-        // Convert pixel coordinates to percentages (0-1 range) for backend
-        return {
-          x: clampedX / this.originalWidth,
-          y: clampedY / this.originalHeight,
-          width: clampedWidth / this.originalWidth,
-          height: clampedHeight / this.originalHeight
-        };
+          canvas.toBlob(resolve, 'image/png', 1.0);
+        });
       }
     }));
   });

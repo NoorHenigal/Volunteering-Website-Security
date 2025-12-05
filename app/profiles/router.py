@@ -1,10 +1,8 @@
 """Router for user and organization profiles."""
 
-import contextlib
-import json
 from typing import Annotated
 
-from fastapi import APIRouter, File, Form, HTTPException, Response, UploadFile, status
+from fastapi import APIRouter, File, HTTPException, Response, UploadFile, status
 from fastapi.responses import JSONResponse
 
 from app.core.base_schemas import ListResponse, error_responses, request_body_from_model
@@ -239,31 +237,22 @@ async def upload_profile_picture(
     ctx: ContextDep,
     user: User,
     file: Annotated[UploadFile, File()],
-    crop_data: Annotated[str | None, Form()] = None,
 ) -> Response:
     """Upload and process profile picture.
 
-    Accepts image file with optional crop data as JSON string.
+    Expects a pre-cropped square image from the client (cropped via Canvas API).
     Re-encodes to WebP, strips metadata, and resizes to 256x256.
     """
     if not file.content_type or not file.content_type.startswith("image/"):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="File must be an image")
 
-    # Read file content
     content = await file.read()
 
-    # Parse crop data if provided
-    crop: dict[str, float] | None = None
-    if crop_data:
-        with contextlib.suppress(json.JSONDecodeError):
-            crop = json.loads(crop_data)
-
     try:
-        filename = process_profile_picture(content, user.id, crop_data=crop)
+        filename = process_profile_picture(content, user.id)
     except ImageProcessingError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
 
-    # Update user's profile picture in database
     user_repo = UserRepository(ctx.db)
     user.profile_picture = filename
     await user_repo.update(user)
