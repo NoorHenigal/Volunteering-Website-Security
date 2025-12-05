@@ -5,7 +5,6 @@ uses SelectorEventLoop on Windows, which is required for psycopg3 compatibility.
 
 Usage:
     python run.py           # Run main application
-    python run.py --ui-dev  # Run UI development mode (no database)
 """
 
 import argparse
@@ -31,13 +30,8 @@ def build_loop() -> asyncio.AbstractEventLoop:
 
 
 def main() -> None:
-    """Parse arguments and start the appropriate server."""
+    """Parse arguments and start the server."""
     parser = argparse.ArgumentParser(description="Run the volunteering web application")
-    parser.add_argument(
-        "--ui-dev",
-        action="store_true",
-        help="Run in UI development mode (no database required)",
-    )
     parser.add_argument(
         "--host",
         default="127.0.0.1",
@@ -57,12 +51,9 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    # Select the appropriate application module
-    app_path = "app.ui_dev:app" if args.ui_dev else "app.main:app"
-
     # Create and configure Granian server
     server = Granian(
-        app_path,
+        "app.main:app",
         address=args.host,
         port=args.port,
         interface=Interfaces.ASGI,
