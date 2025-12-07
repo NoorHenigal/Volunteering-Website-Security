@@ -17,7 +17,7 @@ from app.core.dependencies import (
     OpportunityServiceDep,
     OrganizationServiceDep,
 )
-from app.core.htmx import htmx_redirect
+from app.core.router_helpers import handle_htmx_redirect
 from app.opportunities.schemas import (
     ApplicationCreate,
     ApplicationResponse,
@@ -42,9 +42,19 @@ async def list_opportunities(ctx: ContextDep, opp_svc: OpportunityServiceDep) ->
         data=ListResponse[OpportunityResponse](
             items=[OpportunityResponse.model_validate(opp) for opp in opportunities]
         ),
-        template="opp_list.html",
-        block="opportunity_cards" if ctx.is_htmx else None,
-        opportunities=opportunities,
+        template="pages/shared.html",
+        view="list",
+        block="resource_cards" if ctx.is_htmx else None,
+        # Resource list context
+        resource_type="opportunity",
+        items=opportunities,
+        page_title="Volunteering Opportunities",
+        create_url="/opportunities/new",
+        create_text="Create Opportunity",
+        create_color="green",
+        show_create=ctx.user is not None and ctx.user.role == "organization" and len(opportunities) > 0,
+        empty_message="No opportunities available at the moment.",
+        grid_cols="gap-6 md:grid-cols-2 lg:grid-cols-3",
     )
 
 
@@ -54,11 +64,81 @@ async def new_opportunity_form(ctx: ContextDep, opp_svc: OpportunityServiceDep) 
     user = ctx.require_authenticated()
     require_organization_role(user)
     organizations = await opp_svc.get_user_organizations(user.id)
+
+    # Check if user has organizations
+    if len(organizations) == 0:
+        return render_template(
+            ctx.request,
+            "pages/shared.html",
+            view="form",
+            user=user,
+            resource_type="opportunity",
+            resource=None,
+            form_action="/opportunities",
+            back_url="/opportunities",
+            form_title="Create New Opportunity",
+            page_title="Opportunities",
+            submit_text="Create Opportunity",
+            submit_color="green",
+            show_warning=True,
+            warning_title="Organization Required",
+            warning_message="Before you can create an opportunity, you need to create an organization first. Organizations are used to group and manage volunteering opportunities.",
+            warning_action_url="/organizations/new",
+            warning_action_text="Create Your First Organization",
+            form_fields=[],
+        )
+
     return render_template(
         ctx.request,
-        "opp_form.html",
+        "pages/shared.html",
+        view="form",
         user=user,
-        organizations=organizations,
+        # Resource form context
+        resource_type="opportunity",
+        resource=None,
+        form_action="/opportunities",
+        back_url="/opportunities",
+        form_title="Create New Opportunity",
+        page_title="Opportunities",
+        submit_text="Create Opportunity",
+        submit_color="green",
+        show_warning=False,
+        form_fields=[
+            {
+                "name": "title",
+                "label": "Title",
+                "type": "text",
+                "placeholder": "e.g., Community Garden Helper",
+                "required": True,
+                "value": "",
+            },
+            {
+                "name": "description",
+                "label": "Description",
+                "type": "textarea",
+                "placeholder": "Describe the volunteering opportunity...",
+                "required": True,
+                "value": "",
+                "rows": 6,
+            },
+            {
+                "name": "location",
+                "label": "Location (Optional)",
+                "type": "text",
+                "placeholder": "e.g., Central Station",
+                "required": False,
+                "value": "",
+            },
+            {
+                "name": "organization_id",
+                "label": "Organization",
+                "type": "select",
+                "placeholder": "Select an organization",
+                "required": True,
+                "options": [(str(org.id), org.name) for org in organizations],
+                "selected_value": None,
+            },
+        ],
     )
 
 
@@ -97,13 +177,11 @@ async def create_opportunity(
         )
 
         if ctx.is_ui:
-            if ctx.is_htmx:
-                return htmx_redirect("/opportunities")
-            return RedirectResponse(url="/opportunities", status_code=303)
+            return handle_htmx_redirect(ctx, "/opportunities")
 
         return ctx.success_response(data=OpportunityResponse.model_validate(opportunity), status_code=201)
     except HTTPException as e:
-        return ctx.error_response(e, template="opp_form.html", block="form_content")
+        return ctx.error_response(e, template="pages/shared.html", view="form", block="form_content")
 
 
 @router.get(
@@ -132,7 +210,7 @@ async def get_opportunity(
             is_admin = await org_svc.is_admin(user.id, opportunity.organization_id)
 
         return ctx.success_response(
-            template="opp_detail.html",
+            template="pages/opportunities.html",
             block="opp_detail" if ctx.is_htmx else None,
             opportunity=opportunity,
             user_application=user_application,
@@ -161,7 +239,8 @@ async def apply_form(
 
     return render_template(
         ctx.request,
-        "app_form.html",
+        "pages/opportunities.html",
+        view="apply",
         user=user,
         opportunity=opportunity,
     )
@@ -198,14 +277,14 @@ async def apply_to_opportunity(
         )
 
         if ctx.is_ui:
-            if ctx.is_htmx:
-                return htmx_redirect(f"/opportunities/{opportunity_id}")
-            return RedirectResponse(url=f"/opportunities/{opportunity_id}", status_code=303)
+            return handle_htmx_redirect(ctx, f"/opportunities/{opportunity_id}")
 
         return ctx.success_response(data=ApplicationResponse.model_validate(application), status_code=201)
     except HTTPException as e:
         if ctx.is_ui:
-            return ctx.error_response(e, template="app_form.html", block="form_content", opportunity=opportunity)
+            return ctx.error_response(
+                e, template="pages/opportunities.html", view="apply", block="form_content", opportunity=opportunity
+            )
         raise
 
 
@@ -218,9 +297,19 @@ async def list_user_applications(ctx: ContextDep, app_svc: ApplicationServiceDep
         applications = await app_svc.get_by_volunteer_with_opportunity(user.id)
         return render_template(
             ctx.request,
-            "app_list.html",
+            "pages/shared.html",
+            view="list",
             user=user,
-            applications=applications,
+            # Resource list context
+            resource_type="application",
+            items=applications,
+            page_title="My Applications",
+            create_url="/opportunities",
+            create_text="Browse Opportunities",
+            create_color="blue",
+            show_create=len(applications) > 0,
+            empty_message="You haven't applied to any opportunities yet",
+            grid_cols="space-y-4",
         )
 
     applications = await app_svc.get_by_volunteer(user.id)
@@ -300,7 +389,7 @@ async def withdraw_application_post(
         if target == "application-status-section":
             # We are on detail page, re-render the status section
             return ctx.success_response(
-                template="opp_detail.html",
+                template="pages/opportunities.html",
                 block="user_application_status",
                 opportunity=opportunity,
             )
@@ -329,10 +418,20 @@ async def view_applicants(
     applications = await app_svc.get_by_opportunity_with_volunteer(opportunity_id)
     return render_template(
         ctx.request,
-        "applicants_list.html",
+        "pages/shared.html",
+        view="list",
         user=user,
+        # Resource list context
+        resource_type="applicant",
+        items=applications,
         opportunity=opportunity,
-        applications=applications,
+        page_title=f"Applicants - {opportunity.title}",
+        create_url=f"/opportunities/{opportunity_id}",
+        create_text="Back to Opportunity",
+        create_color="blue",
+        show_create=False,
+        empty_message="No applications yet. Applications will appear here when volunteers apply to this opportunity.",
+        grid_cols="space-y-4",
     )
 
 

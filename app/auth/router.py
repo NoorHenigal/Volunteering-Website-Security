@@ -66,7 +66,7 @@ async def register(
 
     except Exception as e:
         if ctx.is_ui:
-            return ctx.error_response(e, template="register.html", block="register_form")
+            return ctx.error_response(e, template="pages/auth.html", block="content")
         raise
 
 
@@ -111,20 +111,110 @@ async def login(
 
     except Exception as e:
         if ctx.is_ui:
-            return ctx.error_response(e, template="login.html", block="login_form")
+            return ctx.error_response(e, template="pages/auth.html", block="content")
         raise
 
 
 @router.get("/login", include_in_schema=False)
 async def login_page(ctx: Annotated[RequestContext, Depends(get_context)]) -> Response:
     """Show login page (UI only)."""
-    return ctx.success_response(template="login.html")
+    form_config = {
+        "title": "Login",
+        "subtitle": "Access your volunteering account",
+        "container_id": "login-container",
+        "action": "/auth/login",
+        "fields": [
+            {
+                "name": "email",
+                "type": "email",
+                "label": "Email",
+                "placeholder": "",
+                "required": True,
+                "show_label": False,
+            },
+            {
+                "name": "password",
+                "type": "password",
+                "label": "Password",
+                "placeholder": "",
+                "required": True,
+                "show_label": False,
+            },
+        ],
+        "submit_text": "Login",
+        "footer_text": "Don't have an account?",
+        "footer_link": "/auth/register",
+        "footer_link_text": "Register",
+    }
+    return ctx.success_response(template="pages/auth.html", form_config=form_config)
 
 
 @router.get("/register", include_in_schema=False)
 async def register_page(ctx: Annotated[RequestContext, Depends(get_context)]) -> Response:
     """Show registration page (UI only)."""
-    return ctx.success_response(template="register.html")
+    form_config = {
+        "title": "Register",
+        "subtitle": "Create your volunteering account",
+        "container_id": "register-container",
+        "action": "/auth/register",
+        "fields": [
+            {
+                "name": "first_name",
+                "type": "text",
+                "label": "First Name",
+                "placeholder": "John",
+                "required": True,
+                "show_label": True,
+            },
+            {
+                "name": "last_name",
+                "type": "text",
+                "label": "Last Name",
+                "placeholder": "Doe",
+                "required": True,
+                "show_label": True,
+            },
+            {
+                "name": "username",
+                "type": "text",
+                "label": "Username",
+                "placeholder": "johndoe",
+                "required": True,
+                "show_label": True,
+            },
+            {
+                "name": "email",
+                "type": "email",
+                "label": "Email",
+                "placeholder": "john@example.com",
+                "required": True,
+                "show_label": True,
+            },
+            {
+                "name": "password",
+                "type": "password",
+                "label": "Password",
+                "placeholder": "",
+                "required": True,
+                "show_label": True,
+            },
+            {
+                "name": "role",
+                "type": "select",
+                "label": "Role",
+                "placeholder": "Select a role",
+                "required": True,
+                "show_label": True,
+                "options": [("volunteer", "Volunteer"), ("organization", "Organization")],
+                "default": "volunteer",
+            },
+        ],
+        "submit_text": "Register",
+        "footer_text": "Already have an account?",
+        "footer_link": "/auth/login",
+        "footer_link_text": "Login",
+    }
+    return ctx.success_response(template="pages/auth.html", form_config=form_config)
 
 
 @router.post(
@@ -161,4 +251,4 @@ async def get_current_user(ctx: Annotated[RequestContext, Depends(get_context)])
 @router.get("/status", include_in_schema=False)
 async def status_page(ctx: Annotated[RequestContext, Depends(get_context)]) -> Response:
     """Show status page (UI only)."""
-    return ctx.success_response(template="status.html")
+    return ctx.success_response(template="pages/auth.html", view="status")

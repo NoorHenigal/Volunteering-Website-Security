@@ -1,0 +1,113 @@
+{# User Components #}
+
+{% macro user_avatar(user, size='md') %}
+{% set size_classes = {
+'sm': 'h-8 w-8 text-sm',
+'md': 'h-10 w-10 text-base',
+'lg': 'h-16 w-16 text-2xl'
+} %}
+{% set initials = ((user.first_name[0] + user.last_name[0]) if (user and user.first_name and user.last_name) else
+(user.username[:2] if user else '?')).upper() %}
+{% if user and user.profile_picture %}
+<img src="/static/uploads/avatars/{{ user.profile_picture }}" alt="{{ user.first_name }}'s avatar"
+    class="{{ size_classes.get(size, size_classes['md']) }} rounded-full object-cover shadow-md">
+{% else %}
+<div
+    class="{{ size_classes.get(size, size_classes['md']) }} rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold shadow-md">
+    {{ initials }}
+</div>
+{% endif %}
+{% endmacro %}
+
+{% macro user_info_row(label, value) %}
+{# Simple label-value row for user info display #}
+<div class="flex justify-between items-center">
+    <span class="text-gray-600 font-semibold">{{ label }}:</span>
+    <span class="text-gray-900">{{ value }}</span>
+</div>
+{% endmacro %}
+
+{% macro follow_button(username, is_following, size='md') %}
+{% set size_classes = {
+'sm': 'px-3 py-1 text-sm',
+'md': 'px-4 py-2 text-sm',
+'lg': 'px-6 py-3 text-base'
+} %}
+{% if is_following %}
+<form action="/{{ username }}/unfollow" method="POST" class="inline">
+    <button type="submit"
+        class="{{ size_classes.get(size, size_classes['md']) }} rounded-lg font-semibold bg-gray-200 hover:bg-gray-300 text-gray-800 transition-colors">
+        Unfollow
+    </button>
+</form>
+{% else %}
+<form action="/{{ username }}/follow" method="POST" class="inline">
+    <button type="submit"
+        class="{{ size_classes.get(size, size_classes['md']) }} rounded-lg font-semibold bg-blue-600 hover:bg-blue-700 text-white transition-colors">
+        Follow
+    </button>
+</form>
+{% endif %}
+{% endmacro %}
+
+{% macro follower_stats(follower_count, following_count, username, show_links=True) %}
+<div class="flex gap-6 text-sm">
+    {% if show_links %}
+    <a href="/{{ username }}/followers" class="hover:text-blue-600 transition-colors">
+        <span class="font-bold text-gray-900">{{ follower_count }}</span>
+        <span class="text-gray-500">Followers</span>
+    </a>
+    <a href="/{{ username }}/following" class="hover:text-blue-600 transition-colors">
+        <span class="font-bold text-gray-900">{{ following_count }}</span>
+        <span class="text-gray-500">Following</span>
+    </a>
+    {% else %}
+    <span>
+        <span class="font-bold text-gray-900">{{ follower_count }}</span>
+        <span class="text-gray-500">Followers</span>
+    </span>
+    <span>
+        <span class="font-bold text-gray-900">{{ following_count }}</span>
+        <span class="text-gray-500">Following</span>
+    </span>
+    {% endif %}
+</div>
+{% endmacro %}
+
+{% macro bio_section(bio, description, can_edit=False) %}
+{% if bio or description or can_edit %}
+<div class="mt-4">
+    {% if bio %}
+    <p class="text-gray-700">{{ bio }}</p>
+    {% endif %}
+    {% if description %}
+    <div x-data="{ expanded: false }" class="mt-2">
+        <p class="text-gray-600 text-sm" x-show="!expanded">
+            {{ description[:150] }}{% if description|length > 150 %}...{% endif %}
+        </p>
+        <p class="text-gray-600 text-sm" x-show="expanded" style="display: none;">
+            {{ description }}
+        </p>
+        {% if description|length > 150 %}
+        <button @click="expanded = !expanded" class="text-blue-600 hover:text-blue-800 text-sm font-medium mt-1">
+            <span x-show="!expanded">Show more</span>
+            <span x-show="expanded" style="display: none;">Show less</span>
+        </button>
+        {% endif %}
+    </div>
+    {% endif %}
+    {% if can_edit and not bio and not description %}
+    <p class="text-gray-400 italic text-sm">No bio yet. <a href="/settings/profile"
+            class="text-blue-600 hover:underline">Add one</a></p>
+    {% endif %}
+</div>
+{% endif %}
+{% endmacro %}
+
+{% macro datetime_display(date, prefix='') %}
+<span class="text-sm text-gray-500">{{ prefix }}{{ date.strftime('%B %d, %Y at %I:%M %p') }}</span>
+{% endmacro %}
+
+{% macro date_display(date, format='%B %d, %Y', prefix='') %}
+<span class="text-sm text-gray-500">{{ prefix }}{{ date.strftime(format) }}</span>
+{% endmacro %}

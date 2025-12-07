@@ -1,8 +1,10 @@
 """HTMX-specific response utilities."""
 
+import contextlib
 import json
 
 from fastapi import Request, Response
+from jinja2.runtime import new_context
 
 from app.core.templates import templates
 
@@ -27,6 +29,9 @@ def render_block(request: Request, template_name: str, block_name: str, **contex
 
     This is the SECRET SAUCE - render just one block without creating
     separate fragment files!
+
+    The solution: We need to let Jinja2 process the entire template (which handles
+    imports), but we intercept and only return the specific block's content.
     """
     template = templates.get_template(template_name)
 
@@ -36,8 +41,19 @@ def render_block(request: Request, template_name: str, block_name: str, **contex
         msg = f"Block '{block_name}' not found in {template_name}"
         raise ValueError(msg)
 
-    # Render just that block
-    ctx = template.new_context({"request": request, **context})
+    # The key: render the full template to process imports, but capture only the block
+    # We do this by creating a context and calling root_render_func which processes
+    # all imports, then we extract just our block from that context
+    ctx = new_context(template.environment, template_name, template.blocks)
+    ctx.vars.update({"request": request, **context})
+
+    # Call the template's root render function to process imports
+    # This populates the context with all imported macros
+    with contextlib.suppress(Exception):
+        # If root render fails, continue - imports should still be in context
+        list(template.root_render_func(ctx))
+
+    # Now render just the block we want with the fully-initialized context
     html = "".join(block_func(ctx))
 
     return Response(content=html, media_type="text/html")

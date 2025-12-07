@@ -1,0 +1,64 @@
+{# Feedback Components #}
+
+{# Alert that auto-dismisses #}
+{% macro alert_fragment(type, message) %}
+<div id="alert" class="bg-{{ type }}-100 border border-{{ type }}-400 text-{{ type }}-700 px-4 py-3 rounded mb-6"
+    x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 3000)">
+    {{ message }}
+</div>
+{% endmacro %}
+
+{# Alert container with error display - consolidates alert pattern #}
+{% macro alert_container() %}
+<div id="alert-container">
+    {% if error %}
+    {{ alert_fragment('red', error) }}
+    {% endif %}
+</div>
+{% endmacro %}
+
+{% macro message_box(message, label=None, color='gray') %}
+{# Simple message display box #}
+<div class="bg-{{ color }}-50 rounded-lg p-4">
+    {% if label %}
+    <p class="text-sm font-semibold text-{{ color }}-700 mb-1">{{ label }}</p>
+    {% endif %}
+    <p class="text-{{ color }}-700">{{ message }}</p>
+</div>
+{% endmacro %}
+
+{% macro warning_box() %}
+{# Yellow warning box with icon #}
+<div class="bg-yellow-50 border-l-4 border-yellow-400 p-6 mb-6">
+    <div class="flex">
+        <div class="flex-shrink-0">
+            <svg class="h-6 w-6 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+        </div>
+        <div class="ml-3">
+            {{ caller() }}
+        </div>
+    </div>
+</div>
+{% endmacro %}
+
+{% macro empty_state(message, action_url=None, action_text=None, action_color='blue', show_action=True) %}
+<div class="bg-white rounded-lg shadow-lg p-12 text-center">
+    <p class="text-xl text-gray-600 mb-6">{{ message }}</p>
+    {% if action_url and action_text and show_action %}
+    <a href="{{ action_url }}"
+        class="bg-{{ action_color }}-600 hover:bg-{{ action_color }}-700 text-white font-bold py-3 px-8 rounded-lg inline-block">
+        {{ action_text }}
+    </a>
+    {% endif %}
+</div>
+{% endmacro %}
+
+{% macro info_box(color='blue', padding='p-6') %}
+{# Colored info/message box #}
+<div class="bg-{{ color }}-50 border border-{{ color }}-200 rounded-lg {{ padding }}">
+    {{ caller() }}
+</div>
+{% endmacro %}

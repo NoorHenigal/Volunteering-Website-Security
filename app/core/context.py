@@ -28,9 +28,18 @@ def render_template(
     request: Request,
     name: str,
     status_code: int = 200,
+    block: str | None = None,
     **context: object,
 ) -> Response:
-    """Render a template with context."""
+    """Render a template with context.
+
+    If block is provided, only that block will be rendered (for HTMX requests).
+    """
+    # If block is specified, use render_block for partial rendering
+    if block:
+        return render_block(request, name, block, **context)
+
+    # Otherwise, render the full template
     ctx = dict(context)
     ctx.setdefault("request", request)
     return templates.TemplateResponse(
@@ -178,8 +187,9 @@ def handle_form_error(
     return render_template(
         request,
         template,
-        error=error_msg,
         status_code=400,
+        block=None,
+        error=error_msg,
         **context,
     )
 
@@ -232,8 +242,9 @@ class RequestContext:
             return render_template(
                 self.request,
                 template,
-                user=self.user,
                 status_code=status_code,
+                block=None,
+                user=self.user,
                 **template_ctx,
             )
 
@@ -266,9 +277,10 @@ class RequestContext:
                 return render_template(
                     self.request,
                     template,
+                    status_code=status_code,
+                    block=None,
                     error=error_msg,
                     user=self.user,
-                    status_code=status_code,
                     **template_ctx,
                 )
             return RedirectResponse(url="/auth/login", status_code=303)

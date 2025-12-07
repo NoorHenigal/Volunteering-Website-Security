@@ -1,0 +1,188 @@
+{# Card Components #}
+
+{% macro card(padding='p-6', max_width='', extra_classes='') %}
+{% set width_class = 'max-w-' + max_width + ' mx-auto' if max_width else '' %}
+<div class="{{ width_class }}">
+    <div class="bg-white rounded-lg shadow-md {{ padding }} {{ extra_classes }}">
+        {{ caller() }}
+    </div>
+</div>
+{% endmacro %}
+
+{% macro page_card(max_width='6xl') %}
+{# Standard page card wrapper - use for detail/form pages #}
+<div class="max-w-{{ max_width }} mx-auto">
+    <div class="bg-white rounded-xl shadow-lg p-8">
+        {{ caller() }}
+    </div>
+</div>
+{% endmacro %}
+
+{% macro page_card_tight(max_width='6xl') %}
+<div class="max-w-{{ max_width }} mx-auto">
+    <div class="bg-white rounded-lg shadow-lg p-6">
+        {{ caller() }}
+    </div>
+</div>
+{% endmacro %}
+
+{% macro organization_card(org, show_actions=False) %}
+<div class="bg-white rounded-lg shadow-lg p-6 hover:shadow-xl transition-shadow">
+    <h2 class="text-xl font-bold text-gray-800 mb-3">{{ org.name }}</h2>
+    {% if org.description %}
+    <p class="text-gray-600 mb-4 line-clamp-3">{{ org.description }}</p>
+    {% else %}
+    <p class="text-gray-400 italic mb-4">No description provided</p>
+    {% endif %}
+    <a href="/organizations/{{ org.id }}" class="text-blue-600 hover:text-blue-800 font-semibold">
+        View Details →
+    </a>
+</div>
+{% endmacro %}
+
+{% from "components/badges.html" import open_status_badge, application_status_badge %}
+{% from "components/user.html" import user_avatar, follow_button, datetime_display %}
+{% from "components/feedback.html" import message_box %}
+
+{% macro opportunity_card(opp, show_org=True, show_status=True) %}
+<div class="bg-white rounded-lg shadow-lg p-6 hover:shadow-xl transition-shadow">
+    <h2 class="text-xl font-bold text-gray-800 mb-1">{{ opp.title }}</h2>
+    {% if show_org and opp.organization %}
+    <p class="text-sm text-blue-600 font-semibold mb-3">{{ opp.organization.name }}</p>
+    {% endif %}
+    <p class="text-gray-600 mb-4 line-clamp-3">{{ opp.description }}</p>
+    {% if opp.location %}
+    <p class="text-sm text-gray-500 mb-4">
+        <span class="font-semibold">Location:</span> {{ opp.location }}
+    </p>
+    {% endif %}
+    <div class="flex justify-between items-center text-xs text-gray-500 mt-4">
+        <span>Posted {{ opp.created_at.strftime('%b %d, %Y') }}</span>
+        {% if show_status %}
+        {{ open_status_badge(opp.is_open, 'xs') }}
+        {% endif %}
+    </div>
+    <div class="mt-4 text-right">
+        <a href="/opportunities/{{ opp.id }}" class="text-sm font-semibold text-blue-600 hover:text-blue-800">
+            View Details →
+        </a>
+    </div>
+</div>
+{% endmacro %}
+
+{% macro opportunity_list_item(opp, show_status=False) %}
+<div class="bg-gray-50 p-4 rounded-lg hover:bg-gray-100 transition">
+    <div class="flex items-start gap-3">
+        <a href="/opportunities/{{ opp.id }}" class="block flex-1 min-w-0">
+            <h3 class="text-lg font-bold text-gray-800 mb-2 break-words">{{ opp.title }}</h3>
+            <p class="text-gray-600 line-clamp-2 break-words">{{ opp.description }}</p>
+        </a>
+        {% if show_status %}
+        <div class="flex-shrink-0 pt-1">
+            {{ open_status_badge(opp.is_open, 'sm') }}
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endmacro %}
+
+{% macro application_card(app, show_opportunity=True, show_volunteer=False, show_actions=True) %}
+<div class="bg-white rounded-xl shadow-lg p-6">
+    <div class="flex justify-between items-start mb-4">
+        <div class="flex-1">
+            {% if show_opportunity %}
+            <h3 class="text-xl font-bold text-gray-800 mb-1">{{ app.opportunity.title }}</h3>
+            <p class="text-sm text-blue-600 font-semibold">{{ app.opportunity.organization.name }}</p>
+            {% endif %}
+            {% if show_volunteer %}
+            <h3 class="text-xl font-bold text-gray-800 mb-1">{{ app.volunteer.first_name }} {{ app.volunteer.last_name
+                }}</h3>
+            <p class="text-sm text-gray-600">@{{ app.volunteer.username }}</p>
+            {% endif %}
+        </div>
+        {{ application_status_badge(app.status) }}
+    </div>
+
+    {% if app.message %}
+    {{ message_box(app.message, 'Application Message', 'blue') }}
+    {% endif %}
+
+    <div class="mt-4 text-sm text-gray-500">
+        {{ datetime_display(app.created_at, 'Applied ') }}
+    </div>
+
+    {% if show_actions %}
+    {{ caller() }}
+    {% endif %}
+</div>
+{% endmacro %}
+
+{% macro applicant_card(app, opportunity) %}
+<div class="border rounded-lg p-6 hover:shadow-md transition-shadow">
+    <div class="flex justify-between items-start">
+        <div class="flex-1">
+            <div class="flex items-center gap-3 mb-3">
+                <a href="/{{ app.volunteer.username }}"
+                    class="text-xl font-bold text-blue-600 hover:text-blue-800 transition-colors">
+                    {{ app.volunteer.first_name }} {{ app.volunteer.last_name }}
+                </a>
+                {{ application_status_badge(app.status, 'sm') }}
+            </div>
+            <p class="text-sm text-gray-600 mb-2">
+                <span class="font-semibold">@{{ app.volunteer.username }}</span>
+                {% if app.volunteer.email and app.volunteer.username %}
+                • {{ app.volunteer.email }}
+                {% endif %}
+            </p>
+
+            <p class="mb-3">
+                {{ datetime_display(app.created_at, 'Applied on ') }}
+            </p>
+
+            {% if app.message %}
+            {{ message_box(app.message, 'Application Message') }}
+            {% else %}
+            <p class="text-gray-400 italic mb-3">No message provided</p>
+            {% endif %}
+
+            <p class="text-sm text-gray-600 mt-3">
+                <span class="font-semibold">Volunteer ID:</span> {{ app.volunteer_id }}
+            </p>
+        </div>
+
+        {% if app.status == 'pending' %}
+        <div class="ml-6 flex gap-2">
+            <button hx-post="/opportunities/{{ opportunity.id }}/applicants/{{ app.id }}/accept"
+                hx-target="closest .border" hx-swap="outerHTML"
+                class="inline-flex items-center justify-center gap-2 font-semibold rounded-lg bg-green-600 text-white hover:bg-green-700 transition-colors text-sm py-2 px-4">
+                Accept
+            </button>
+            <button hx-post="/opportunities/{{ opportunity.id }}/applicants/{{ app.id }}/reject"
+                hx-target="closest .border" hx-swap="outerHTML"
+                hx-confirm="Are you sure you want to reject this application?"
+                class="inline-flex items-center justify-center gap-2 font-semibold rounded-lg border border-red-200 bg-white text-red-600 hover:bg-red-50 hover:border-red-300 transition-colors text-sm py-2 px-4">
+                Reject
+            </button>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endmacro %}
+
+{% macro user_card(profile_user, current_user, is_following) %}
+<div class="bg-white rounded-lg shadow-md p-4 flex items-center gap-4">
+    {{ user_avatar(profile_user, 'lg') }}
+    <div class="flex-1">
+        <a href="/{{ profile_user.username }}" class="text-lg font-bold text-gray-800 hover:text-blue-600">
+            {{ profile_user.first_name }} {{ profile_user.last_name }}
+        </a>
+        <p class="text-sm text-gray-600">@{{ profile_user.username }}</p>
+        {% if profile_user.bio %}
+        <p class="text-sm text-gray-700 mt-1 line-clamp-2">{{ profile_user.bio }}</p>
+        {% endif %}
+    </div>
+    {% if current_user and profile_user.username != current_user.username %}
+    {{ follow_button(profile_user.username, is_following) }}
+    {% endif %}
+</div>
+{% endmacro %}

@@ -1,10 +1,61 @@
-{% extends "base.html" %}
-{% from "components/ui.html" import back_link, open_status_badge, application_status_badge, location_display, info_box,
-withdraw_button, section_title, page_card, date_display %}
+{% extends "layouts/base.html" %}
+{% from "components/buttons.html" import back_link, withdraw_button, action_buttons %}
+{% from "components/badges.html" import open_status_badge, application_status_badge %}
+{% from "components/layout.html" import location_display, section_title, form_header %}
+{% from "components/cards.html" import page_card %}
+{% from "components/user.html" import date_display %}
+{% from "components/feedback.html" import info_box %}
+{% from "components/forms.html" import form_label, form_textarea, htmx_form %}
 
-{% block title %}{{ opportunity.title }}{% endblock %}
+
+{% block title %}
+{% if view == 'apply' %}
+Apply to {{ opportunity.title }}
+{% else %}
+{{ opportunity.title }}
+{% endif %}
+{% endblock %}
 
 {% block content %}
+{% if view == 'apply' %}
+{# Apply View #}
+{% call page_card('2xl') %}
+<div id="form-container">
+    {% block form_content %}
+    {{ form_header('/opportunities/' + opportunity.id|string, 'Back to Opportunity', 'Apply to Volunteer') }}
+
+    <div id="alert-container">
+        {% if error %}
+        <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
+            {{ error }}
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="mb-6">
+        <h2 class="text-2xl font-bold text-gray-800 mb-2">{{ opportunity.title }}</h2>
+        <p class="text-gray-600">{{ opportunity.organization.name }}</p>
+    </div>
+
+    {% call htmx_form('/opportunities/' + opportunity.id|string + '/apply', '#form-container') %}
+    <div class="space-y-6">
+        <div>
+            {{ form_label('Message (Optional)', 'message', False) }}
+            {{ form_textarea('message', 6, 'Tell the organization why you\'re interested in this opportunity...', False,
+            '') }}
+            <p class="text-sm text-gray-500 mt-1">Share your motivation, relevant experience, or any questions you have.
+            </p>
+        </div>
+
+        {{ action_buttons('Submit Application', '/opportunities/' + opportunity.id|string, 'blue') }}
+    </div>
+    {% endcall %}
+    {% endblock %}
+</div>
+{% endcall %}
+
+{% else %}
+{# Detail View (Default) #}
 {% call page_card('4xl') %}
 <div class="mb-6">
     {{ back_link('/opportunities', 'Back to Opportunities') }}
@@ -107,4 +158,5 @@ withdraw_button, section_title, page_card, date_display %}
 </div>
 {% endif %}
 {% endcall %}
+{% endif %}
 {% endblock %}

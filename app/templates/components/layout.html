@@ -1,0 +1,50 @@
+{# Layout Components #}
+
+{% from "components/buttons.html" import back_link %}
+
+{% macro section_title(title, border_top=True) %}
+<div class="{% if border_top %}border-t pt-6 mt-6{% endif %}">
+    <h2 class="text-xl font-bold text-gray-800 mb-3">{{ title }}</h2>
+</div>
+{% endmacro %}
+
+{% macro detail_header(back_url, back_text, title, subtitle=None) %}
+{# Standard detail page header with back link and title #}
+<div class="mb-6">
+    {{ back_link(back_url, back_text) }}
+</div>
+<div class="mb-6">
+    <h1 class="text-4xl font-bold text-gray-800 mb-2">{{ title }}</h1>
+    {% if subtitle %}
+    <p class="text-xl text-gray-600">{{ subtitle }}</p>
+    {% endif %}
+</div>
+{% endmacro %}
+
+{% macro form_header(back_url, back_text, title) %}
+{# Standard form page header with back link and title #}
+<div class="mb-6">
+    {{ back_link(back_url, back_text) }}
+</div>
+<h1 class="text-3xl font-bold text-gray-800 mb-6">{{ title }}</h1>
+{% endmacro %}
+
+{% macro page_header(title, action_url=None, action_text=None, action_color='blue', show_action=True) %}
+<div class="flex justify-between items-center mb-8">
+    <h1 class="text-4xl font-bold text-gray-800">{{ title }}</h1>
+    {% if action_url and action_text and show_action %}
+    <a href="{{ action_url }}"
+        class="bg-{{ action_color }}-600 hover:bg-{{ action_color }}-700 text-white font-bold py-2 px-6 rounded-lg">
+        {{ action_text }}
+    </a>
+    {% endif %}
+</div>
+{% endmacro %}
+
+{% macro location_display(location) %}
+{% if location %}
+<span class="text-gray-600">
+    <span class="font-semibold">Location:</span> {{ location }}
+</span>
+{% endif %}
+{% endmacro %}

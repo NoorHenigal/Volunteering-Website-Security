@@ -82,7 +82,7 @@ app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="stat
 @app.get("/", include_in_schema=False)
 async def home(ctx: ContextDep) -> Response:
     """Home page."""
-    return render_template(ctx.request, "index.html", user=ctx.user)
+    return render_template(ctx.request, "pages/home.html", user=ctx.user)
 
 
 app.include_router(auth_router)

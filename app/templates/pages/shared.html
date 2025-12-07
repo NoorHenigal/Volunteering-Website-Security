@@ -1,0 +1,230 @@
+{% extends "layouts/base.html" %}
+{% from "components/layout.html" import page_header, form_header, section_title %}
+{% from "components/feedback.html" import empty_state, warning_box, alert_fragment %}
+{% from "components/cards.html" import organization_card, opportunity_card, page_card %}
+{% from "components/forms.html" import form_label, form_input, form_textarea, form_select, htmx_form %}
+{% from "components/buttons.html" import action_buttons, back_link %}
+
+{% block title %}
+{% if view == 'list' %}
+{{ page_title }}
+{% elif view == 'form' %}
+{% if resource %}Edit{% else %}Create{% endif %} {{ resource_type|title }}
+{% else %}
+{{ detail_config.title }}
+{% endif %}
+{% endblock %}
+
+{% block content %}
+{% if view == 'list' %}
+{# List View #}
+<div class="max-w-6xl mx-auto">
+    {{ page_header(page_title, create_url, create_text, create_color, show_create) }}
+
+    <div id="{{ resource_type }}-list">
+        {% block resource_cards %}
+        {% if items %}
+        <div class="grid gap-6 {{ grid_cols }}">
+            {% for item in items %}
+            {% block resource_card scoped %}
+            {% if resource_type == 'organization' %}
+            {{ organization_card(item) }}
+            {% elif resource_type == 'opportunity' %}
+            {{ opportunity_card(item) }}
+            {% elif resource_type == 'applicant' %}
+            {% from "components/cards.html" import applicant_card %}
+            {{ applicant_card(item, opportunity) }}
+            {% elif resource_type == 'follower' or resource_type == 'following' %}
+            {% from "components/cards.html" import user_card %}
+            {{ user_card(item, user, item.is_following if item.is_following is defined else false) }}
+            {% elif resource_type == 'application' %}
+            <div id="application-{{ item.id }}"
+                class="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow">
+                <div class="p-6">
+                    <div class="flex justify-between items-start gap-4">
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-3 mb-2">
+                                <h2 class="text-xl font-bold text-gray-800 truncate">
+                                    <a href="/opportunities/{{ item.opportunity_id }}"
+                                        class="hover:text-blue-600 transition-colors">
+                                        {% if item.opportunity %}{{ item.opportunity.title }}{% else %}Opportunity #{{
+                                        item.opportunity_id }}{% endif %}
+                                    </a>
+                                </h2>
+                                {% from "components/badges.html" import application_status_badge %}
+                                {{ application_status_badge(item.status, 'sm') }}
+                            </div>
+                            {% if item.opportunity %}
+                            <p class="text-gray-600 mb-3 line-clamp-2">{{ item.opportunity.description[:150] }}{% if
+                                item.opportunity.description|length > 150 %}...{% endif %}</p>
+                            {% endif %}
+                            {% from "components/user.html" import datetime_display %}
+                            {{ datetime_display(item.created_at, 'Applied on ') }}
+                        </div>
+                        {% if item.status == 'pending' %}
+                        <div class="flex-shrink-0">
+                            <button hx-post="/applications/{{ item.id }}/withdraw"
+                                hx-target="#application-{{ item.id }}" hx-swap="outerHTML"
+                                hx-confirm="Are you sure you want to withdraw this application?"
+                                class="inline-flex items-center gap-2 bg-white border border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 font-semibold py-2 px-4 text-sm rounded-lg transition-all">
+                                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                                Withdraw
+                            </button>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% if item.message %}
+                <div class="border-t border-gray-100 px-6 py-4">
+                    {% from "components/feedback.html" import message_box %}
+                    {{ message_box(item.message, 'Your message') }}
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
+            {% endblock %}
+            {% endfor %}
+        </div>
+        {% else %}
+        {{ empty_state(empty_message, create_url, create_text, create_color, show_create) }}
+        {% endif %}
+        {% endblock %}
+    </div>
+</div>
+
+{% elif view == 'form' %}
+{# Form View #}
+{% call page_card('2xl') %}
+<div id="form-container">
+    {% block form_content %}
+    {{ form_header(back_url, 'Back to ' + page_title, form_title) }}
+
+    <div id="alert-container">
+        {% if error %}
+        {{ alert_fragment('red', error) }}
+        {% endif %}
+    </div>
+
+    {% if show_warning %}
+    {% call warning_box() %}
+    <h3 class="text-lg font-semibold text-yellow-800">{{ warning_title }}</h3>
+    <p class="mt-2 text-sm text-yellow-700">{{ warning_message }}</p>
+    <div class="mt-4">
+        <a href="{{ warning_action_url }}"
+            class="inline-flex items-center px-4 py-2 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 transition-colors">
+            <svg class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+            </svg>
+            {{ warning_action_text }}
+        </a>
+    </div>
+    {% endcall %}
+
+    <p class="mt-6 text-center text-gray-600">
+        <a href="{{ back_url }}" class="text-blue-600 hover:text-blue-800 font-semibold">← Back to {{ page_title }}</a>
+    </p>
+    {% else %}
+    {% call htmx_form(form_action, '#form-container') %}
+    <div class="space-y-6">
+        {% for field in form_fields %}
+        <div>
+            {{ form_label(field.label, field.name, field.required) }}
+            {% if field.type == 'text' %}
+            {{ form_input(field.name, 'text', field.placeholder, field.required, field.value if resource else '') }}
+            {% elif field.type == 'textarea' %}
+            {{ form_textarea(field.name, field.rows or 6, field.placeholder, field.required, field.value if resource
+            else '') }}
+            {% elif field.type == 'select' %}
+            {{ form_select(field.name, field.options, field.placeholder, field.required, field.selected_value) }}
+            {% endif %}
+        </div>
+        {% endfor %}
+
+        {{ action_buttons(submit_text, back_url, submit_color) }}
+    </div>
+    {% endcall %}
+    {% endif %}
+    {% endblock %}
+</div>
+{% endcall %}
+
+{% else %}
+{# Detail View (Default/Fallback) #}
+{% call page_card(detail_config.max_width) %}
+{% if detail_config.show_back_link %}
+<div class="mb-6">
+    {{ back_link(detail_config.back_url, detail_config.back_text) }}
+</div>
+{% endif %}
+
+{# Header Section #}
+<div
+    class="{% if detail_config.header_actions %}flex flex-col md:flex-row md:items-start md:justify-between gap-4{% endif %} mb-6">
+    <div>
+        <h1 class="text-4xl font-bold text-gray-800 mb-4">{{ detail_config.title }}</h1>
+        {% if detail_config.subtitle %}
+        <p class="text-gray-700 text-lg leading-relaxed">{{ detail_config.subtitle }}</p>
+        {% endif %}
+        {% if detail_config.badges %}
+        <div class="flex items-center gap-4 mt-4">
+            {% for badge in detail_config.badges %}
+            {{ badge }}
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+    {% if detail_config.header_actions %}
+    <div>
+        {{ detail_config.header_actions }}
+    </div>
+    {% endif %}
+</div>
+
+{# Description Section #}
+{% if detail_config.description %}
+<div class="mb-8">
+    {% if detail_config.description_title %}
+    <h2 class="text-xl font-bold text-gray-800 mb-3">{{ detail_config.description_title }}</h2>
+    {% endif %}
+    <p class="text-gray-700 leading-relaxed whitespace-pre-wrap">{{ detail_config.description }}</p>
+</div>
+{% endif %}
+
+{# Details Grid Section #}
+{% if detail_config.details %}
+{{ section_title('Details', True) }}
+<div class="grid md:grid-cols-2 gap-4">
+    {% for detail in detail_config.details %}
+    <div>
+        <p class="text-gray-600">
+            <span class="font-semibold">{{ detail.label }}:</span> {{ detail.value }}
+        </p>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+{# Dynamic Content Sections #}
+{% for section in detail_config.sections %}
+{% if section.show_title %}
+{{ section_title(section.title, section.border_top) }}
+{% endif %}
+<div class="{% if section.border_top %}mt-4{% else %}mb-8{% endif %}" id="{{ section.id }}">
+    {% block section scoped %}
+    {{ section.content }}
+    {% endblock %}
+</div>
+{% endfor %}
+
+{# Actions Section #}
+{% if detail_config.actions %}
+<div class="border-t pt-6 mt-6" id="actions-section">
+    {{ detail_config.actions }}
+</div>
+{% endif %}
+{% endcall %}
+{% endif %}
+{% endblock %}
