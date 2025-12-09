@@ -1,7 +1,4 @@
-"""Business logic for organizations.
-
-This service layer consolidates logic shared between API and UI handlers.
-"""
+"""Organization business logic."""
 
 from uuid import UUID
 
@@ -40,20 +37,17 @@ class OrganizationService(BaseService):
         self,
         *,
         name: str,
+        username: str,
         description: str | None,
         admin_user_id: UUID,
     ) -> Organization:
-        """Create a new organization with the creator as admin.
-
-        Args:
-            name: Organization name
-            description: Optional description
-            admin_user_id: User ID to assign as admin
-
-        Returns:
-            Created Organization
-        """
-        return await self._org_repo.create_with_admin(name, description, admin_user_id)
+        """Create organization with creator as admin."""
+        org = Organization(
+            name=name,
+            username=username,
+            description=description,
+        )
+        return await self._org_repo.create_with_admin(org, admin_user_id)
 
     async def update(
         self,
@@ -62,16 +56,7 @@ class OrganizationService(BaseService):
         name: str | None = None,
         description: str | None = None,
     ) -> Organization:
-        """Update an organization.
-
-        Args:
-            organization: Organization to update
-            name: New name (optional)
-            description: New description (optional)
-
-        Returns:
-            Updated Organization
-        """
+        """Update organization name and/or description."""
         if name is not None:
             organization.name = name
         if description is not None:
@@ -89,6 +74,7 @@ class OrganizationService(BaseService):
                 username=r.user.username,
                 first_name=r.user.first_name,
                 last_name=r.user.last_name,
+                user_role=r.user.role,
                 role=r.role,
             )
             for r in member_roles

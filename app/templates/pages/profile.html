@@ -8,7 +8,7 @@
 {% if view == 'privacy' %}
 Privacy Settings
 {% else %}
-{{ profile_user.first_name }} {{ profile_user.last_name }} (@{{ profile_user.username }})
+{{ profile_user.display_name }} (@{{ profile_user.username }})
 {% endif %}
 {% endblock %}
 
@@ -141,7 +141,7 @@ Privacy Settings
                     <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                         <div>
                             <h1 class="text-3xl font-bold text-gray-900">
-                                {{ profile_user.first_name }} {{ profile_user.last_name }}
+                                {{ profile_user.display_name }}
                             </h1>
                             <p class="text-lg text-gray-500 font-medium">
                                 @{{ profile_user.username }}
@@ -206,44 +206,60 @@ Privacy Settings
             <div class="mt-8 border-t border-gray-200 pt-6" id="edit-profile-container">
                 {% block edit_profile_form %}
                 <h2 class="text-xl font-semibold text-gray-900 mb-4">Edit Profile</h2>
-                {% call htmx_form('/settings/profile', '#edit-profile-container') %}
-                <div
-                    x-data="{ bioLength: {{ (profile_user.bio or '')|length }}, descLength: {{ (profile_user.description or '')|length }} }">
-                    <div class="mb-4">
-                        <label for="bio" class="block text-sm font-medium text-gray-700 mb-1">Bio</label>
-                        <textarea id="bio" name="bio" rows="2" maxlength="200"
-                            x-on:input="bioLength = $event.target.value.length"
-                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            placeholder="A short bio about yourself">{{ profile_user.bio or '' }}</textarea>
-                        <p class="text-sm text-right mt-1"
-                            :class="bioLength > 180 ? (bioLength >= 200 ? 'text-red-600' : 'text-yellow-600') : 'text-gray-500'">
-                            <span x-text="bioLength"></span>/200
-                        </p>
+                <form hx-post="/settings/profile" class="mt-4 space-y-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label for="first_name" class="block text-sm font-medium text-gray-700">First Name</label>
+                            <input type="text" name="first_name" id="first_name"
+                                value="{{ profile_user.first_name or '' }}"
+                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                        </div>
+                        <div>
+                            <label for="last_name" class="block text-sm font-medium text-gray-700">Last Name</label>
+                            <input type="text" name="last_name" id="last_name"
+                                value="{{ profile_user.last_name or '' }}"
+                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                        </div>
                     </div>
-                    <div class="mb-4">
-                        <label for="description"
-                            class="block text-sm font-medium text-gray-700 mb-1">Description</label>
-                        <textarea id="description" name="description" rows="4" maxlength="1000"
-                            x-on:input="descLength = $event.target.value.length"
-                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            placeholder="Tell us more about yourself, your interests, and experience">{{ profile_user.description or '' }}</textarea>
-                        <p class="text-sm text-right mt-1"
-                            :class="descLength > 900 ? (descLength >= 1000 ? 'text-red-600' : 'text-yellow-600') : 'text-gray-500'">
-                            <span x-text="descLength"></span>/1000
-                        </p>
+
+                    <div>
+                        <label for="display_name" class="block text-sm font-medium text-gray-700">Display Name</label>
+                        <input type="text" name="display_name" id="display_name"
+                            value="{{ profile_user.custom_display_name or '' }}"
+                            placeholder="Defaults to First Last if empty"
+                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                        <p class="mt-1 text-xs text-gray-500">This is how your name will appear publicly.</p>
                     </div>
-                </div>
-                <div class="flex gap-3">
-                    <button type="submit"
-                        class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors">
-                        Save Changes
-                    </button>
-                    <a href="/{{ profile_user.username }}"
-                        class="px-6 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium rounded-lg transition-colors">
-                        Cancel
-                    </a>
-                </div>
-                {% endcall %}
+
+                    <div>
+                        <label for="bio" class="block text-sm font-medium text-gray-700">Bio</label>
+                        <div class="mt-1">
+                            <input type="text" name="bio" id="bio" value="{{ profile.bio or '' }}"
+                                class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                                placeholder="Short bio (max 200 chars)">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label for="description" class="block text-sm font-medium text-gray-700">About Me</label>
+                        <div class="mt-1">
+                            <textarea id="description" name="description" rows="4"
+                                class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                                placeholder="Tell us more about yourself...">{{ profile.description or '' }}</textarea>
+                        </div>
+                    </div>
+
+                    <div class="flex justify-end gap-3 pt-4">
+                        <a href="/{{ user.username }}"
+                            class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">
+                            Cancel
+                        </a>
+                        <button type="submit"
+                            class="px-4 py-2 bg-blue-600 border border-transparent rounded-md shadow-sm text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                            Save Changes
+                        </button>
+                    </div>
+                </form>
                 {% endblock %}
             </div>
             {% endif %}

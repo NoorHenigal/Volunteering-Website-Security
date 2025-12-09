@@ -34,7 +34,7 @@
     {% else %}
     <p class="text-gray-400 italic mb-4">No description provided</p>
     {% endif %}
-    <a href="/organizations/{{ org.id }}" class="text-blue-600 hover:text-blue-800 font-semibold">
+    <a href="/{{ org.username }}" class="text-blue-600 hover:text-blue-800 font-semibold">
         View Details →
     </a>
 </div>
@@ -95,8 +95,7 @@
             <p class="text-sm text-blue-600 font-semibold">{{ app.opportunity.organization.name }}</p>
             {% endif %}
             {% if show_volunteer %}
-            <h3 class="text-xl font-bold text-gray-800 mb-1">{{ app.volunteer.first_name }} {{ app.volunteer.last_name
-                }}</h3>
+            <h3 class="text-xl font-bold text-gray-800 mb-1">{{ app.volunteer.display_name }}</h3>
             <p class="text-sm text-gray-600">@{{ app.volunteer.username }}</p>
             {% endif %}
         </div>
@@ -124,7 +123,7 @@
             <div class="flex items-center gap-3 mb-3">
                 <a href="/{{ app.volunteer.username }}"
                     class="text-xl font-bold text-blue-600 hover:text-blue-800 transition-colors">
-                    {{ app.volunteer.first_name }} {{ app.volunteer.last_name }}
+                    {{ app.volunteer.display_name }} ({{ app.volunteer.username }})
                 </a>
                 {{ application_status_badge(app.status, 'sm') }}
             </div>
@@ -174,7 +173,7 @@
     {{ user_avatar(profile_user, 'lg') }}
     <div class="flex-1">
         <a href="/{{ profile_user.username }}" class="text-lg font-bold text-gray-800 hover:text-blue-600">
-            {{ profile_user.first_name }} {{ profile_user.last_name }}
+            {{ profile_user.display_name }}
         </a>
         <p class="text-sm text-gray-600">@{{ profile_user.username }}</p>
         {% if profile_user.bio %}

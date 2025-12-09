@@ -1,4 +1,4 @@
-"""Organization routes - both API and UI endpoints."""
+"""Organization routes."""
 
 from typing import Annotated
 from uuid import UUID
@@ -9,7 +9,6 @@ from app.core.base_schemas import ListResponse, error_responses
 from app.core.context import (
     ContextDep,
     render_template,
-    require_organization_role,
 )
 from app.core.dependencies import OrganizationServiceDep
 from app.core.router_helpers import handle_htmx_redirect
@@ -36,7 +35,7 @@ async def list_organizations(
     organizations = await org_svc.list_all()
 
     if ctx.is_ui:
-        return ctx.success_response(
+        return await ctx.success_response(
             template="pages/shared.html",
             view="list",
             block="resource_cards" if ctx.is_htmx else None,
@@ -47,7 +46,7 @@ async def list_organizations(
             create_url="/organizations/new",
             create_text="Create Organization",
             create_color="blue",
-            show_create=ctx.user is not None and ctx.user.role == "organization" and len(organizations) > 0,
+            show_create=ctx.user is not None,
             empty_message="No organizations found",
             grid_cols="md:grid-cols-2 lg:grid-cols-3",
         )
@@ -57,10 +56,9 @@ async def list_organizations(
 
 @router.get("/organizations/new", responses=error_responses(auth=True))
 async def new_organization_form(ctx: ContextDep) -> Response:
-    """Shows the create organization form (organization role only)."""
+    """Show create organization form."""
     user = ctx.require_authenticated()
-    require_organization_role(user)
-    return render_template(
+    return await render_template(
         ctx.request,
         "pages/shared.html",
         view="form",
@@ -80,7 +78,15 @@ async def new_organization_form(ctx: ContextDep) -> Response:
                 "name": "name",
                 "label": "Organization Name",
                 "type": "text",
-                "placeholder": "Enter organization name",
+                "placeholder": "Enter organization display name",
+                "required": True,
+                "value": "",
+            },
+            {
+                "name": "username",
+                "label": "Username (Profile URL)",
+                "type": "text",
+                "placeholder": "my-organization",
                 "required": True,
                 "value": "",
             },
@@ -107,25 +113,33 @@ async def create_organization(
     ctx: ContextDep,
     org_svc: OrganizationServiceDep,
 ) -> Response | OrganizationResponse:
-    """Create a new organization (organization role only)."""
+    """Create a new organization."""
     user = ctx.require_authenticated()
-    require_organization_role(user)
 
     # Parse body (JSON or Form)
     try:
         data = await ctx.parse_body_or_400(
             OrganizationCreate,
-            {"name": "name", "description": "description"},
+            {
+                "name": "name",
+                "username": "username",
+                "description": "description",
+            },
         )
     except HTTPException as e:
         if ctx.is_ui:
-            return ctx.error_response(e, template="pages/shared.html", view="form", block="form_content")
+            return await ctx.error_response(e, template="pages/shared.html", view="form", block="form_content")
         raise
 
-    organization = await org_svc.create(name=data.name, description=data.description, admin_user_id=user.id)
+    organization = await org_svc.create(
+        name=data.name,
+        username=data.username,
+        description=data.description,
+        admin_user_id=user.id,
+    )
 
     if ctx.is_ui:
-        return handle_htmx_redirect(ctx, f"/organizations/{organization.id}")
+        return await handle_htmx_redirect(ctx, f"/{organization.username}")
 
     return OrganizationResponse.model_validate(organization)
 
@@ -148,7 +162,7 @@ async def get_organization(
         members = await org_svc.get_members(organization_id)
         is_admin = await org_svc.is_admin(user.id, organization_id)
 
-        return ctx.success_response(
+        return await ctx.success_response(
             template="pages/organizations.html",
             block="org_detail" if ctx.is_htmx else None,
             organization=organization,
@@ -182,7 +196,7 @@ async def update_organization(
     ctx: ContextDep,
     org_svc: OrganizationServiceDep,
 ) -> OrganizationResponse:
-    """Update an organization (API only)."""
+    """Update an organization."""
     organization = await org_svc.get_by_id(organization_id)
     await org_svc.require_admin(ctx.require_authenticated().id, organization_id)
 
@@ -196,12 +210,12 @@ async def edit_organization_form(
     ctx: ContextDep,
     org_svc: OrganizationServiceDep,
 ) -> Response:
-    """Shows the edit organization form (admins only)."""
+    """Show edit organization form."""
     user = ctx.require_authenticated()
     organization = await org_svc.get_by_id(organization_id)
     await org_svc.require_admin(user.id, organization_id)
 
-    return render_template(
+    return await render_template(
         ctx.request,
         "pages/shared.html",
         view="form",
@@ -246,7 +260,7 @@ async def update_organization_form(
     name: Annotated[str, Form(...)],
     description: Annotated[str, Form()] = "",
 ) -> Response:
-    """Updates an organization from form submission (UI only)."""
+    """Update organization from form submission."""
     user = ctx.require_authenticated()
     organization = await org_svc.get_by_id(organization_id)
     await org_svc.require_admin(user.id, organization_id)
@@ -257,8 +271,8 @@ async def update_organization_form(
             name=name,
             description=description if description else None,
         )
-        return handle_htmx_redirect(ctx, f"/organizations/{organization.id}")
+        return await handle_htmx_redirect(ctx, f"/{organization.username}")
     except HTTPException as e:
-        return ctx.error_response(
+        return await ctx.error_response(
             e, template="pages/shared.html", view="form", block="form_content", organization=organization
         )

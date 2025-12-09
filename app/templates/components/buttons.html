@@ -57,7 +57,11 @@ hover:bg-' ~ color ~ '-700 text-white transition-colors' %}
 {% endmacro %}
 
 {% macro back_link(url, text) %}
-<a href="{{ url }}" class="text-blue-600 hover:text-blue-800 font-semibold">← {{ text }}</a>
+<a href="{{ url }}"
+    onclick="if(document.referrer && document.referrer.indexOf(window.location.host) !== -1) { history.back(); return false; }"
+    class="text-blue-600 hover:text-blue-800 font-semibold">
+    ← {{ text }}
+</a>
 {% endmacro %}
 
 {% macro withdraw_button(application_id, size='md') %}

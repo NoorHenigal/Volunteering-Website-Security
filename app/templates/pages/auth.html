@@ -9,8 +9,10 @@
 {% block title %}
 {% if view == 'status' %}
 Status
+{% elif view == 'register' %}
+Create Account
 {% else %}
-{{ form_config.title }}
+Sign In
 {% endif %}
 {% endblock %}
 
@@ -23,7 +25,7 @@ Status
     <div class="flex justify-center mb-4">
         {{ user_avatar(user, 'lg') }}
     </div>
-    <h2 class="text-3xl font-bold text-gray-900">{{ user.first_name }} {{ user.last_name }}</h2>
+    <h2 class="text-3xl font-bold text-gray-900">{{ user.display_name }}</h2>
     <p class="text-gray-500 mt-1">@{{ user.username }}</p>
 </div>
 <div class="border-t border-gray-200 pt-6 mb-6 space-y-3">
@@ -47,10 +49,112 @@ Status
 {% endif %}
 {% endcall %}
 
+{% elif view == 'register' %}
+{# Tabbed Registration View #}
+{% call page_card('md') %}
+<div class="text-center mb-8">
+    <h1 class="text-3xl font-bold text-gray-900 mb-2">Create Account</h1>
+    <p class="text-gray-600">Join the volunteering community</p>
+</div>
+
+{# Tab Navigation #}
+<div class="flex mb-8 bg-gray-100 rounded-xl p-1" id="register-tabs">
+    <button type="button" onclick="switchTab('volunteer')" id="tab-volunteer"
+        class="flex-1 py-3 px-4 rounded-lg text-sm font-semibold transition-all duration-200 bg-white text-gray-900 shadow-sm">
+        🙋 Volunteer
+    </button>
+    <button type="button" onclick="switchTab('organization')" id="tab-organization"
+        class="flex-1 py-3 px-4 rounded-lg text-sm font-semibold transition-all duration-200 text-gray-600 hover:text-gray-900">
+        🏢 Organization
+    </button>
+</div>
+
+{# Volunteer Registration Form #}
+<div id="form-volunteer" class="tab-content">
+    {% call htmx_form(volunteer_form.action, '#main-content', 'innerHTML') %}
+    <div class="space-y-5">
+        <div class="grid grid-cols-2 gap-4">
+            <div>
+                {{ form_label('First Name', 'first_name', true) }}
+                {{ form_input('first_name', 'text', 'John', true, '', id='first_name') }}
+            </div>
+            <div>
+                {{ form_label('Last Name', 'last_name', true) }}
+                {{ form_input('last_name', 'text', 'Doe', true, '', id='last_name') }}
+            </div>
+        </div>
+        <div>
+            {{ form_label('Username', 'username', true) }}
+            {{ form_input('username', 'text', 'johndoe', true, '', id='username') }}
+            <p class="mt-1 text-xs text-gray-500">This will be your profile URL</p>
+        </div>
+        <div>
+            {{ form_label('Email', 'email', true) }}
+            {{ form_input('email', 'email', 'john@example.com', true, '', id='email') }}
+        </div>
+        <div>
+            {{ form_label('Password', 'password', true) }}
+            {{ form_input('password', 'password', 'Min 8 characters', true, '', id='password') }}
+        </div>
+        {{ primary_button('Create Account', 'submit', 'blue') }}
+    </div>
+    {% endcall %}
+</div>
+
+{# Organization Registration Form #}
+<div id="form-organization" class="tab-content hidden">
+    {% call htmx_form(organization_form.action, '#main-content', 'innerHTML') %}
+    <div class="space-y-5">
+        <div>
+            {{ form_label('Organization Name', 'name', true) }}
+            {{ form_input('name', 'text', 'Helping Hands Foundation', true, '', id='org_name') }}
+            <p class="mt-1 text-xs text-gray-500">Your organization's display name</p>
+        </div>
+        <div>
+            {{ form_label('Username', 'username', true) }}
+            {{ form_input('username', 'text', 'helping-hands', true, '', id='org_username') }}
+            <p class="mt-1 text-xs text-gray-500">This will be your organization's profile URL</p>
+        </div>
+        <div>
+            {{ form_label('Organization Email', 'email', true) }}
+            {{ form_input('email', 'email', 'contact@helpinghands.org', true, '', id='org_email') }}
+        </div>
+        <div>
+            {{ form_label('Password', 'password', true) }}
+            {{ form_input('password', 'password', 'Min 8 characters', true, '', id='org_password') }}
+        </div>
+        {{ primary_button('Create Organization', 'submit', 'green') }}
+    </div>
+    {% endcall %}
+</div>
+
+<p class="mt-8 text-center text-gray-600">
+    Already have an account? <a href="/auth/login" class="text-blue-600 font-semibold hover:text-blue-800">Sign in</a>
+</p>
+{% endcall %}
+
+<script>
+    function switchTab(tab) {
+        // Update tab buttons
+        document.querySelectorAll('#register-tabs button').forEach(btn => {
+            btn.classList.remove('bg-white', 'text-gray-900', 'shadow-sm');
+            btn.classList.add('text-gray-600');
+        });
+        document.getElementById('tab-' + tab).classList.remove('text-gray-600');
+        document.getElementById('tab-' + tab).classList.add('bg-white', 'text-gray-900', 'shadow-sm');
+
+        // Update form visibility
+        document.querySelectorAll('.tab-content').forEach(form => {
+            form.classList.add('hidden');
+        });
+        document.getElementById('form-' + tab).classList.remove('hidden');
+    }
+</script>
+
 {% else %}
-{# Auth Form View Content (default) #}
+{# Login Form View (default) #}
 {% call auth_form_card(form_config.title, form_config.subtitle, form_config.container_id) %}
-{% call htmx_form(form_config.action, '#' + form_config.container_id) %}
+{% call htmx_form(form_config.action, '#main-content', 'innerHTML') %}
 <div class="space-y-6">
     {% for field in form_config.fields %}
     <div>

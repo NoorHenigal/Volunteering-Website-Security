@@ -1,4 +1,4 @@
-"""Base service class for shared service patterns."""
+"""Base service class."""
 
 from typing import TYPE_CHECKING
 from uuid import UUID
@@ -15,17 +15,10 @@ __all__ = ["BaseService"]
 
 
 class BaseService:
-    """Base class for all service classes.
-
-    Provides common initialization pattern with database session.
-    """
+    """Base class for services with database access."""
 
     def __init__(self, db: AsyncSession) -> None:
-        """Initialize service with database session.
-
-        Args:
-            db: SQLAlchemy async session
-        """
+        """Initialize with database session."""
         self.db = db
 
     async def get_or_404[T: DeclarativeBase](
@@ -34,17 +27,5 @@ class BaseService:
         entity_id: UUID,
         message: str = "Not found",
     ) -> T:
-        """Get entity by ID or raise 404.
-
-        Args:
-            repo: Repository instance to use for lookup
-            entity_id: UUID of the entity to find
-            message: Error message if not found
-
-        Returns:
-            The found entity
-
-        Raises:
-            HTTPException: 404 if entity not found
-        """
+        """Get entity by ID or raise 404."""
         return require(await repo.get_by_id(entity_id), message)

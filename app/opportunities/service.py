@@ -1,7 +1,4 @@
-"""Business logic for opportunities and applications.
-
-This service layer consolidates logic shared between API and UI handlers.
-"""
+"""Opportunity and application business logic."""
 
 from uuid import UUID
 
@@ -47,21 +44,7 @@ class OpportunityService(BaseService):
         posted_by: UUID,
         location: str | None = None,
     ) -> Opportunity:
-        """Create a new opportunity.
-
-        Args:
-            title: Opportunity title
-            description: Opportunity description
-            organization_id: Organization ID
-            posted_by: User ID of the poster
-            location: Optional location
-
-        Returns:
-            Created Opportunity
-
-        Raises:
-            HTTPException: If organization not found
-        """
+        """Create a new opportunity."""
         # Verify organization exists
         if not await self._org_repo.get_by_id(organization_id):
             raise HTTPException(
@@ -80,13 +63,8 @@ class OpportunityService(BaseService):
 
     async def get_user_organizations(self, user_id: UUID) -> list[Organization]:
         """Get organizations where user is a member."""
-        user_org_roles = await self._role_repo.get_user_organizations(user_id)
-        organizations = []
-        for role in user_org_roles:
-            org = await self._org_repo.get_by_id(role.organization_id)
-            if org:
-                organizations.append(org)
-        return organizations
+        roles = await self._role_repo.get_user_organizations_with_org(user_id)
+        return [r.organization for r in roles]
 
 
 class ApplicationService(BaseService):
@@ -114,19 +92,7 @@ class ApplicationService(BaseService):
         volunteer_id: UUID,
         message: str | None = None,
     ) -> Application:
-        """Apply to an opportunity.
-
-        Args:
-            opportunity_id: Opportunity to apply to
-            volunteer_id: Volunteer user ID
-            message: Optional application message
-
-        Returns:
-            Created Application
-
-        Raises:
-            HTTPException: If opportunity not found, closed, or already applied
-        """
+        """Apply to an opportunity."""
         # Verify opportunity exists and is open
         opportunity = await self.get_or_404(self._opp_repo, opportunity_id, "Opportunity not found")
 
@@ -170,15 +136,7 @@ class ApplicationService(BaseService):
         return await self._app_repo.update_status(application, new_status)
 
     async def withdraw(self, application_id: UUID, user: User) -> None:
-        """Withdraw an application by deleting it (volunteers only).
-
-        Args:
-            application_id: Application to withdraw
-            user: User attempting to withdraw
-
-        Raises:
-            HTTPException: If not found or not owner
-        """
+        """Withdraw an application (volunteers only)."""
         application = await self.get_by_id(application_id)
 
         forbid(application.volunteer_id != user.id, "You can only withdraw your own applications")

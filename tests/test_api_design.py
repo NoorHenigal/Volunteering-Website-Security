@@ -91,14 +91,14 @@ class TestOpenAPIDocumentation:
     """Test OpenAPI documentation improvements."""
 
     @pytest.mark.anyio
-    async def test_auth_api_endpoints_documented(self, client: AsyncClient) -> None:
-        """Test auth API endpoints have response documentation."""
+    async def test_volunteer_register_endpoint_documented(self, client: AsyncClient) -> None:
+        """Test /auth/register/volunteer API endpoint has response documentation."""
         response = await client.get("/openapi.json")
         assert response.status_code == status.HTTP_200_OK
         schema = response.json()
 
-        # Check /auth/register has responses documented
-        register_path = schema["paths"].get("/auth/register", {}).get("post", {})
+        # Check /auth/register/volunteer has responses documented
+        register_path = schema["paths"].get("/auth/register/volunteer", {}).get("post", {})
         assert "responses" in register_path
         assert "201" in register_path["responses"] or "200" in register_path["responses"]
 

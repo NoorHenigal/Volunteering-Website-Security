@@ -1,4 +1,4 @@
-"""Router for user and organization profiles."""
+"""Profile routes."""
 
 from typing import Annotated
 
@@ -8,7 +8,7 @@ from sqlalchemy.orm import selectinload
 
 from app.core.base_schemas import ListResponse, error_responses, request_body_from_model
 from app.core.context import ContextDep, render_template, ui_auth_required
-from app.core.dependencies import ProfileServiceDep
+from app.core.dependencies import OrganizationServiceDep, ProfileServiceDep
 from app.core.htmx import trigger_toast
 from app.core.router_helpers import handle_htmx_redirect
 from app.core.types import ProfileVisibilityType, SlugPath, UsernamePath
@@ -45,7 +45,7 @@ async def _get_follow_list(
             else f"People {profile_user.first_name if profile_user else username} follows"
         )
 
-        return render_template(
+        return await render_template(
             ctx.request,
             "pages/shared.html",
             view="list",
@@ -62,12 +62,22 @@ async def _get_follow_list(
             empty_message=f"No {list_type} yet" if list_type == "followers" else "Not following anyone yet",
             grid_cols="space-y-4",
         )
-    return ctx.success_response(data=ListResponse[PublicProfileSchema](items=profiles))
+    return await ctx.success_response(data=ListResponse[PublicProfileSchema](items=profiles))
 
 
 async def _update_profile_core(ctx: ContextDep, service: ProfileServiceDep, user: User) -> User:
     """Shared logic for profile update endpoints."""
-    data = await ctx.parse_body_or_400(ProfileUpdateSchema, {"bio": "bio", "description": "description"})
+    data = await ctx.parse_body_or_400(
+        ProfileUpdateSchema,
+        {
+            "bio": "bio",
+            "description": "description",
+            "display_name": "display_name",
+            "first_name": "first_name",
+            "last_name": "last_name",
+        },
+    )
+
     return await service.update_profile(user, data)
 
 
@@ -75,8 +85,20 @@ async def _update_profile_core(ctx: ContextDep, service: ProfileServiceDep, user
 @ui_auth_required
 async def edit_profile_page(ctx: ContextDep, user: User, service: ProfileServiceDep) -> Response:
     """Show profile edit page."""
+    if user.role == "organization":
+        org_repo = OrganizationRepository(ctx.db)
+        org = await org_repo.find_one(Organization.user_roles.any(user_id=user.id, role="admin"))
+
+        return await render_template(
+            ctx.request,
+            "pages/org_settings.html",
+            user=user,
+            organization=org,
+        )
+
+    # Volunteer View
     profile = await service.get_profile(user.username, user)
-    return render_template(
+    return await render_template(
         ctx.request,
         "pages/profile.html",
         user=user,
@@ -90,7 +112,7 @@ async def edit_profile_page(ctx: ContextDep, user: User, service: ProfileService
 @ui_auth_required
 async def privacy_settings_page(ctx: ContextDep, user: User) -> Response:
     """Show privacy settings page."""
-    return render_template(ctx.request, "pages/profile.html", view="privacy", user=user)
+    return await render_template(ctx.request, "pages/profile.html", view="privacy", user=user)
 
 
 @router.get(
@@ -118,16 +140,21 @@ async def get_following(username: UsernamePath, ctx: ContextDep, service: Profil
     response_model=PublicProfileSchema | OrganizationResponse | None,
     responses=error_responses(not_found=True),
 )
-async def view_profile(slug: SlugPath, ctx: ContextDep, service: ProfileServiceDep) -> Response:
+async def view_profile(
+    slug: SlugPath,
+    ctx: ContextDep,
+    service: ProfileServiceDep,
+    org_svc: OrganizationServiceDep,
+) -> Response:
     """Show user or organization profile."""
     # Check User first
     user_repo = UserRepository(ctx.db)
     profile_user = await user_repo.get_by_username(slug)
 
-    if profile_user:
+    if profile_user and profile_user.role != "organization":
         profile = await service.get_profile(slug, ctx.user)
         if ctx.is_ui:
-            return render_template(
+            return await render_template(
                 ctx.request,
                 "pages/profile.html",
                 user=ctx.user,
@@ -137,25 +164,34 @@ async def view_profile(slug: SlugPath, ctx: ContextDep, service: ProfileServiceD
         return JSONResponse(content=profile.model_dump(mode="json"))
 
     # Check Organization
-    org_repo = OrganizationRepository(ctx.db)
-    org = await org_repo.find_one(
-        Organization.name == slug,
+    org_service = org_svc
+
+    # Try to find org by username
+    org = await OrganizationRepository(ctx.db).find_one(
+        Organization.username == slug,
         options=[selectinload(Organization.opportunities)],
     )
+
     if org:
         if ctx.is_ui:
-            return render_template(
+            # Replicate logic from organizations/router.py:get_organization
+            members = await org_service.get_members(org.id)
+            is_admin = False
+            if ctx.user:
+                is_admin = await org_service.is_admin(ctx.user.id, org.id)
+
+            return await render_template(
                 ctx.request,
-                "pages/organizations/org_detail.html",
+                "pages/organizations.html",
                 user=ctx.user,
                 organization=org,
-                is_public_view=True,
-                is_admin=False,
-                members=[],  # Don't show members in public view
+                members=members,
+                is_admin=is_admin,
+                is_public_view=False,  # Use the "beautiful" internal view
             )
         return JSONResponse(content=OrganizationResponse.model_validate(org).model_dump(mode="json"))
 
-    return ctx.error_response("Profile not found", status_code=404)
+    return await ctx.error_response("Profile not found", status_code=404)
 
 
 @router.put(
@@ -177,7 +213,7 @@ async def update_profile_form(ctx: ContextDep, user: User, service: ProfileServi
     """Update own profile bio/description (UI form)."""
     await _update_profile_core(ctx, service, user)
     # Use redirect for clean page reload - ensures Alpine.js and navbar work correctly
-    return handle_htmx_redirect(ctx, f"/{user.username}")
+    return await handle_htmx_redirect(ctx, f"/{user.username}")
 
 
 @router.put(
@@ -235,9 +271,9 @@ async def update_privacy_form(ctx: ContextDep, user: User, service: ProfileServi
 
     if ctx.is_htmx:
         # Re-render the form to show updated state (and keep user on page)
-        response = ctx.success_response(template="pages/profile.html", view="privacy", block="content", user=user)
-        return trigger_toast(response, "Privacy settings updated")
-    return ctx.success_response(redirect_url="/settings/privacy")
+        response = await ctx.success_response(template="pages/profile.html", view="privacy", block="content", user=user)
+        return await trigger_toast(response, "Privacy settings updated")
+    return await ctx.success_response(redirect_url="/settings/privacy")
 
 
 @router.post(
@@ -254,14 +290,14 @@ async def follow_user(ctx: ContextDep, user: User, service: ProfileServiceDep, u
     if ctx.is_ui:
         if ctx.is_htmx:
             # Re-render the follow button block
-            response = ctx.success_response(
+            response = await ctx.success_response(
                 template="pages/profile.html",
                 block="follow_button",
                 profile_user=await UserRepository(ctx.db).get_by_username(username),
                 profile={"is_following": True},
             )
-            return trigger_toast(response, f"You are now following {username}")
-        return ctx.success_response(redirect_url=f"/{username}")
+            return await trigger_toast(response, f"You are now following {username}")
+        return await ctx.success_response(redirect_url=f"/{username}")
     return JSONResponse(content=FollowResponseSchema.model_validate(follow).model_dump(mode="json"), status_code=201)
 
 
@@ -283,7 +319,7 @@ async def unfollow_user_api(
     await service.unfollow_user(user, username)
     # Return appropriate response based on request type (API vs UI)
     if ctx.is_ui:
-        return ctx.success_response(redirect_url=f"/{username}")
+        return await ctx.success_response(redirect_url=f"/{username}")
     return Response(status_code=204)
 
 
@@ -297,15 +333,15 @@ async def unfollow_user_form(
 
     if ctx.is_htmx:
         # Re-render the follow button block
-        response = ctx.success_response(
+        response = await ctx.success_response(
             template="pages/profile.html",
             block="follow_button",
             profile_user=await UserRepository(ctx.db).get_by_username(username),
             profile={"is_following": False},
         )
-        return trigger_toast(response, f"Unfollowed {username}", "info")
+        return await trigger_toast(response, f"Unfollowed {username}", "info")
 
-    return ctx.success_response(redirect_url=f"/{username}")
+    return await ctx.success_response(redirect_url=f"/{username}")
 
 
 @router.post(
@@ -319,11 +355,7 @@ async def upload_profile_picture(
     user: User,
     file: Annotated[UploadFile, File()],
 ) -> Response:
-    """Upload and process profile picture.
-
-    Expects a pre-cropped square image from the client (cropped via Canvas API).
-    Re-encodes to WebP, strips metadata, and resizes to 256x256.
-    """
+    """Upload profile picture. Re-encodes to WebP and resizes to 256x256."""
     if not file.content_type or not file.content_type.startswith("image/"):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="File must be an image")
 
@@ -339,6 +371,6 @@ async def upload_profile_picture(
     await user_repo.update(user)
 
     if ctx.is_ui:
-        return handle_htmx_redirect(ctx, f"/{user.username}")
+        return await handle_htmx_redirect(ctx, f"/{user.username}")
 
-    return ctx.success_response(data=None)
+    return await ctx.success_response(data=None)

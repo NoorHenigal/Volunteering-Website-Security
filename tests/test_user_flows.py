@@ -153,31 +153,41 @@ class TestAuthorizationBoundaries:
         )
 
     @pytest.mark.anyio
-    async def test_volunteer_cannot_create_organization(self, api: APIHelper, ctx: FixtureContext) -> None:
-        """Test: Volunteers cannot create organizations."""
+    async def test_volunteer_can_create_organization(
+        self, api: APIHelper, ctx: FixtureContext, flows: FlowHelper
+    ) -> None:
+        """Test: Volunteers CAN now create organizations (new permission model)."""
         volunteer = await ctx.volunteer()
-        await api.forbidden(
-            "POST",
+        data = await api.created(
             "/organizations",
             auth=volunteer,
-            json={"name": "Unauthorized Org", "description": "Should fail"},
+            json={
+                "name": "Volunteer Created Org",
+                "username": "volunteer-org",
+                "email": "volunteer-org@example.com",
+                "password": "TestPass123!",
+                "description": "Created by volunteer",
+            },
         )
+        assert data["name"] == "Volunteer Created Org"
 
     @pytest.mark.anyio
-    async def test_organization_cannot_apply_to_opportunity(
+    async def test_volunteer_org_admin_can_still_apply_to_other_opportunity(
         self,
         api: APIHelper,
         ctx: FixtureContext,
     ) -> None:
-        """Test: Organization users cannot apply to opportunities."""
+        """Test: Volunteer who is org admin can still apply to other opportunities."""
         test_opp = await ctx.opportunity()
-        org = await ctx.organization(key="other")
-        await api.forbidden(
-            "POST",
+        # Get another org context where user is admin but NOT part of test_opp's org
+        other_org = await ctx.organization(key="other")
+        # This volunteer/admin can apply (they're still a volunteer)
+        app_data = await api.created(
             f"/opportunities/{test_opp.opportunity.id}/apply",
-            auth=org.admin,
-            json={"message": "Orgs can't apply"},
+            auth=other_org.admin,
+            json={"message": "Org admin can apply to other opps"},
         )
+        assert app_data is not None
 
     @pytest.mark.anyio
     async def test_volunteer_cannot_withdraw_others_application(
@@ -207,12 +217,12 @@ class TestOrganizationMembership:
     ) -> None:
         """Test: Organization user cannot post opportunity for org they're not member of."""
         test_org = await ctx.organization()
-        other_org_user = await flows.create_user("organization")
+        other_user = await flows.create_user("volunteer")
 
         await api.forbidden(
             "POST",
             "/opportunities",
-            auth=other_org_user,
+            auth=other_user,
             json={
                 "title": "Unauthorized Post",
                 "description": "Should fail",
@@ -230,7 +240,7 @@ class TestOrganizationMembership:
     ) -> None:
         """Test: Organization member can post opportunity for their org."""
         test_org = await ctx.organization()
-        member = await flows.create_user("organization")
+        member = await flows.create_user("volunteer")
         await flows.add_member(test_db, member, test_org, role="member")
 
         await api.created(
@@ -248,30 +258,69 @@ class TestUIFlows:
     """Test UI-based user flows with cookie authentication."""
 
     @pytest.mark.anyio
-    async def test_ui_organization_can_access_create_form(
+    async def test_ui_user_can_access_create_form_if_org_member(
         self,
         client: AsyncClient,
         flows: FlowHelper,
+        test_db: AsyncSession,
     ) -> None:
-        """Test: Organization user can access opportunity creation form."""
-        org_user = await flows.create_user("organization")
-        await flows.login_via_ui(org_user.email, org_user.password)
-        response = await client.get("/opportunities/new", headers={"Accept": "text/html"})
+        """Test: User who is org member can access opportunity creation form."""
+        user = await flows.create_user("volunteer")
+        await flows.create_org(user)  # creates org and makes user admin
+        await flows.login_via_ui(user.email, user.password)
+        response = await client.get("/opportunities/new", headers={"Accept": "text/html"}, follow_redirects=True)
         assert response.status_code == status.HTTP_200_OK
-        assert b"Create" in response.content
 
     @pytest.mark.anyio
-    async def test_ui_volunteer_cannot_access_create_form(
+    async def test_ui_user_without_org_gets_warning_page(
         self,
         client: AsyncClient,
         ctx: FixtureContext,
         flows: FlowHelper,
     ) -> None:
-        """Test: Volunteer cannot access opportunity creation form."""
+        """Test: User without org membership gets warning page instead of form."""
         volunteer = await ctx.volunteer()
         await flows.login_via_ui(volunteer.email, volunteer.password)
-        response = await client.get("/opportunities/new", headers={"Accept": "text/html"})
-        assert response.status_code == status.HTTP_403_FORBIDDEN
+        response = await client.get("/opportunities/new", headers={"Accept": "text/html"}, follow_redirects=False)
+
+        # Should NOT redirect, but return 200 with warning
+        assert response.status_code == status.HTTP_200_OK
+        assert "Organization Required" in response.text
+
+
+class TestDisplayNames:
+    """Test display name configuration and updates."""
+
+    @pytest.mark.anyio
+    async def test_volunteer_can_update_display_name(
+        self,
+        api: APIHelper,
+        ctx: FixtureContext,
+        flows: FlowHelper,
+    ) -> None:
+        """Test: Volunteer can update their display name and it reflects in profile."""
+        volunteer = await ctx.volunteer()
+
+        # Initial state - uses first last
+        profile = await api.ok("GET", f"/{volunteer.username}", auth=volunteer)
+        assert profile["first_name"] == volunteer.first_name
+        assert profile["last_name"] == volunteer.last_name
+
+        # Update display name
+        new_name = "Super Volunteer"
+        await api.ok("PUT", "/settings/profile", auth=volunteer, json={"display_name": new_name})
+
+        # Verify in profile
+        await api.ok("GET", f"/{volunteer.username}", auth=volunteer)
+
+        # Let's check DB directly to be sure
+        from app.db.repositories import UserRepository
+
+        repo = UserRepository(ctx.db)
+        db_user = await repo.get_by_id(volunteer.id)
+        assert db_user is not None
+        assert db_user.custom_display_name == new_name
+        assert db_user.display_name == new_name
 
 
 class TestEdgeCases:
@@ -291,7 +340,7 @@ class TestEdgeCases:
         await api(
             "PUT",
             f"/applications/{app_data['id']}/status",
-            expected=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            expected=status.HTTP_400_BAD_REQUEST,
             auth=test_opp.organization.admin,
             json={"status": "invalid_status"},
         )

@@ -1,8 +1,4 @@
-"""Service dependency factories for FastAPI dependency injection.
-
-This module provides typed dependency factories for services, reducing
-boilerplate in route handlers and improving testability.
-"""
+"""Service dependency factories for FastAPI."""
 
 from typing import Annotated
 

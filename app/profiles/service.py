@@ -1,4 +1,4 @@
-"""Profile service for managing user profiles and follow functionality."""
+"""Profile and follow business logic."""
 
 import logging
 
@@ -25,7 +25,7 @@ class ProfileService(BaseService):
     """Service for profile management and follow functionality."""
 
     def __init__(self, db: AsyncSession) -> None:
-        """Initialize ProfileService with database session."""
+        """Initialize with database session."""
         super().__init__(db)
         self.user_repo = UserRepository(db)
         self.follow_repo = FollowRepository(db)
@@ -35,18 +35,7 @@ class ProfileService(BaseService):
         username: str,
         viewer: User | None,
     ) -> PublicProfileSchema | FullProfileSchema:
-        """Get user profile with appropriate visibility based on viewer relationship.
-
-        Args:
-            username: Username of the profile to view
-            viewer: Currently authenticated user (or None for anonymous)
-
-        Returns:
-            PublicProfileSchema or FullProfileSchema based on privacy settings
-
-        Raises:
-            HTTPException: 404 if user not found, 403 if profile is private
-        """
+        """Get user profile with visibility based on privacy settings."""
         profile_user = require(await self.user_repo.get_by_username(username), "User not found")
 
         # Check if viewer can see full profile
@@ -96,15 +85,7 @@ class ProfileService(BaseService):
         )
 
     async def _can_view_full_profile(self, profile_user: User, viewer: User | None) -> bool:
-        """Check if viewer can see full profile based on privacy settings.
-
-        Args:
-            profile_user: User whose profile is being viewed
-            viewer: Currently authenticated user (or None)
-
-        Returns:
-            True if viewer can see full profile
-        """
+        """Check if viewer can see full profile."""
         visibility = profile_user.profile_visibility
 
         # Owner can always see their own full profile
@@ -126,15 +107,7 @@ class ProfileService(BaseService):
         return False
 
     async def update_profile(self, user: User, data: ProfileUpdateSchema) -> User:
-        """Update user's bio and description.
-
-        Args:
-            user: User to update
-            data: Profile update data
-
-        Returns:
-            Updated user
-        """
+        """Update user profile fields."""
         update_data = data.model_dump(exclude_unset=True)
 
         for field, value in update_data.items():
@@ -143,15 +116,7 @@ class ProfileService(BaseService):
         return await self.user_repo.update(user)
 
     async def update_privacy_settings(self, user: User, data: PrivacySettingsSchema) -> User:
-        """Update user's privacy settings.
-
-        Args:
-            user: User to update
-            data: Privacy settings data
-
-        Returns:
-            Updated user
-        """
+        """Update user privacy settings."""
         update_data = data.model_dump(exclude_unset=True)
 
         for field, value in update_data.items():
@@ -162,18 +127,7 @@ class ProfileService(BaseService):
         return await self.user_repo.update(user)
 
     async def follow_user(self, follower: User, followed_username: str) -> Follow:
-        """Create follow relationship.
-
-        Args:
-            follower: User who wants to follow
-            followed_username: Username of user to follow
-
-        Returns:
-            Created Follow relationship
-
-        Raises:
-            HTTPException: 404 if user not found, 400 if invalid operation
-        """
+        """Create follow relationship."""
         followed = require(await self.user_repo.get_by_username(followed_username), "User not found")
 
         if follower.id == followed.id:
@@ -187,15 +141,7 @@ class ProfileService(BaseService):
         return await self.follow_repo.create_follow(follower.id, followed.id)
 
     async def unfollow_user(self, follower: User, followed_username: str) -> None:
-        """Remove follow relationship (idempotent).
-
-        Args:
-            follower: User who wants to unfollow
-            followed_username: Username of user to unfollow
-
-        Raises:
-            HTTPException: 404 if user not found
-        """
+        """Remove follow relationship."""
         followed = require(await self.user_repo.get_by_username(followed_username), "User not found")
 
         await self.follow_repo.delete_follow(follower.id, followed.id)
@@ -205,18 +151,7 @@ class ProfileService(BaseService):
         username: str,
         viewer: User | None,
     ) -> list[PublicProfileSchema]:
-        """Get list of followers for a user.
-
-        Args:
-            username: Username of the user
-            viewer: Currently authenticated user (or None)
-
-        Returns:
-            List of follower profiles
-
-        Raises:
-            HTTPException: 404 if user not found
-        """
+        """Get list of followers for a user."""
         user = require(await self.user_repo.get_by_username(username), "User not found")
 
         if not await self._can_view_followers(user, viewer):
@@ -230,18 +165,7 @@ class ProfileService(BaseService):
         username: str,
         viewer: User | None,
     ) -> list[PublicProfileSchema]:
-        """Get list of users that a user follows.
-
-        Args:
-            username: Username of the user
-            viewer: Currently authenticated user (or None)
-
-        Returns:
-            List of followed user profiles
-
-        Raises:
-            HTTPException: 404 if user not found
-        """
+        """Get list of users that a user follows."""
         user = require(await self.user_repo.get_by_username(username), "User not found")
 
         if not await self._can_view_followers(user, viewer):
@@ -251,15 +175,7 @@ class ProfileService(BaseService):
         return [await self._to_public_profile(f.followed) for f in follows]
 
     async def _can_view_followers(self, user: User, viewer: User | None) -> bool:
-        """Check if viewer can see user's followers/following lists.
-
-        Args:
-            user: User whose lists are being viewed
-            viewer: Currently authenticated user (or None)
-
-        Returns:
-            True if viewer can see the lists
-        """
+        """Check if viewer can see followers/following lists."""
         # Owner can always see their own lists
         if viewer and viewer.id == user.id:
             return True
@@ -268,14 +184,7 @@ class ProfileService(BaseService):
         return await self._can_view_full_profile(user, viewer)
 
     async def _to_public_profile(self, user: User) -> PublicProfileSchema:
-        """Convert User to PublicProfileSchema.
-
-        Args:
-            user: User to convert
-
-        Returns:
-            PublicProfileSchema
-        """
+        """Convert User to PublicProfileSchema."""
         follower_count = await self.follow_repo.get_follower_count(user.id)
         following_count = await self.follow_repo.get_following_count(user.id)
 

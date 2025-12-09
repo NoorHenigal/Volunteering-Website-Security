@@ -82,14 +82,43 @@ async def _create_organizations(session: AsyncSession, fake: Faker) -> list[Orga
 
     # Create 4-6 organizations with dynamic names and descriptions
     num_orgs = fake.random_int(min=4, max=6)
+    default_password = hash_password("demo123")
+
     for _ in range(num_orgs):
-        org = Organization(
-            name=fake.company(),
-            description=fake.catch_phrase() + ". " + fake.bs().capitalize() + ".",
+        username = fake.unique.user_name()
+
+        # 1. Create backend user (admin)
+        admin_user = User(
+            email=fake.unique.company_email(),
+            password_hash=default_password,
+            role="organization",
+            username=username,
+            first_name=fake.company(),
+            last_name="Admin",
+            show_email=True,
+            show_organizations=True,
         )
+        session.add(admin_user)
+        await session.flush()
+
+        # 2. Create Organization
+        org = Organization(
+            name=admin_user.first_name,
+            description=fake.catch_phrase() + ". " + fake.bs().capitalize() + ".",
+            username=username,
+        )
+        session.add(org)
+        await session.flush()
+
+        # 3. Link them
+        role = UserOrganizationRole(
+            user_id=admin_user.id,
+            organization_id=org.id,
+            role="admin",
+        )
+        session.add(role)
         organizations.append(org)
 
-    session.add_all(organizations)
     await session.flush()  # Get IDs without committing
     return organizations
 

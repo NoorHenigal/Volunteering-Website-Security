@@ -124,10 +124,10 @@
     {% endcall %}
 
     <p class="mt-6 text-center text-gray-600">
-        <a href="{{ back_url }}" class="text-blue-600 hover:text-blue-800 font-semibold">← Back to {{ page_title }}</a>
+        {{ back_link(back_url, 'Back to ' + page_title) }}
     </p>
     {% else %}
-    {% call htmx_form(form_action, '#form-container') %}
+    {% call htmx_form(form_action, '#form-container', 'innerHTML') %}
     <div class="space-y-6">
         {% for field in form_fields %}
         <div>

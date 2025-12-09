@@ -1,4 +1,4 @@
-"""Database repositories for centralized data access."""
+"""Database repositories."""
 
 from uuid import UUID
 
@@ -35,15 +35,7 @@ class BaseRepository[T: DeclarativeBase]:
         *filters: ColumnElement[bool],
         options: list[_AbstractLoad] | None = None,
     ) -> T | None:
-        """Find a single entity matching the given filters.
-
-        Args:
-            *filters: SQLAlchemy filter expressions (e.g., Model.field == value)
-            options: Optional list of eager loading options
-
-        Returns:
-            Entity if found, None otherwise
-        """
+        """Find a single entity matching filters."""
         query = select(self.model).where(*filters)
         if options:
             query = query.options(*options)
@@ -57,17 +49,7 @@ class BaseRepository[T: DeclarativeBase]:
         skip: int = 0,
         limit: int = 100,
     ) -> list[T]:
-        """Find all entities matching the given filters.
-
-        Args:
-            *filters: SQLAlchemy filter expressions
-            options: Optional list of eager loading options
-            skip: Number of records to skip
-            limit: Maximum number of records to return
-
-        Returns:
-            List of matching entities
-        """
+        """Find all entities matching filters with pagination."""
         query = select(self.model).where(*filters)
         if options:
             query = query.options(*options)
@@ -131,6 +113,10 @@ class OrganizationRepository(BaseRepository[Organization]):
 
     model = Organization
 
+    async def get_by_username(self, username: str) -> Organization | None:
+        """Get organization by username."""
+        return await self.find_one(Organization.username == username)
+
     async def get_by_id_with_opportunities(self, org_id: UUID) -> Organization | None:
         """Get organization by ID with opportunities eagerly loaded."""
         return await self.find_one(
@@ -138,10 +124,9 @@ class OrganizationRepository(BaseRepository[Organization]):
             options=[selectinload(Organization.opportunities)],
         )
 
-    async def create_with_admin(self, name: str, description: str | None, user_id: UUID) -> Organization:
+    async def create_with_admin(self, org: Organization, user_id: UUID) -> Organization:
         """Create organization and assign user as admin in one operation."""
-        organization = Organization(name=name, description=description)
-        organization = await self.create(organization)
+        organization = await self.create(org)
         role = UserOrganizationRole(user_id=user_id, organization_id=organization.id, role="admin")
         self.session.add(role)
         await self.session.flush()
@@ -163,6 +148,13 @@ class UserOrganizationRoleRepository(BaseRepository[UserOrganizationRole]):
     async def get_user_organizations(self, user_id: UUID) -> list[UserOrganizationRole]:
         """Get all organizations for a user."""
         return await self.find_many(UserOrganizationRole.user_id == user_id)
+
+    async def get_user_organizations_with_org(self, user_id: UUID) -> list[UserOrganizationRole]:
+        """Get all organizations for a user with organization details eagerly loaded."""
+        return await self.find_many(
+            UserOrganizationRole.user_id == user_id,
+            options=[selectinload(UserOrganizationRole.organization)],
+        )
 
     async def is_organization_admin(self, user_id: UUID, organization_id: UUID) -> bool:
         """Check if a user is an admin of an organization."""
@@ -188,10 +180,13 @@ class OpportunityRepository(BaseRepository[Opportunity]):
     model = Opportunity
 
     async def get_all_open(self) -> list[Opportunity]:
-        """Get all open opportunities."""
+        """Get all open opportunities with organization and poster eagerly loaded."""
         return await self.find_many(
             Opportunity.is_open.is_(True),
-            options=[selectinload(Opportunity.organization)],
+            options=[
+                selectinload(Opportunity.organization),
+                selectinload(Opportunity.poster),
+            ],
         )
 
     async def get_by_id_with_organization(self, opportunity_id: UUID) -> Opportunity | None:

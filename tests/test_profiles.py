@@ -26,8 +26,8 @@ async def test_user_profile_access(client: AsyncClient) -> None:
 @pytest.mark.anyio
 async def test_organization_profile_access(client: AsyncClient, test_db: AsyncSession) -> None:
     """Test accessing an organization profile."""
-    await create_organization_with_admin(client, test_db, org_name="TestOrg")
-    response = await client.get("/TestOrg", headers={"Accept": "text/html"})
+    org_ctx = await create_organization_with_admin(client, test_db, org_name="TestOrg")
+    response = await client.get(f"/{org_ctx.organization.username}", headers={"Accept": "text/html"})
     assert response.status_code == 200
     assert "TestOrg" in response.text
 

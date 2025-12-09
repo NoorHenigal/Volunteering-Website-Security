@@ -10,7 +10,7 @@
         :aria-expanded="open" aria-haspopup="true">
         {{ user_avatar(user, 'sm') }}
         <div class="hidden md:block text-left">
-            <div class="text-sm font-semibold text-gray-800">{{ user.first_name }}</div>
+            <div class="text-sm font-semibold text-gray-800">{{ user.display_name }}</div>
             <div class="text-xs text-gray-500">{{ user.role|title }}</div>
         </div>
         <svg class="h-4 w-4 text-gray-500 transition-transform duration-200" :class="{ 'rotate-180': open }" fill="none"
@@ -27,7 +27,7 @@
         class="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-xl z-50 border border-gray-100"
         style="display: none;">
         <div class="px-4 py-3 border-b border-gray-100">
-            <p class="text-sm font-semibold text-gray-900">{{ user.first_name }} {{ user.last_name }}</p>
+            <p class="text-sm font-semibold text-gray-900">{{ user.display_name }}</p>
             <p class="text-xs text-gray-500 truncate">{{ user.email }}</p>
             <span class="inline-block mt-2 px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
                 {{ user.role|title }}

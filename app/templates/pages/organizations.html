@@ -46,16 +46,18 @@
         {% if members %}
         <div class="space-y-3">
             {% for member in members %}
+            {% if member.user_role != 'organization' %}
             <div class="flex justify-between items-center bg-gray-50 p-4 rounded-lg">
                 <div>
                     <a href="/{{ member.username }}"
                         class="font-semibold text-blue-600 hover:text-blue-800 transition-colors">
-                        {{ member.first_name }} {{ member.last_name }}
+                        {{ member.display_name }}
                     </a>
                     <p class="text-sm text-gray-600">@{{ member.username }}</p>
                 </div>
                 {{ member_role_badge(member.role) }}
             </div>
+            {% endif %}
             {% endfor %}
         </div>
         {% else %}

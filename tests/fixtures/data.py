@@ -16,22 +16,19 @@ from polyfactory.factories.pydantic_factory import ModelFactory
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.schemas import RegisterSchema
+from app.auth.schemas import VolunteerRegisterSchema
 from app.db.models import Application, Opportunity, Organization, User, UserOrganizationRole
 from app.opportunities.schemas import ApplicationCreate, OpportunityCreate
 from app.organizations.schemas import OrganizationCreate
 
-RoleType = Literal["admin", "volunteer", "organization"]
+# Updated role type - volunteer, system_admin, and organization (for test context)
+RoleType = Literal["volunteer", "system_admin", "organization"]
 
 
-class RegisterSchemaFactory(ModelFactory[RegisterSchema]):
-    """Factory for generating registration data."""
+class VolunteerRegisterSchemaFactory(ModelFactory[VolunteerRegisterSchema]):
+    """Factory for generating volunteer registration data."""
 
-    __model__ = RegisterSchema
-
-    @classmethod
-    def role(cls) -> RoleType:
-        return "volunteer"
+    __model__ = VolunteerRegisterSchema
 
     @classmethod
     def first_name(cls) -> str:
@@ -46,10 +43,18 @@ class RegisterSchemaFactory(ModelFactory[RegisterSchema]):
         return cls.__faker__.user_name()
 
 
+# Backwards compatibility alias
+RegisterSchemaFactory = VolunteerRegisterSchemaFactory
+
+
 class OrganizationCreateFactory(ModelFactory[OrganizationCreate]):
     """Factory for generating organization creation data."""
 
     __model__ = OrganizationCreate
+
+    @classmethod
+    def username(cls) -> str:
+        return cls.__faker__.user_name()
 
 
 class OpportunityCreateFactory(ModelFactory[OpportunityCreate]):
@@ -68,7 +73,11 @@ class ApplicationCreateFactory(ModelFactory[ApplicationCreate]):
 class AuthenticatedUser:
     """Represents an authenticated user with credentials and tokens."""
 
+    id: UUID
+    first_name: str | None
+    last_name: str | None
     email: str
+    username: str
     password: str
     tokens: dict[str, str]
     role: str
@@ -105,8 +114,8 @@ async def register_user(
     last_name: str | None = None,
     username: str | None = None,
 ) -> AuthenticatedUser:
-    """Register a new user."""
-    data = RegisterSchemaFactory.build(role=role)
+    """Register a new volunteer user."""
+    data = VolunteerRegisterSchemaFactory.build()
     email = email or data.email
     password = password or data.password
     first_name = first_name or data.first_name
@@ -114,18 +123,27 @@ async def register_user(
     username = username or data.username
 
     response = await client.post(
-        "/auth/register",
+        "/auth/register/volunteer",
         json={
             "email": email,
             "password": password,
-            "role": role,
             "first_name": first_name,
             "last_name": last_name,
             "username": username,
         },
     )
     assert response.status_code == 201, f"Registration failed: {response.text}"
-    return AuthenticatedUser(email=email, password=password, tokens={}, role=role)
+    user_data = response.json()
+    return AuthenticatedUser(
+        id=UUID(user_data["id"]),
+        first_name=first_name,
+        last_name=last_name,
+        email=email,
+        username=username,
+        password=password,
+        tokens={},
+        role=role,
+    )
 
 
 async def login_user(client: AsyncClient, email: str, password: str) -> dict[str, str]:
@@ -160,11 +178,16 @@ async def get_user_from_db(db: AsyncSession, email: str) -> User:
 async def create_organization_db(
     db: AsyncSession,
     name: str | None = None,
+    username: str | None = None,
     description: str | None = None,
 ) -> Organization:
     """Create a test organization directly in the database."""
     data = OrganizationCreateFactory.build()
-    org = Organization(name=name or data.name, description=description or data.description)
+    org = Organization(
+        name=name or data.name,
+        username=username or data.username,
+        description=description or data.description,
+    )
     db.add(org)
     await db.commit()
     await db.refresh(org)
@@ -191,9 +214,14 @@ async def create_organization_with_admin(
     org_name: str | None = None,
 ) -> OrganizationContext:
     """Create an organization with an admin user - full setup."""
-    org = await create_organization_db(db, name=org_name)
-    admin = await register_and_login(client, role="organization")
+    # First register a volunteer who will become org admin
+    admin = await register_and_login(client, role="volunteer")
     admin_user = await get_user_from_db(db, admin.email)
+
+    # Create org directly in DB with auth fields
+    org = await create_organization_db(db, name=org_name)
+
+    # Add user as org admin
     await add_user_to_organization(db, admin_user.id, org.id, role="admin")
     return OrganizationContext(organization=org, admin=admin, admin_user=admin_user)
 

@@ -1,4 +1,4 @@
-"""Handles user login, registration, and token stuff. Keeps things simple."""
+"""Authentication service: registration, login, and token management."""
 
 import secrets
 from datetime import UTC, datetime
@@ -10,11 +10,18 @@ from argon2.exceptions import VerifyMismatchError
 from fastapi import HTTPException, status
 from jose import jwt
 
-from app.auth.schemas import RegisterSchema, TokenResponse, UserResponse
+from app.auth.schemas import (
+    AccountType,
+    OrganizationRegisterSchema,
+    OrganizationResponse,
+    TokenResponse,
+    UserResponse,
+    VolunteerRegisterSchema,
+)
 from app.core.config import settings
 from app.core.exceptions import require
-from app.db.models import RefreshToken, User
-from app.db.repositories import RefreshTokenRepository, UserRepository
+from app.db.models import Organization, RefreshToken, User, UserOrganizationRole
+from app.db.repositories import OrganizationRepository, RefreshTokenRepository, UserRepository
 
 _ph = PasswordHasher(
     time_cost=4,
@@ -30,27 +37,12 @@ if TYPE_CHECKING:
 
 
 def hash_password(password: str) -> str:
-    """Hashes a password securely using Argon2id.
-
-    Args:
-        password: Plain text password to hash
-
-    Returns:
-        Hashed password string
-    """
+    """Hash password with Argon2id."""
     return _ph.hash(password)
 
 
 def verify_password(password: str, hashed: str) -> bool:
-    """Checks if a password matches its hash.
-
-    Args:
-        password: Plain text password to verify
-        hashed: Hashed password to check against
-
-    Returns:
-        True if password matches, False otherwise
-    """
+    """Check if password matches hash."""
     try:
         _ph.verify(hashed, password)
     except VerifyMismatchError:
@@ -59,20 +51,13 @@ def verify_password(password: str, hashed: str) -> bool:
         return True
 
 
-def create_jwt_token(user_id: UUID, role: str) -> str:
-    """Creates a JWT access token for a user.
-
-    Args:
-        user_id: User ID to encode in token
-        role: User role to encode in token
-
-    Returns:
-        Encoded JWT token string
-    """
+def create_jwt_token(entity_id: UUID, role_or_type: str, account_type: AccountType = "volunteer") -> str:
+    """Create a JWT access token."""
     expire = datetime.now(UTC) + settings.access_token_expiry
     to_encode = {
-        "sub": str(user_id),
-        "role": role,
+        "sub": str(entity_id),
+        "role": role_or_type,
+        "account_type": account_type,
         "exp": int(expire.timestamp()),
     }
     encoded: str = jwt.encode(
@@ -84,23 +69,12 @@ def create_jwt_token(user_id: UUID, role: str) -> str:
 
 
 def generate_refresh_token() -> str:
-    """Generates a secure random refresh token.
-
-    Returns:
-        Random token string (64 characters)
-    """
+    """Generate a secure random refresh token."""
     return secrets.token_urlsafe(48)
 
 
 def hash_refresh_token(token: str) -> str:
-    """Hash a refresh token for storage.
-
-    Args:
-        token: Plain refresh token to hash
-
-    Returns:
-        Hashed token string
-    """
+    """Hash a refresh token for storage."""
     return hash_password(token)
 
 
@@ -108,15 +82,7 @@ async def _get_token_by_cookie(
     refresh_cookie: str,
     db: AsyncSession,
 ) -> tuple[RefreshTokenRepository, RefreshToken | None]:
-    """Get refresh token from cookie hash.
-
-    Args:
-        refresh_cookie: Refresh token from cookie
-        db: Database session
-
-    Returns:
-        Tuple of (repository, token or None)
-    """
+    """Get refresh token from cookie hash."""
     token_hash = hash_refresh_token(refresh_cookie)
     token_repo = RefreshTokenRepository(db)
     db_token = await token_repo.get_by_token_hash(token_hash)
@@ -124,36 +90,14 @@ async def _get_token_by_cookie(
 
 
 async def verify_user_exists(db: AsyncSession, user_id: UUID) -> User:
-    """Verifies a user exists by ID.
-
-    Args:
-        db: Database session
-        user_id: User ID to verify
-
-    Returns:
-        User model
-
-    Raises:
-        HTTPException: If user not found
-    """
+    """Get user by ID or raise 401."""
     user_repo = UserRepository(db)
     user = await user_repo.get_by_id(user_id)
     return require(user, "User not found", status.HTTP_401_UNAUTHORIZED)
 
 
 async def validate_refresh_token(refresh_cookie: str, db: AsyncSession) -> tuple[User, object]:
-    """Validates refresh token and returns user and token.
-
-    Args:
-        refresh_cookie: Refresh token from cookie
-        db: Database session
-
-    Returns:
-        Tuple of (User, RefreshToken)
-
-    Raises:
-        HTTPException: If token is invalid or expired
-    """
+    """Validate refresh token, return user and token or raise 401."""
     require(refresh_cookie, "Refresh token not found", status.HTTP_401_UNAUTHORIZED)
 
     token_repo, db_token = await _get_token_by_cookie(refresh_cookie, db)
@@ -170,66 +114,35 @@ async def validate_refresh_token(refresh_cookie: str, db: AsyncSession) -> tuple
     return user, validated_token
 
 
-async def register_user(data: RegisterSchema, db: AsyncSession) -> UserResponse:
-    """Registers a new user account.
-
-    Args:
-        data: Registration data with email, password, and role
-        db: Database session
-
-    Returns:
-        UserResponse with user details
-
-    Raises:
-        HTTPException: If email already exists
-    """
-    # Check if user already exists
+async def register_volunteer(data: VolunteerRegisterSchema, db: AsyncSession) -> UserResponse:
+    """Register a new volunteer account."""
     user_repo = UserRepository(db)
-    existing_user = await user_repo.get_by_email(data.email)
+    org_repo = OrganizationRepository(db)
 
-    if existing_user:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Email already registered",
-        )
+    # Check if email already exists (in users or orgs)
+    if await user_repo.get_by_email(data.email):
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered")
 
-    # Check if username already exists
-    existing_username = await user_repo.get_by_username(data.username)
-    if existing_username:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Username already taken",
-        )
+    # Check if username already exists (in users or orgs)
+    if await user_repo.get_by_username(data.username):
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Username already taken")
+    if await org_repo.get_by_username(data.username):
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Username already taken")
 
-    # Create new user
-    hashed_password = hash_password(data.password)
+    # Create new user (role defaults to volunteer)
     new_user = User(
         email=data.email,
-        password_hash=hashed_password,
-        role=data.role,
+        password_hash=hash_password(data.password),
         first_name=data.first_name,
         last_name=data.last_name,
         username=data.username,
     )
     new_user = await user_repo.create(new_user)
-
     return UserResponse.model_validate(new_user)
 
 
 async def authenticate_user(email: str, password: str, db: AsyncSession) -> User:
-    """Checks if email and password match a user.
-
-    Args:
-        email: User email
-        password: Plain text password
-        db: Database session
-
-    Returns:
-        Authenticated User model
-
-    Raises:
-        HTTPException: If credentials are invalid
-    """
+    """Authenticate user by email/password or raise 401."""
     user_repo = UserRepository(db)
     user = await user_repo.get_by_email(email)
     if not user or not verify_password(password, user.password_hash):
@@ -240,28 +153,15 @@ async def authenticate_user(email: str, password: str, db: AsyncSession) -> User
     return user
 
 
-async def issue_tokens(user: User, device: str | None, db: AsyncSession) -> TokenResponse:
-    """Creates access and refresh tokens for a user.
-
-    Args:
-        user: User model to issue tokens for
-        device: Optional device information
-        db: Database session
-
-    Returns:
-        TokenResponse with access token
-    """
-    # Create access token
-    access_token = create_jwt_token(user.id, user.role)
+async def issue_user_tokens(user: User, device: str | None, db: AsyncSession) -> TokenResponse:
+    """Create access and refresh tokens for a user."""
+    access_token = create_jwt_token(user.id, user.role, "volunteer")
 
     # Generate and store refresh token
     refresh_token = generate_refresh_token()
     token_hash = hash_refresh_token(refresh_token)
-
-    # Calculate expiry
     expires_at = datetime.now(UTC) + settings.refresh_token_expiry
 
-    # Store refresh token in database
     token_repo = RefreshTokenRepository(db)
     refresh_token_obj = RefreshToken(
         user_id=user.id,
@@ -271,43 +171,88 @@ async def issue_tokens(user: User, device: str | None, db: AsyncSession) -> Toke
     )
     await token_repo.create(refresh_token_obj)
 
-    return TokenResponse(access_token=access_token)
+    return TokenResponse(access_token=access_token, account_type="volunteer")
+
+
+async def register_organization(data: OrganizationRegisterSchema, db: AsyncSession) -> OrganizationResponse:
+    """Register a new organization account."""
+    user_repo = UserRepository(db)
+    org_repo = OrganizationRepository(db)
+
+    if await user_repo.get_by_email(data.email):
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered")
+    if await user_repo.get_by_username(data.username):
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Username already taken")
+
+    backend_user = User(
+        email=data.email,
+        password_hash=hash_password(data.password),
+        username=data.username,
+        role="organization",
+        first_name=data.name,
+        last_name=None,
+    )
+    backend_user = await user_repo.create(backend_user)
+
+    new_org = Organization(
+        username=data.username,
+        name=data.name,
+    )
+    new_org = await org_repo.create(new_org)
+
+    user_org_role = UserOrganizationRole(
+        user_id=backend_user.id,
+        organization_id=new_org.id,
+        role="admin",
+    )
+    db.add(user_org_role)
+    await db.commit()
+    await db.refresh(new_org)
+    return OrganizationResponse.model_validate(new_org)
+
+
+async def authenticate_organization(email: str, password: str, db: AsyncSession) -> User:
+    """Authenticate organization by email/password or raise 401."""
+    user = await authenticate_user(email, password, db)
+    if user.role != "organization":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not an organization account",
+        )
+    return user
+
+
+async def issue_org_tokens(user: User) -> TokenResponse:
+    """Create access token for an organization."""
+    access_token = create_jwt_token(user.id, "organization", "organization")
+    return TokenResponse(access_token=access_token, account_type="organization")
+
+
+async def login_entity(
+    db: AsyncSession,
+    email: str,
+    password: str,
+    account_type: AccountType,
+    user_agent: str | None,
+) -> TokenResponse:
+    """Log in user or organization and return tokens."""
+    if account_type == "organization":
+        user = await authenticate_organization(email, password, db)
+        return await issue_org_tokens(user)
+    user = await authenticate_user(email, password, db)
+    return await issue_user_tokens(user, user_agent, db)
 
 
 async def refresh_tokens(refresh_cookie: str, db: AsyncSession) -> TokenResponse:
-    """Creates a new access token using a refresh token.
-
-    Args:
-        refresh_cookie: Refresh token from cookie
-        db: Database session
-
-    Returns:
-        TokenResponse with new access token
-
-    Raises:
-        HTTPException: If refresh token is invalid or expired
-    """
-    # Validate refresh token and get user
+    """Create new access token from refresh token."""
     user, _db_token = await validate_refresh_token(refresh_cookie, db)
-
-    # Create new access token
-    access_token = create_jwt_token(user.id, user.role)
-
-    return TokenResponse(access_token=access_token)
+    access_token = create_jwt_token(user.id, user.role, "volunteer")
+    return TokenResponse(access_token=access_token, account_type="volunteer")
 
 
 async def logout(refresh_cookie: str, db: AsyncSession) -> None:
-    """Logs out a user by deleting their refresh token.
-
-    Args:
-        refresh_cookie: Refresh token from cookie
-        db: Database session
-
-    Raises:
-        HTTPException: If refresh token is invalid
-    """
+    """Delete refresh token to log out."""
     require(refresh_cookie, "Refresh token not found", status.HTTP_401_UNAUTHORIZED)
-
     token_repo, db_token = await _get_token_by_cookie(refresh_cookie, db)
     if db_token:
         await token_repo.delete(db_token)
@@ -319,19 +264,5 @@ async def login_user(
     password: str,
     user_agent: str | None,
 ) -> TokenResponse:
-    """Logs in a user and returns tokens.
-
-    Args:
-        db: Database session
-        email: User email
-        password: User password
-        user_agent: Optional device info
-
-    Returns:
-        TokenResponse with access token
-
-    Raises:
-        HTTPException: If credentials are invalid
-    """
-    user = await authenticate_user(email, password, db)
-    return await issue_tokens(user, user_agent, db)
+    """Legacy alias for login_entity with volunteer account type."""
+    return await login_entity(db, email, password, "volunteer", user_agent)

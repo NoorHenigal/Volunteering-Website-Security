@@ -1,4 +1,4 @@
-"""Base Pydantic schemas for common patterns."""
+"""Base Pydantic schemas and response helpers."""
 
 from collections.abc import Sequence
 from datetime import datetime
@@ -16,18 +16,7 @@ def request_body_from_model(
     required: bool = True,
     additional_properties: bool = False,
 ) -> dict[str, object]:
-    """Generate openapi_extra requestBody from Pydantic model.
-
-    Produces schema compatible with existing Schemathesis tests.
-
-    Args:
-        model: Pydantic model to generate schema from
-        required: Whether the request body is required
-        additional_properties: Whether to allow additional properties
-
-    Returns:
-        Dictionary suitable for FastAPI's openapi_extra parameter
-    """
+    """Generate OpenAPI requestBody schema from a Pydantic model."""
     schema = model.model_json_schema(mode="validation")
 
     # Flatten to match existing manual schemas (no $defs)
@@ -58,12 +47,11 @@ OpenAPIResponseDict = dict[int | str, dict[str, object]]
 
 
 class _NullByteValidator(BaseModel):
-    """Mixin that rejects null bytes in all string fields."""
+    """Rejects null bytes in all string fields."""
 
     @model_validator(mode="before")
     @classmethod
     def reject_null_bytes(cls, data: Any) -> Any:  # noqa: ANN401
-        """Reject null bytes in all string fields globally."""
         if isinstance(data, dict):
             for key, value in data.items():
                 if isinstance(value, str) and "\x00" in value:
@@ -73,55 +61,51 @@ class _NullByteValidator(BaseModel):
 
 
 class StrictModel(_NullByteValidator):
-    """Base model with strict validation for responses."""
+    """Strict model that forbids extra fields."""
 
     model_config = STRICT_CONFIG
 
 
 class TimestampSchemaMixin(BaseModel):
-    """Mixin for timestamp fields in Pydantic schemas."""
+    """Adds created_at and updated_at fields."""
 
     created_at: datetime = Field(description="Creation timestamp")
     updated_at: datetime = Field(description="Last update timestamp")
 
 
 class UserFieldsMixin(BaseModel):
-    """Mixin for common user identity fields shared across schemas.
-
-    Used by UserResponse, BaseProfileSchema, and similar schemas
-    to reduce field definition duplication.
-    """
+    """Common user identity fields (username, names, profile picture)."""
 
     username: str
-    first_name: str
-    last_name: str
+    first_name: str | None = None
+    last_name: str | None = None
     profile_picture: str | None = None
 
 
 class _MutableSchemaConfig(_NullByteValidator):
-    """Shared config for create/update schemas."""
+    """Base for create/update schemas with whitespace stripping."""
 
     model_config = MUTABLE_CONFIG
 
 
 class BaseCreate(_MutableSchemaConfig):
-    """Base schema for create operations."""
+    """Base for resource creation schemas."""
 
 
 class BaseUpdate(_MutableSchemaConfig):
-    """Base schema for update operations."""
+    """Base for resource update schemas."""
 
 
 class BaseOut(TimestampSchemaMixin):
-    """Base schema for output operations with ID and timestamps."""
+    """Base response schema with ID and timestamps."""
 
-    id: UUID = Field(description="Unique identifier")
+    id: UUID
 
     model_config = ORM_CONFIG
 
 
 class ErrorResponse(StrictModel):
-    """Standardized error response."""
+    """API error response."""
 
     detail: str
     status_code: int | None = None
@@ -136,18 +120,7 @@ def error_responses(
     bad_request: bool = True,
     conflict: bool = False,
 ) -> OpenAPIResponseDict:
-    """Generate common error response documentation for OpenAPI.
-
-    Args:
-        auth: Include 401 Unauthorized response
-        forbidden: Include 403 Forbidden response
-        not_found: Include 404 Not Found response
-        bad_request: Include 400 Bad Request response
-        conflict: Include 409 Conflict response
-
-    Returns:
-        Dictionary of status codes to response schemas for FastAPI's `responses` parameter.
-    """
+    """Build OpenAPI error response documentation."""
     responses: OpenAPIResponseDict = {}
     if auth:
         responses[401] = {"model": ErrorResponse, "description": "Not authenticated"}
@@ -163,7 +136,7 @@ def error_responses(
 
 
 class PaginationMeta(StrictModel):
-    """Pagination metadata for list responses."""
+    """Pagination metadata."""
 
     total: int | None = None
     page: int | None = None
@@ -171,22 +144,14 @@ class PaginationMeta(StrictModel):
 
 
 class ListResponse[T](StrictModel):
-    """Generic list response wrapper."""
+    """Paginated list response."""
 
     items: list[T]
     meta: PaginationMeta | None = None
 
 
 def list_response[T: BaseModel](items: Sequence[Any], schema: type[T]) -> ListResponse[T]:
-    """Create a ListResponse from a sequence of ORM models.
-
-    Args:
-        items: Sequence of ORM models to convert
-        schema: Pydantic schema to validate each item against
-
-    Returns:
-        ListResponse with validated items
-    """
+    """Convert ORM models to a ListResponse."""
     return ListResponse[T](items=[schema.model_validate(i) for i in items])
 
 

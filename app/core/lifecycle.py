@@ -1,4 +1,4 @@
-"""Application lifecycle management: startup checks and lifespan utilities."""
+"""Startup checks and application lifecycle."""
 
 import asyncio
 import logging

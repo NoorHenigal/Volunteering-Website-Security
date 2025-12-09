@@ -32,7 +32,8 @@
 
 {# HTMX-enabled form wrapper #}
 {% macro htmx_form(action, target="#main-content", swap="outerHTML") %}
-<form hx-post="{{ action }}" hx-target="{{ target }}" hx-swap="{{ swap }}" hx-indicator=".htmx-indicator">
+<form hx-post="{{ action }}" hx-target="{{ target }}" hx-swap="{{ swap }}" hx-indicator=".htmx-indicator"
+    hx-ext="response-targets" hx-target-4*="{{ target }}">
     {{ caller() }}
 </form>
 {% endmacro %}

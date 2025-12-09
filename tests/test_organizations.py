@@ -21,13 +21,16 @@ class TestOrganizationAPI:
         test_db: AsyncSession,
     ) -> None:
         """Creating an organization also makes the creator an admin (DB check)."""
-        org_user = await flows.create_user("organization")
+        user = await flows.create_user("volunteer")
 
         data = await api.created(
             "/organizations",
-            auth=org_user,
+            auth=user,
             json={
                 "name": "Sustainability Society",
+                "username": "sustainability-society",
+                "email": "sustainability@example.com",
+                "password": "TestPass123!",
                 "description": "Sustainability society...",
             },
         )
@@ -41,10 +44,10 @@ class TestOrganizationAPI:
         org = org_result.scalar_one_or_none()
         assert org is not None
 
-        user = await get_user_from_db(test_db, org_user.email)
+        user_db = await get_user_from_db(test_db, user.email)
         result = await test_db.execute(
             select(UserOrganizationRole).where(
-                UserOrganizationRole.user_id == user.id,
+                UserOrganizationRole.user_id == user_db.id,
                 UserOrganizationRole.organization_id == org.id,
             )
         )
@@ -60,9 +63,9 @@ class TestOrganizationAPI:
     ) -> None:
         """Test listing all organizations."""
         # Create orgs via API (not DB)
-        org_user = await flows.create_user("organization")
-        await flows.create_org(org_user, name="Campus Food Bank", description="On-campus food support")
-        await flows.create_org(org_user, name="Park Clean-Up Group", description="Local park volunteering")
+        user = await flows.create_user("volunteer")
+        await flows.create_org(user, name="Campus Food Bank", description="On-campus food support")
+        await flows.create_org(user, name="Park Clean-Up Group", description="Local park volunteering")
 
         volunteer = await flows.create_user("volunteer")
         data = await api.ok("GET", "/organizations", auth=volunteer)
@@ -78,8 +81,8 @@ class TestOrganizationAPI:
     ) -> None:
         """Test getting organization details with members."""
         # Create org via API
-        org_user = await flows.create_user("organization")
-        org = await flows.create_org(org_user, name="Test Org", description="Test description")
+        user = await flows.create_user("volunteer")
+        org = await flows.create_org(user, name="Test Org", description="Test description")
 
         # Add member via flows helper
         member = await flows.create_user("volunteer")
@@ -118,8 +121,8 @@ class TestOrganizationAPI:
     ) -> None:
         """Test that non-admins cannot update organization."""
         # Create org via API
-        org_user = await flows.create_user("organization")
-        org = await flows.create_org(org_user, name="Test Org", description="Test description")
+        user = await flows.create_user("volunteer")
+        org = await flows.create_org(user, name="Test Org", description="Test description")
 
         # Add member via flows helper
         member = await flows.create_user("volunteer")
@@ -133,5 +136,11 @@ class TestOrganizationAPI:
         await api.unauthorized(
             "POST",
             "/organizations",
-            json={"name": "Test Org", "description": "Test description"},
+            json={
+                "name": "Test Org",
+                "username": "test-org",
+                "email": "test@example.com",
+                "password": "TestPass123!",
+                "description": "Test description",
+            },
         )

@@ -1,4 +1,4 @@
-"""Global exception handlers for consistent error responses."""
+"""Exception handlers and error helpers."""
 
 import json
 from collections.abc import Sequence
@@ -12,69 +12,31 @@ HTTP_405_METHOD_NOT_ALLOWED = 405
 
 
 def serialize_validation_errors(errors: Sequence[object]) -> list[object]:
-    """Serialize validation errors to JSON-safe format.
-
-    Args:
-        errors: Sequence of validation error dictionaries
-
-    Returns:
-        JSON-serializable list of error dictionaries
-    """
+    """Convert validation errors to JSON-serializable format."""
     return json.loads(json.dumps(list(errors), default=str))  # type: ignore[no-any-return]
 
 
 def require[T](entity: T | None, message: str, code: int = status.HTTP_404_NOT_FOUND) -> T:
-    """Require entity to exist, otherwise raise HTTPException.
-
-    Args:
-        entity: Entity to check
-        message: Error message if entity is None
-        code: HTTP status code (default 404)
-
-    Returns:
-        Entity if it exists
-
-    Raises:
-        HTTPException: If entity is None
-    """
+    """Return entity or raise HTTPException if None."""
     if entity is None:
         raise HTTPException(status_code=code, detail=message)
     return entity
 
 
 def forbid(condition: bool, message: str) -> None:
-    """Raise 403 Forbidden if condition is True.
-
-    Args:
-        condition: If True, raises HTTPException
-        message: Error message for the exception
-
-    Raises:
-        HTTPException: 403 Forbidden if condition is True
-    """
+    """Raise 403 if condition is True."""
     if condition:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=message)
 
 
 def conflict(condition: bool, message: str) -> None:
-    """Raise 409 Conflict if condition is True.
-
-    Args:
-        condition: If True, raises HTTPException
-        message: Error message for the exception
-
-    Raises:
-        HTTPException: 409 Conflict if condition is True
-    """
+    """Raise 409 if condition is True."""
     if condition:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=message)
 
 
 async def http_exception_handler(request: Request, exc: Exception) -> Response:
-    """Handle HTTP exceptions with structured ErrorResponse.
-
-    For 405 responses, includes RFC 9110 compliant Allow header.
-    """
+    """Handle HTTP exceptions. Adds Allow header for 405 responses."""
     status_code = getattr(exc, "status_code", 500)
     detail = getattr(exc, "detail", str(exc))
     headers: dict[str, str] = getattr(exc, "headers", None) or {}
@@ -101,8 +63,7 @@ async def http_exception_handler(request: Request, exc: Exception) -> Response:
 
 
 async def validation_exception_handler(_request: Request, exc: Exception) -> Response:
-    """Handle validation exceptions with proper array format per OpenAPI schema."""
-    # exc.errors() returns structured array for RequestValidationError
+    """Handle validation exceptions with 422 response."""
     errors: list[dict[str, object]] = getattr(exc, "errors", list)()
 
     return JSONResponse(
