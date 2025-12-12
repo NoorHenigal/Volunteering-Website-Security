@@ -32,7 +32,7 @@ class VolunteerRegisterSchema(BaseCreate):
 class OrganizationRegisterSchema(BaseCreate):
     """Organization registration."""
 
-    name: str = Field(min_length=1)
+    name: str = Field(min_length=1, pattern=r"^[\x20-\x7E]+$")
     email: EmailStr
     password: str = Field(min_length=8)
     username: str = Field(min_length=3, pattern=r"^[a-zA-Z0-9_-]+$")  # Profile URL
