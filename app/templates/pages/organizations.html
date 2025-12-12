@@ -1,93 +1,190 @@
 {% extends "layouts/base.html" %}
+{% from "components/icons.html" import icon %}
 {% from "components/buttons.html" import back_link %}
 {% from "components/badges.html" import member_role_badge, open_status_badge %}
-{% from "components/layout.html" import section_title %}
+{% from "components/layout.html" import section_title, hero_section, page_hero, location_display %}
 {% from "components/cards.html" import page_card, opportunity_list_item %}
-
+{% from "components/user.html" import user_avatar, avatar_initials %}
+{% from "components/image_upload.html" import image_upload_modal %}
 {% block title %}{{ organization.name }}{% endblock %}
-
 {% block content %}
-{% call page_card('6xl') %}
-<div id="org-detail">
-    {% block org_detail %}
-    {% if not is_public_view %}
-    <div class="mb-6">
-        {{ back_link('/organizations', 'Back to Organizations') }}
-    </div>
-    {% endif %}
-
-    <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-6">
-        <div>
-            <h1 class="text-4xl font-bold text-gray-800 mb-4">{{ organization.name }}</h1>
-            {% if organization.description %}
-            <p class="text-gray-700 text-lg leading-relaxed">{{ organization.description }}</p>
-            {% else %}
-            <p class="text-gray-400 italic">No description provided</p>
+    <div class="animate-enter">
+        {% set banner_url = '/static/uploads/banners/' ~ organization.banner if organization.banner else None %}
+        {% set admin_ctrl %}
+            {% if is_admin %}
+                {% call image_upload_modal('banner-upload', 'Update Banner Image', '/organizations/' ~ organization.id ~ '/banner', aspect_ratio=16/9) %}
+                    <div x-data="imageUploader({ endpointUrl: '/organizations/{{ organization.id }}/banner', aspectRatio: 16/9 })">
+                        <button type="button"
+                                @click="triggerSelect()"
+                                class="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/20 rounded-full text-white text-sm font-bold transition-all shadow-lg">
+                            {{ icon('camera', 'sm') }}
+                            Edit Banner
+                        </button>
+                    </div>
+                {% endcall %}
             {% endif %}
-        </div>
-        {% if is_admin and not is_public_view %}
-        <a href="/organizations/{{ organization.id }}/edit"
-            class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg whitespace-nowrap">
-            Edit Organization
-        </a>
-        {% endif %}
-    </div>
-
-    {% if is_public_view %}
-    <div class="text-sm text-gray-500 mb-6">
-        Organization since {{ organization.created_at.strftime('%B %Y') }}
-    </div>
-    {% endif %}
-
-    {% if not is_public_view %}
-    {{ section_title('Members', True) }}
-    <div class="mt-4" id="member-list">
-        {% block member_list %}
-        {% if members %}
-        <div class="space-y-3">
-            {% for member in members %}
-            {% if member.user_role != 'organization' %}
-            <div class="flex justify-between items-center bg-gray-50 p-4 rounded-lg">
-                <div>
-                    <a href="/{{ member.username }}"
-                        class="font-semibold text-blue-600 hover:text-blue-800 transition-colors">
-                        {{ member.display_name }}
-                    </a>
-                    <p class="text-sm text-gray-600">@{{ member.username }}</p>
+        {% endset %}
+        {% call page_hero(gradient_from='purple-900', banner_image=banner_url, admin_controls=admin_ctrl if is_admin else None) %}
+            <div class="flex flex-col md:flex-row items-end md:items-center gap-8">
+                <div class="group/logo relative">
+                    <div class="w-32 h-32 rounded-full bg-white shadow-2xl flex items-center justify-center flex-shrink-0 text-5xl font-extrabold text-brand-600 transform transition-all duration-500 overflow-hidden">
+                        {% if organization.logo %}
+                            <img src="/static/uploads/logos/{{ organization.logo }}"
+                                 alt="{{ organization.name }}"
+                                 class="w-full h-full object-cover">
+                        {% else %}
+                            {{ organization.name[:1] }}
+                        {% endif %}
+                    </div>
+                    {% if is_admin %}
+                        {% call image_upload_modal('logo-upload', 'Update Logo', '/organizations/' ~ organization.id ~ '/logo', aspect_ratio=1) %}
+                            <div x-data="imageUploader({ endpointUrl: '/organizations/{{ organization.id }}/logo', aspectRatio: 1 })">
+                                <div @click="triggerSelect()"
+                                     class="absolute inset-0 bg-black/50 rounded-full opacity-0 group-hover/logo:opacity-100 transition-opacity flex items-center justify-center cursor-pointer backdrop-blur-sm border-2 border-white/20">
+                                    <span class="text-white drop-shadow-md">{{ icon('camera', 'xl') }}</span>
+                                </div>
+                            </div>
+                        {% endcall %}
+                    {% endif %}
                 </div>
-                {{ member_role_badge(member.role) }}
+                <div class="flex-1 text-white space-y-2">
+                    <h1 class="text-4xl md:text-5xl font-black tracking-tight mb-2 text-shadow-lg">{{ organization.name }}</h1>
+                    <div class="flex flex-wrap gap-4 text-slate-300 font-bold text-lg items-center">
+                        <span>@{{ organization.username }}</span>
+                        <span class="w-1.5 h-1.5 rounded-full bg-slate-500"></span>
+                        <span>Est. {{ organization.created_at.strftime("%Y") }}</span>
+                        {% if is_admin and not is_public_view %}
+                            <a href="/organizations/{{ organization.id }}/edit"
+                               class="ml-4 px-4 py-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white text-sm font-bold border border-white/20 backdrop-blur-md transition-all shadow-lg">
+                                Edit Page
+                            </a>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="hidden lg:flex gap-1 bg-white/10 backdrop-blur-md border border-white/10 rounded-2xl p-2 shrink-0 shadow-lg">
+                    <div class="px-6 py-2 text-center border-r border-white/10">
+                        <span class="block text-2xl font-bold text-white">{{ organization.opportunities|length }}</span>
+                        <span class="text-xs text-slate-400 font-bold uppercase tracking-wider">Posts</span>
+                    </div>
+                    <div class="px-6 py-2 text-center">
+                        <span class="block text-2xl font-bold text-white">{{ members|length }}</span>
+                        <span class="text-xs text-slate-400 font-bold uppercase tracking-wider">Team</span>
+                    </div>
+                </div>
             </div>
-            {% endif %}
-            {% endfor %}
+        {% endcall %}
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 max-w-7xl mx-auto">
+            <div class="space-y-8">
+                <div class="bg-white rounded-3xl p-8 border border-slate-100 shadow-sm relative overflow-hidden">
+                    <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">About Us</h3>
+                    {% if organization.description %}
+                        <p class="text-slate-700 text-lg leading-relaxed whitespace-pre-wrap">{{ organization.description }}</p>
+                    {% else %}
+                        <p class="text-slate-400 italic">No description provided yet.</p>
+                    {% endif %}
+                </div>
+                {% set visible_members = members|selectattr('is_visible')|list %}
+                {% if not is_public_view and visible_members %}
+                    <div class="bg-white rounded-3xl p-8 border border-slate-100 shadow-sm">
+                        <div class="flex justify-between items-center mb-6">
+                            <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest">Team Members</h3>
+                            <span class="px-2 py-1 bg-slate-100 rounded-lg text-xs font-bold text-slate-600">{{
+                                visible_members|length
+                            }}</span>
+                        </div>
+                        <div class="space-y-4">
+                            {% for member in visible_members[:5] %}
+                                <div class="flex items-center gap-3">
+                                    {{ avatar_initials(first_name=member.first_name,
+                                                                        last_name=member.last_name,
+                                                                        username=member.username,
+                                                                        profile_picture=member.profile_picture if member.profile_picture is defined else None,
+                                                                        size='sm') }}
+                                    <div class="flex-1 min-w-0">
+                                        <a href="/{{ member.username }}"
+                                           class="block text-sm font-bold text-slate-900 truncate hover:text-brand-600 transition-colors">
+                                            {{ member.display_name }}
+                                        </a>
+                                        <p class="text-xs text-slate-500 truncate">@{{ member.username }}</p>
+                                    </div>
+                                    {% if member.role == 'admin' %}
+                                        <span class="px-2 py-0.5 bg-brand-50 text-brand-600 text-xs font-bold rounded-full">Admin</span>
+                                    {% endif %}
+                                </div>
+                            {% endfor %}
+                            {% if visible_members|length > 5 %}
+                                <div class="pt-2 text-center">
+                                    <span class="text-sm text-slate-500 font-medium">+{{ visible_members|length - 5 }} more
+                                    members</span>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
+            <div class="lg:col-span-2">
+                <div class="flex justify-between items-end mb-6 px-2">
+                    <h2 class="text-2xl font-bold text-slate-900 flex items-center gap-2">
+                        <span class="w-2 h-8 rounded-full bg-brand-500"></span>
+                        Active Opportunities
+                    </h2>
+                    {% if is_admin %}
+                        <a href="/opportunities/new"
+                           class="text-sm font-bold text-brand-600 hover:text-brand-700 flex items-center gap-1 bg-brand-50 px-4 py-2 rounded-full hover:bg-brand-100 transition-colors">
+                            {{ icon('plus', 'sm') }}
+                            Create New
+                        </a>
+                    {% endif %}
+                </div>
+                {% if organization.opportunities %}
+                    <div class="grid gap-4">
+                        {% for opp in organization.opportunities %}
+                            <div class="group bg-white rounded-2xl p-6 border border-slate-100 hover:border-brand-200 shadow-sm hover:shadow-md transition-all duration-300 transform hover:-translate-y-1 relative overflow-hidden">
+                                <div class="relative z-10">
+                                    <div class="flex justify-between items-start mb-2">
+                                        {{ open_status_badge(opp.is_open, 'sm') }}
+                                        {% if opp.location %}
+                                            <span class="text-xs font-bold text-slate-400 uppercase">{{ location_display(opp.location) }}</span>
+                                        {% endif %}
+                                    </div>
+                                    <a href="/opportunities/{{ opp.id }}"
+                                       class="block group-hover:text-brand-600 transition-colors">
+                                        <h3 class="text-xl font-bold text-slate-900 mb-2 leading-tight">{{ opp.title }}</h3>
+                                    </a>
+                                    <p class="text-slate-500 text-sm line-clamp-2 mb-4">{{ opp.description }}</p>
+                                    <div class="flex items-center justify-between border-t border-slate-50 pt-4 mt-2">
+                                        <span class="text-xs font-medium text-slate-400">Posted {{ opp.created_at.strftime("%b %d") 
+                                        }}</span>
+                                        <a href="/opportunities/{{ opp.id }}"
+                                           class="text-sm font-bold text-brand-600 flex items-center gap-1 group/link">
+                                            Details
+                                            <span class="transition-transform group-hover/link:translate-x-1">{{ icon('arrow-right', 'sm') }}</span>
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="bg-slate-50 rounded-3xl p-12 text-center border-2 border-dashed border-slate-200">
+                        <div class="w-20 h-20 bg-white rounded-full mx-auto mb-6 flex items-center justify-center shadow-sm text-slate-300">
+                            {{ icon('archive', '2xl') }}
+                        </div>
+                        <h3 class="text-lg font-bold text-slate-900 mb-2">No active opportunities</h3>
+                        <p class="text-slate-500 max-w-sm mx-auto mb-6">
+                            This organization hasn't posted any volunteering
+                            opportunities yet.
+                        </p>
+                        {% if is_admin %}
+                            <a href="/opportunities/new"
+                               class="inline-flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white font-bold py-3 px-8 rounded-full shadow-lg hover:shadow-brand-500/30 transition-all transform hover:-translate-y-1">
+                                {{ icon('plus', 'md') }}
+                                Post First Opportunity
+                            </a>
+                        {% endif %}
+                    </div>
+                {% endif %}
+            </div>
         </div>
-        {% else %}
-        <p class="text-gray-500 italic">No members yet</p>
-        {% endif %}
-        {% endblock %}
     </div>
-    {% endif %}
-
-    {{ section_title('Opportunities', True) }}
-    <div class="mt-4" id="opportunity-list">
-        {% block opportunity_list %}
-        {% if organization.opportunities %}
-        <div class="space-y-3">
-            {% for opp in organization.opportunities %}
-            {{ opportunity_list_item(opp, show_status=True) }}
-            {% endfor %}
-        </div>
-        {% else %}
-        <p class="text-gray-500 italic">No opportunities posted yet</p>
-        {% if is_admin %}
-        <a href="/opportunities/new"
-            class="mt-4 inline-block bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-lg">
-            Post an Opportunity
-        </a>
-        {% endif %}
-        {% endif %}
-        {% endblock %}
-    </div>
-    {% endblock %}
-</div>
-{% endcall %}
 {% endblock %}

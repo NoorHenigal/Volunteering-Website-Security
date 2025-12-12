@@ -1,11 +1,4 @@
-"""Image processing service for secure profile picture uploads.
-
-Security features:
-- Re-encodes images to WebP to strip all metadata (EXIF, GPS, etc.)
-- Validates file content, not just extension
-- Uses UUID filenames to prevent path traversal
-- Enforces size limits
-"""
+"""Image processing service for secure profile picture uploads."""
 
 from io import BytesIO
 from pathlib import Path
@@ -66,7 +59,7 @@ class ImageProcessor:
             msg = f"Unsupported image format. Allowed: {', '.join(ALLOWED_FORMATS)}"
             raise ImageProcessingError(msg)
 
-        # Ensure square (handles edge cases where client sends non-square)
+        # Ensure square
         img = self._make_square(img)
 
         # Resize to target dimensions
@@ -83,12 +76,11 @@ class ImageProcessor:
             # Convert to RGB for opaque images
             img = img.convert("RGB")
 
-        # Generate secure filename with UUID
+        # Generate filename with UUID
         filename = f"{user_id}_{uuid4().hex[:8]}.webp"
         filepath = self.upload_dir / filename
 
         # Save as WebP with appropriate compression settings
-        # Lossless for transparent images, lossy for opaque images
         if has_transparency:
             img.save(filepath, format="WEBP", lossless=True, method=6)
         else:

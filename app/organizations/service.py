@@ -20,9 +20,12 @@ class OrganizationService(BaseService):
         self._org_repo = OrganizationRepository(db)
         self._role_repo = UserOrganizationRoleRepository(db)
 
-    async def list_all(self) -> list[Organization]:
-        """Get all organizations."""
-        return await self._org_repo.get_all()
+    async def list_all(self, page: int = 1, limit: int = 100) -> tuple[list[Organization], int]:
+        """Get all organizations with pagination."""
+        skip = (page - 1) * limit
+        items = await self._org_repo.get_all(skip=skip, limit=limit)
+        total = await self._org_repo.count_all()
+        return items, total
 
     async def get_by_id(self, organization_id: UUID) -> Organization:
         """Get organization by ID or raise 404."""
@@ -62,6 +65,18 @@ class OrganizationService(BaseService):
         if description is not None:
             organization.description = description
 
+        return await self._org_repo.update(organization)
+
+    async def update_banner(self, organization_id: UUID, filename: str) -> Organization:
+        """Update organization banner."""
+        organization = await self.get_by_id(organization_id)
+        organization.banner = filename
+        return await self._org_repo.update(organization)
+
+    async def update_logo(self, organization_id: UUID, filename: str) -> Organization:
+        """Update organization logo."""
+        organization = await self.get_by_id(organization_id)
+        organization.logo = filename
         return await self._org_repo.update(organization)
 
     async def get_members(self, organization_id: UUID) -> list[OrganizationMemberResponse]:

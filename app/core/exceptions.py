@@ -5,8 +5,10 @@ from collections.abc import Sequence
 
 from fastapi import HTTPException, Request, status
 from fastapi.responses import JSONResponse
-from starlette.responses import Response
+from starlette.responses import RedirectResponse, Response
 from starlette.routing import Match
+
+HTTP_303_SEE_OTHER = 303
 
 HTTP_405_METHOD_NOT_ALLOWED = 405
 
@@ -41,9 +43,10 @@ async def http_exception_handler(request: Request, exc: Exception) -> Response:
     detail = getattr(exc, "detail", str(exc))
     headers: dict[str, str] = getattr(exc, "headers", None) or {}
 
+    if status_code == HTTP_303_SEE_OTHER and "Location" in headers:
+        return RedirectResponse(url=headers["Location"], status_code=HTTP_303_SEE_OTHER)
+
     if status_code == HTTP_405_METHOD_NOT_ALLOWED:
-        # Compute allowed methods for RFC 9110 compliance
-        # Check for PARTIAL match (path matches but method doesn't) or FULL match
         allowed: set[str] = set()
         for route in request.app.routes:
             match, _ = route.matches({"type": "http", "path": request.url.path, "method": "GET"})

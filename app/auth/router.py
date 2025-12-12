@@ -169,9 +169,9 @@ async def login(
 
         if ctx.is_ui:
             if ctx.is_htmx:
-                response = await htmx_redirect("/auth/status")
+                response = await htmx_redirect("/")
             else:
-                response = await ctx.success_response(redirect_url="/auth/status")
+                response = await ctx.success_response(redirect_url="/")
 
             set_auth_cookies(response, tokens.access_token)
             return response
@@ -234,80 +234,11 @@ async def register_page(ctx: Annotated[RequestContext, Depends(get_context)]) ->
     # Configuration for volunteer registration form
     volunteer_form = {
         "action": "/auth/register/volunteer",
-        "fields": [
-            {
-                "name": "first_name",
-                "type": "text",
-                "label": "First Name",
-                "placeholder": "John",
-                "required": True,
-            },
-            {
-                "name": "last_name",
-                "type": "text",
-                "label": "Last Name",
-                "placeholder": "Doe",
-                "required": True,
-            },
-            {
-                "name": "username",
-                "type": "text",
-                "label": "Username",
-                "placeholder": "johndoe",
-                "required": True,
-            },
-            {
-                "name": "email",
-                "type": "email",
-                "label": "Email",
-                "placeholder": "john@example.com",
-                "required": True,
-            },
-            {
-                "name": "password",
-                "type": "password",
-                "label": "Password",
-                "placeholder": "Min 8 characters",
-                "required": True,
-            },
-        ],
-        "submit_text": "Create Volunteer Account",
     }
 
     # Configuration for organization registration form
     organization_form = {
         "action": "/auth/register/organization",
-        "fields": [
-            {
-                "name": "name",
-                "type": "text",
-                "label": "Organization Name",
-                "placeholder": "Helping Hands Foundation",
-                "required": True,
-            },
-            {
-                "name": "username",
-                "type": "text",
-                "label": "Username (Profile URL)",
-                "placeholder": "helping-hands",
-                "required": True,
-            },
-            {
-                "name": "email",
-                "type": "email",
-                "label": "Organization Email",
-                "placeholder": "contact@helpinghands.org",
-                "required": True,
-            },
-            {
-                "name": "password",
-                "type": "password",
-                "label": "Password",
-                "placeholder": "Min 8 characters",
-                "required": True,
-            },
-        ],
-        "submit_text": "Create Organization Account",
     }
 
     return await ctx.success_response(
@@ -357,4 +288,4 @@ async def get_current_user(ctx: Annotated[RequestContext, Depends(get_context)])
 @router.get("/status", include_in_schema=False)
 async def status_page(ctx: Annotated[RequestContext, Depends(get_context)]) -> Response:
     """Show status page (UI only)."""
-    return await ctx.success_response(template="pages/auth.html", view="status")
+    return await ctx.success_response(template="pages/auth_status.html")

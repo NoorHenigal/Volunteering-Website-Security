@@ -1,22 +1,28 @@
 """Opportunity and application routes."""
 
+from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Response, status
+from fastapi import APIRouter, File, HTTPException, Response, UploadFile, status
 from fastapi.responses import RedirectResponse
+from starlette.concurrency import run_in_threadpool
 
-from app.core.base_schemas import ListResponse, error_responses
+from app.core.base_schemas import ListResponse, PaginationMeta, error_responses
 from app.core.context import (
     ContextDep,
     render_template,
     require_volunteer_role,
 )
+from app.core.context_types import form_view_context, list_view_context
 from app.core.dependencies import (
     ApplicationServiceDep,
+    ImageServiceDep,
     OpportunityServiceDep,
     OrganizationServiceDep,
 )
-from app.core.router_helpers import handle_htmx_redirect
+from app.core.form_fields import OPPORTUNITY_FIELDS, with_select_options
+from app.core.htmx import handle_htmx_redirect
+from app.core.services.images import ImagePreset
 from app.opportunities.schemas import (
     ApplicationCreate,
     ApplicationResponse,
@@ -29,28 +35,33 @@ router = APIRouter(tags=["Opportunities"])
 
 
 @router.get("/opportunities", response_model=None, responses=error_responses(auth=True))
-async def list_opportunities(ctx: ContextDep, opp_svc: OpportunityServiceDep) -> Response:
+async def list_opportunities(
+    ctx: ContextDep,
+    opp_svc: OpportunityServiceDep,
+    page: int = 1,
+) -> Response:
     """List all open opportunities."""
     ctx.require_authenticated()
-    opportunities = await opp_svc.list_open()
+    limit = 9
+
+    items, total = await opp_svc.list_open(page=page, limit=limit)
+
+    context = list_view_context(
+        items=items,
+        page_title="Volunteering Opportunities",
+        meta={"page": page, "total": total, "per_page": limit, "total_pages": (total + limit - 1) // limit},
+        create_url="/opportunities/new",
+        show_create=ctx.user is not None,
+        empty_message="No opportunities available at the moment.",
+    )
 
     return await ctx.success_response(
         data=ListResponse[OpportunityResponse](
-            items=[OpportunityResponse.model_validate(opp) for opp in opportunities]
+            items=[OpportunityResponse.model_validate(opp) for opp in items],
+            meta=PaginationMeta(total=total, page=page, per_page=limit),
         ),
-        template="pages/shared.html",
-        view="list",
-        block="resource_cards" if ctx.is_htmx else None,
-        # Resource list context
-        resource_type="opportunity",
-        items=opportunities,
-        page_title="Volunteering Opportunities",
-        create_url="/opportunities/new",
-        create_text="Create Opportunity",
-        create_color="green",
-        show_create=ctx.user is not None,
-        empty_message="No opportunities available at the moment.",
-        grid_cols="gap-6 md:grid-cols-2 lg:grid-cols-3",
+        template="pages/opportunities/list.html",
+        **context,
     )
 
 
@@ -60,79 +71,39 @@ async def new_opportunity_form(ctx: ContextDep, opp_svc: OpportunityServiceDep) 
     user = ctx.require_authenticated()
     organizations = await opp_svc.get_user_organizations(user.id)
     if len(organizations) == 0:
-        return await render_template(
-            ctx.request,
-            "pages/shared.html",
-            view="form",
-            user=user,
+        context = form_view_context(
             resource_type="opportunity",
-            resource=None,
             form_action="/opportunities",
             back_url="/opportunities",
             form_title="Create New Opportunity",
             page_title="Opportunities",
-            submit_text="Create Opportunity",  # Won't be clicked but needed for template
+            form_fields=[],
+            submit_text="Create Opportunity",
             submit_color="green",
             show_warning=True,
             warning_title="Organization Required",
             warning_message="You need an organization profile to post opportunities.",
             warning_action_url="/organizations/new",
             warning_action_text="Create Organization",
-            form_fields=[],  # No fields to show
         )
+        return await render_template(ctx.request, "pages/shared.html", user=user, **context)
 
-    return await render_template(
-        ctx.request,
-        "pages/shared.html",
-        view="form",
-        user=user,
-        # Resource form context
+    fields_with_org = with_select_options(
+        OPPORTUNITY_FIELDS,
+        "organization_id",
+        [(str(org.id), org.name) for org in organizations],
+    )
+    context = form_view_context(
         resource_type="opportunity",
-        resource=None,
         form_action="/opportunities",
         back_url="/opportunities",
         form_title="Create New Opportunity",
         page_title="Opportunities",
+        form_fields=fields_with_org,
         submit_text="Create Opportunity",
         submit_color="green",
-        show_warning=False,
-        form_fields=[
-            {
-                "name": "title",
-                "label": "Title",
-                "type": "text",
-                "placeholder": "e.g., Community Garden Helper",
-                "required": True,
-                "value": "",
-            },
-            {
-                "name": "description",
-                "label": "Description",
-                "type": "textarea",
-                "placeholder": "Describe the volunteering opportunity...",
-                "required": True,
-                "value": "",
-                "rows": 6,
-            },
-            {
-                "name": "location",
-                "label": "Location (Optional)",
-                "type": "text",
-                "placeholder": "e.g., Central Station",
-                "required": False,
-                "value": "",
-            },
-            {
-                "name": "organization_id",
-                "label": "Organization",
-                "type": "select",
-                "placeholder": "Select an organization",
-                "required": True,
-                "options": [(str(org.id), org.name) for org in organizations],
-                "selected_value": None,
-            },
-        ],
     )
+    return await render_template(ctx.request, "pages/shared.html", user=user, **context)
 
 
 @router.post(
@@ -280,15 +251,10 @@ async def list_user_applications(ctx: ContextDep, app_svc: ApplicationServiceDep
 
     if ctx.is_ui:
         applications = await app_svc.get_by_volunteer_with_opportunity(user.id)
-        return await render_template(
-            ctx.request,
-            "pages/shared.html",
-            view="list",
-            user=user,
-            # Resource list context
-            resource_type="application",
+        context = list_view_context(
             items=applications,
             page_title="My Applications",
+            resource_type="application",
             create_url="/opportunities",
             create_text="Browse Opportunities",
             create_color="blue",
@@ -296,6 +262,7 @@ async def list_user_applications(ctx: ContextDep, app_svc: ApplicationServiceDep
             empty_message="You haven't applied to any opportunities yet",
             grid_cols="space-y-4",
         )
+        return await render_template(ctx.request, "pages/shared.html", view="list", user=user, **context)
 
     applications = await app_svc.get_by_volunteer(user.id)
     return await ctx.success_response(
@@ -398,22 +365,24 @@ async def view_applicants(
     await org_svc.require_admin(user.id, opportunity.organization_id)
 
     applications = await app_svc.get_by_opportunity_with_volunteer(opportunity_id)
-    return await render_template(
-        ctx.request,
-        "pages/shared.html",
-        view="list",
-        user=user,
-        # Resource list context
-        resource_type="applicant",
+    context = list_view_context(
         items=applications,
-        opportunity=opportunity,
         page_title=f"Applicants - {opportunity.title}",
+        resource_type="applicant",
         create_url=f"/opportunities/{opportunity_id}",
         create_text="Back to Opportunity",
         create_color="blue",
         show_create=False,
         empty_message="No applications yet. Applications will appear here when volunteers apply to this opportunity.",
         grid_cols="space-y-4",
+    )
+    return await render_template(
+        ctx.request,
+        "pages/opportunities/applicants.html",
+        view="list",
+        user=user,
+        opportunity=opportunity,
+        **context,
     )
 
 
@@ -427,9 +396,6 @@ async def accept_applicant(
     application_id: UUID,
 ) -> Response:
     """Accept an application (UI helper)."""
-    # Reuse the update logic but fake the body or call service directly
-    # Since we have the logic in update_application_status, we could call it,
-    # but it expects a request body. Easier to just call service here.
     user = ctx.require_authenticated()
     opportunity = await opp_svc.get_by_id(opportunity_id)
     await org_svc.require_admin(user.id, opportunity.organization_id)
@@ -462,3 +428,36 @@ async def reject_applicant(
 
     await app_svc.update_status(application, "rejected")
     return RedirectResponse(url=f"/opportunities/{opportunity_id}/applicants", status_code=303)
+
+
+@router.post(
+    "/opportunities/{opportunity_id}/banner", response_model=OpportunityResponse, responses=error_responses(auth=True)
+)
+async def upload_opportunity_banner(
+    opportunity_id: UUID,
+    ctx: ContextDep,
+    opp_svc: OpportunityServiceDep,
+    org_svc: OrganizationServiceDep,
+    image_svc: ImageServiceDep,
+    file: Annotated[UploadFile, File(...)],
+) -> OpportunityResponse:
+    """Upload opportunity banner image."""
+    user = ctx.require_authenticated()
+    opportunity = await opp_svc.get_by_id(opportunity_id)
+
+    # Check permission
+    await org_svc.require_admin(user.id, opportunity.organization_id)
+
+    # Use ImageService to process file
+    content = await file.read()
+    filename = await run_in_threadpool(
+        image_svc.process_and_save,
+        content,
+        opportunity_id,
+        ImagePreset.BANNER,
+    )
+
+    # Update database
+    opportunity = await opp_svc.update_banner(opportunity.id, filename)
+
+    return OpportunityResponse.model_validate(opportunity)

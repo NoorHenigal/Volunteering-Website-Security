@@ -1,162 +1,196 @@
 {% extends "layouts/base.html" %}
+{% from "components/icons.html" import icon %}
 {% from "components/buttons.html" import back_link, withdraw_button, action_buttons %}
 {% from "components/badges.html" import open_status_badge, application_status_badge %}
-{% from "components/layout.html" import location_display, section_title, form_header %}
+{% from "components/layout.html" import location_display, section_title, form_header, hero_section, location_badge,
+detail_row, page_hero %}
 {% from "components/cards.html" import page_card %}
 {% from "components/user.html" import date_display %}
 {% from "components/feedback.html" import info_box %}
 {% from "components/forms.html" import form_label, form_textarea, htmx_form %}
-
-
+{% from "components/image_upload.html" import image_upload_modal %}
 {% block title %}
-{% if view == 'apply' %}
-Apply to {{ opportunity.title }}
-{% else %}
-{{ opportunity.title }}
-{% endif %}
+    {% if view == 'apply' %}
+        Apply to {{ opportunity.title }}
+    {% else %}
+        {{ opportunity.title }}
+    {% endif %}
 {% endblock %}
-
 {% block content %}
-{% if view == 'apply' %}
-{# Apply View #}
-{% call page_card('2xl') %}
-<div id="form-container">
-    {% block form_content %}
-    {{ form_header('/opportunities/' + opportunity.id|string, 'Back to Opportunity', 'Apply to Volunteer') }}
-
-    <div id="alert-container">
-        {% if error %}
-        <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
-            {{ error }}
-        </div>
-        {% endif %}
-    </div>
-
-    <div class="mb-6">
-        <h2 class="text-2xl font-bold text-gray-800 mb-2">{{ opportunity.title }}</h2>
-        <p class="text-gray-600">{{ opportunity.organization.name }}</p>
-    </div>
-
-    {% call htmx_form('/opportunities/' + opportunity.id|string + '/apply', '#form-container', 'innerHTML') %}
-    <div class="space-y-6">
-        <div>
-            {{ form_label('Message (Optional)', 'message', False) }}
-            {{ form_textarea('message', 6, 'Tell the organization why you\'re interested in this opportunity...', False,
-            '') }}
-            <p class="text-sm text-gray-500 mt-1">Share your motivation, relevant experience, or any questions you have.
-            </p>
-        </div>
-
-        {{ action_buttons('Submit Application', '/opportunities/' + opportunity.id|string, 'blue') }}
-    </div>
-    {% endcall %}
-    {% endblock %}
-</div>
-{% endcall %}
-
-{% else %}
-{# Detail View (Default) #}
-{% call page_card('4xl') %}
-<div class="mb-6">
-    {{ back_link('/opportunities', 'Back to Opportunities') }}
-</div>
-
-<div class="mb-6">
-    <h1 class="text-4xl font-bold text-gray-800 mb-4">{{ opportunity.title }}</h1>
-    <div class="flex items-center gap-4">
-        {{ open_status_badge(opportunity.is_open, 'md') }}
-        {{ location_display(opportunity.location) }}
-    </div>
-</div>
-
-<div class="mb-8">
-    <h2 class="text-xl font-bold text-gray-800 mb-3">Description</h2>
-    <p class="text-gray-700 leading-relaxed whitespace-pre-wrap">{{ opportunity.description }}</p>
-</div>
-
-{{ section_title('Details', True) }}
-<div class="grid md:grid-cols-2 gap-4">
-    <div>
-        <p>
-            <span class="font-semibold text-gray-600">Posted:</span> {{ date_display(opportunity.created_at) }}
-        </p>
-    </div>
-    <div>
-        <p class="text-gray-600">
-            <span class="font-semibold">Organization:</span> <a href="/{{ opportunity.organization.username }}"
-                class="text-blue-600 hover:underline">{{ opportunity.organization.name }}</a>
-        </p>
-    </div>
-</div>
-
-{% if is_admin %}
-<div class="border-t pt-6 mt-6">
-    <div class="flex justify-between items-center">
-        <h2 class="text-xl font-bold text-gray-800">Manage Applications</h2>
-        <a href="/opportunities/{{ opportunity.id }}/applicants"
-            class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-6 rounded-lg">
-            View Applicants
-        </a>
-    </div>
-    <p class="text-gray-600 mt-2">Review and manage volunteer applications for this opportunity</p>
-</div>
-{% endif %}
-
-{% if user.role == 'volunteer' %}
-<div class="border-t pt-6 mt-6" id="application-status-section">
-    {% block user_application_status scoped %}
-    {% if user_application %}
-    <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-xl p-6">
-        <div class="flex items-center justify-between flex-wrap gap-4">
-            <div class="flex items-center gap-4">
-                <div class="flex-shrink-0">
-                    <div class="h-12 w-12 rounded-full bg-blue-100 flex items-center justify-center">
-                        <svg class="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
-                    </div>
-                </div>
-                <div>
-                    <p class="text-sm font-medium text-gray-500">Your Application</p>
-                    <div class="mt-1">
-                        {{ application_status_badge(user_application.status, 'md') }}
+    {% if view == 'apply' %}
+        <div class="max-w-xl mx-auto animate-enter">
+            <div class="bg-white/80 backdrop-blur-xl rounded-2xl shadow-glass border border-white/50 p-5">
+                <div id="form-container">
+                    {% block form_content %}
+                        <div class="mb-3">
+                            <div class="mb-2">{{ back_link('/opportunities/' + opportunity.id|string, 'Back to Opportunity') }}</div>
+                            <h1 class="text-xl font-bold text-slate-900 tracking-tight">Apply to Volunteer</h1>
+                        </div>
+                        <div id="alert-container">
+                            {% if error %}
+                                <div class="bg-red-50 border border-red-200 text-red-600 px-3 py-2 rounded-lg mb-4 text-sm">{{ error }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="mb-4 p-3 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-between">
+                            <div>
+                                <h2 class="text-base font-bold text-slate-900 mb-0.5">{{ opportunity.title }}</h2>
+                                <p class="text-slate-600 font-medium text-sm">{{ opportunity.organization.name }}</p>
+                            </div>
+                            {{ open_status_badge(opportunity.is_open, 'sm') }}
+                        </div>
+                        {% call htmx_form('/opportunities/' + opportunity.id|string + '/apply', '#form-container', 'innerHTML') %}
+                            <div class="space-y-4">
+                                <div>
+                                    {{ form_label('Message (Optional)', 'message', False) }}
+                                    {{ form_textarea('message', 3, 'Tell the organization why you\'re interested in this
+                                                                        opportunity...', False,
+                                                                        '') }}
+                                                                        <p class="text-xs text-slate-500 mt-1.5 flex items-center gap-1">
+                                                                            {{ icon('info-circle', 'xs') }}
+                                                                            Share your motivation, relevant experience, or any questions.
+                                                                        </p>
+                                                                    </div>
+                                                                    <div class="pt-1">{{ action_buttons('Submit Application', '/opportunities/' + opportunity.id|string, 'brand') }}</div>
+                                                                </div>
+                                                            {% endcall %}
+                                                        {% endblock %}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        {% else %}
+                                            <div class="animate-enter">
+                                                {% set banner_url = '/static/uploads/banners/' ~ opportunity.banner if opportunity.banner else None %}
+                                                {% set admin_ctrl %}
+                                                    {% if is_admin %}
+                                                        {% call image_upload_modal('banner-upload', 'Update Banner Image', '/opportunities/' ~ opportunity.id ~ '/banner', aspect_ratio=16/9) %}
+                                                            <div x-data="imageUploader({ endpointUrl: '/opportunities/{{ opportunity.id }}/banner', aspectRatio: 16/9 })">
+                                                                <button type="button"
+                                                                        @click="triggerSelect()"
+                                                                        class="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/20 rounded-full text-white text-sm font-bold transition-all shadow-lg">
+                                                                    {{ icon('camera', 'sm') }}
+                                                                    Edit Banner
+                                                                </button>
+                                                            </div>
+                                                        {% endcall %}
+                                                    {% endif %}
+                                                {% endset %}
+                                                {% call page_hero(banner_image=banner_url, admin_controls=admin_ctrl if is_admin else None) %}
+                                                    {{ back_link('/opportunities', 'Back to Opportunities', 'text-white/60 hover:text-white mb-6 w-fit') }}
+                                                    <div class="flex flex-col md:flex-row md:items-end justify-between gap-8">
+                                                        <div class="space-y-4 max-w-3xl animate-slide-up">
+                                                            <div class="flex items-center gap-3 flex-wrap">
+                                                                {{ open_status_badge(opportunity.is_open, 'md') }}
+                                                                {{ location_badge(opportunity.location) }}
+                                                            </div>
+                                                            <h1 class="text-4xl md:text-6xl font-black text-white tracking-tight leading-ti animate-slide-up delay-75 drop-shadow-lg">
+                                                                {{ opportunity.title }}
+                                                            </h1>
+                                                        </div>
+                                                        <a href="/{{ opportunity.organization.username }}"
+                                                           class="group flex items-center gap-3 bg-white/10 hover:bg-white/20 backdrop-blur-xl border border-white/10 pr-6 pl-2 py-2 rounded-full transition-all animate-slide-up delay-100">
+                                                            <div class="w-10 h-10 rounded-full bg-white flex items-center justify-center text-brand-600 font-bold text-lg shadow-lg group-hover:scale-110 transition-transform overflow-hidden">
+                                                                {% if opportunity.organization.logo %}
+                                                                    <img src="/static/uploads/logos/{{ opportunity.organization.logo }}"
+                                                                         alt="{{ opportunity.organization.name }}"
+                                                                         class="w-full h-full object-cover">
+                                                                {% else %}
+                                                                    {{ opportunity.organization.name[:1] }}
+                                                                {% endif %}
+                                                            </div>
+                                                            <div class="text-left">
+                                                                <p class="text-xs text-white/60 font-bold uppercase tracking-wider">Organized by</p>
+                                                                <p class="text-white font-bold leading-none text-shadow-sm">{{ opportunity.organization.name }}</p>
+                                                            </div>
+                                                        </a>
+                                                    </div>
+                                                {% endcall %}
+                                                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 max-w-7xl mx-auto px-2">
+                                                    <div class="lg:col-span-2 space-y-6">
+                                                        <div class="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm">
+                                                            <h2 class="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
+                                                                <span class="w-2 h-8 rounded-full bg-brand-500"></span>
+                                                                About this Opportunity
+                                                            </h2>
+                                                            <div class="prose prose-slate prose-lg max-w-none text-slate-600 leading-relaxed whitespace-pre-wrap">
+                                                                {{
+                                                                opportunity.description }}
+                                                            </div>
+                                                        </div>
+                                                        {% if is_admin %}
+                                                            <div class="bg-slate-900 rounded-3xl p-8 shadow-xl text-white relative overflow-hidden group">
+                                                                <div class="absolute top-0 right-0 w-64 h-64 bg-brand-500 rounded-full mix-blend-overlay filter blur-3xl opacity-20 -mr-16 -mt-16 group-hover:opacity-30 transition-opacity">
+                                                                </div>
+                                                                <div class="relative z-10 flex flex-col sm:flex-row justify-between items-center gap-6">
+                                                                    <div>
+                                                                        <h2 class="text-2xl font-bold mb-2">Manage Applications</h2>
+                                                                        <p class="text-slate-400">Review candidates and manage volunteer workforce.</p>
+                                                                    </div>
+                                                                    <a href="/opportunities/{{ opportunity.id }}/applicants"
+                                                                       class="bg-white text-slate-900 font-bold py-3 px-8 rounded-xl shadow-lg hover:bg-brand-50 transition-all hover:scale-105 active:scale-95">
+                                                                        View Applicants
+                                                                    </a>
+                                                                </div>
+                                                            </div>
+                                                        {% endif %}
+                                                    </div>
+                                                    <div class="space-y-6">
+                                                        <div class="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm sticky top-6">
+                                                            {% if user.role == 'volunteer' %}
+                                                                {% block user_application_status scoped %}
+                                                                    {% if user_application %}
+                                                                        <div class="text-center rounded-2xl bg-slate-50 border border-slate-100 p-6 mb-4">
+                                                                            <span class="inline-block p-3 rounded-full bg-blue-100 text-blue-600 mb-3">{{ icon('check-circle', 'xl') }}</span>
+                                                                            <h3 class="text-slate-900 font-bold mb-1">Application Sent</h3>
+                                                                            <div class="flex justify-center mt-2">{{ application_status_badge(user_application.status, 'lg') }}</div>
+                                                                        </div>
+                                                                        {% if user_application.status == 'pending' %}
+                                                                            <div id="application-status-section">
+                                                                                <button hx-post="/applications/{{ user_application.id }}/withdraw"
+                                                                                        hx-target="#application-status-section"
+                                                                                        hx-swap="outerHTML"
+                                                                                        hx-confirm="Are you sure?"
+                                                                                        class="w-full py-3 rounded-xl border border-red-200 text-red-600 font-bold hover:bg-red-50 transition-colors flex items-center justify-center gap-2">
+                                                                                    {{ icon('x', 'sm') }}
+                                                                                    Withdraw
+                                                                                </button>
+                                                                            </div>
+                                                                        {% endif %}
+                                                                    {% elif opportunity.is_open %}
+                                                                        <div class="text-center">
+                                                                            <h3 class="text-xl font-bold text-slate-900 mb-2">Interested?</h3>
+                                                                            <p class="text-slate-500 mb-6 text-sm">
+                                                                                Join others in making a difference with {{
+                                                                                opportunity.organization.name }}.
+                                                                            </p>
+                                                                            <a href="/opportunities/{{ opportunity.id }}/apply"
+                                                                               class="block w-full py-4 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-2xl shadow-lg shadow-brand-500/30 transition-all hover:scale-[1.02] active:scale-[0.98]">
+                                                                                Apply Now
+                                                                            </a>
+                                                                        </div>
+                                                                    {% else %}
+                                                                        <div class="text-center p-6 bg-slate-50 rounded-2xl border border-dashed border-slate-300">
+                                                                            <p class="text-slate-400 font-bold uppercase tracking-wider text-sm">Applications Closed</p>
+                                                                        </div>
+                                                                    {% endif %}
+                                                                {% endblock %}
+                                                            {% else %}
+                                                                <div class="text-center p-6 bg-slate-50 rounded-2xl">
+                                                                    <p class="text-slate-500 font-medium">Log in as a volunteer to apply.</p>
+                                                                </div>
+                                                            {% endif %}
+                                                        </div>
+                                                        <div class="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm space-y-6">
+                                                            {% call detail_row('Posted', 'calendar') %}
+                                                                {{ date_display(opportunity.created_at) }}
+                                                            {% endcall %}
+                                                            {% if opportunity.location %}
+                                                                {% call detail_row('Location', 'location-marker') %}
+                                {{ opportunity.location }}
+                            {% endcall %}
+                        {% endif %}
                     </div>
                 </div>
             </div>
-            {% if user_application.status == 'pending' %}
-            <button hx-post="/applications/{{ user_application.id }}/withdraw" hx-target="#application-status-section"
-                hx-swap="innerHTML" hx-confirm="Are you sure you want to withdraw this application?"
-                class="inline-flex items-center gap-2 bg-white border border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 font-semibold py-2 px-4 text-sm rounded-lg transition-all">
-                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-                Withdraw
-            </button>
-            {% endif %}
         </div>
-        {% if user_application.message %}
-        <div class="mt-4 pt-4 border-t border-blue-100">
-            <p class="text-sm font-medium text-gray-500 mb-1">Your message</p>
-            <p class="text-gray-700">{{ user_application.message }}</p>
-        </div>
-        {% endif %}
-    </div>
-    {% elif opportunity.is_open %}
-    <div class="text-center">
-        <a href="/opportunities/{{ opportunity.id }}/apply"
-            class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg text-lg transition-colors">
-            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-            </svg>
-            Apply to Volunteer
-        </a>
-    </div>
     {% endif %}
-    {% endblock %}
-</div>
-{% endif %}
-{% endcall %}
-{% endif %}
 {% endblock %}

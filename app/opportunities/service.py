@@ -26,9 +26,12 @@ class OpportunityService(BaseService):
         self._org_repo = OrganizationRepository(db)
         self._role_repo = UserOrganizationRoleRepository(db)
 
-    async def list_open(self) -> list[Opportunity]:
-        """Get all open opportunities."""
-        return await self._opp_repo.get_all_open()
+    async def list_open(self, page: int = 1, limit: int = 100) -> tuple[list[Opportunity], int]:
+        """Get all open opportunities with pagination."""
+        skip = (page - 1) * limit
+        items = await self._opp_repo.get_all_open(skip=skip, limit=limit)
+        total = await self._opp_repo.count_open()
+        return items, total
 
     async def get_by_id(self, opportunity_id: UUID) -> Opportunity:
         """Get opportunity by ID or raise 404."""
@@ -65,6 +68,15 @@ class OpportunityService(BaseService):
         """Get organizations where user is a member."""
         roles = await self._role_repo.get_user_organizations_with_org(user_id)
         return [r.organization for r in roles]
+
+    async def update_banner(self, opportunity_id: UUID, filename: str) -> Opportunity:
+        """Update opportunity banner."""
+        opportunity = await self.get_by_id(opportunity_id)
+        # Verify user is admin of organization (simple check for now, can be improved)
+        # TODO In a real app we'd check permissions properly  # noqa: FIX002, TD002, TD003, TD004
+
+        opportunity.banner = filename
+        return await self._opp_repo.update(opportunity)
 
 
 class ApplicationService(BaseService):

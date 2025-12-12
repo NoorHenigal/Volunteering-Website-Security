@@ -52,6 +52,9 @@ class Settings(BaseSettings):
     # Demo Data
     demo_data: bool = Field(default=False, alias="DEMO_DATA")
 
+    # Uploads (optional override)
+    upload_dir: Path | None = Field(default=None, alias="UPLOAD_DIR")
+
     @property
     def database_url(self) -> str:
         """PostgreSQL connection URL."""

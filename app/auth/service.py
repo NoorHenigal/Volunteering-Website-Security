@@ -24,8 +24,8 @@ from app.db.models import Organization, RefreshToken, User, UserOrganizationRole
 from app.db.repositories import OrganizationRepository, RefreshTokenRepository, UserRepository
 
 _ph = PasswordHasher(
-    time_cost=4,
-    memory_cost=512,
+    time_cost=2,
+    memory_cost=262144,
     parallelism=4,
     hash_len=32,
     salt_len=16,
@@ -206,7 +206,7 @@ async def register_organization(data: OrganizationRegisterSchema, db: AsyncSessi
         role="admin",
     )
     db.add(user_org_role)
-    await db.commit()
+    await db.flush()  # Flush to get IDs without committing - let get_db() handle commit
     await db.refresh(new_org)
     return OrganizationResponse.model_validate(new_org)
 

@@ -1,8 +1,8 @@
 """Initial Migration.
 
-Revision ID: 73a083e0c708
+Revision ID: a87655c0d81c
 Revises:
-Create Date: 2025-12-09 01:45:55.252743+00:00
+Create Date: 2025-12-12 01:42:18.726367+00:00
 """
 
 from collections.abc import Sequence
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 from alembic import op
 
 # Revision identifiers, used by Alembic.
-revision: str = "73a083e0c708"
+revision: str = "a87655c0d81c"
 down_revision: str | None = None
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
@@ -25,11 +25,14 @@ def upgrade() -> None:
         sa.Column("username", sa.String(length=50), nullable=False),
         sa.Column("name", sa.String(length=255), nullable=False),
         sa.Column("description", sa.String(length=1000), nullable=True),
+        sa.Column("banner", sa.String(length=255), nullable=True),
+        sa.Column("logo", sa.String(length=255), nullable=True),
         sa.Column("id", sa.UUID(), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
         sa.CheckConstraint("username ~ '^[a-zA-Z0-9_-]+$'", name="ck_org_username_pattern"),
         sa.CheckConstraint("length(name) >= 1", name="ck_org_name_nonempty"),
+        sa.CheckConstraint("length(username) >= 3", name="ck_org_username_length"),
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index(op.f("ix_organizations_name"), "organizations", ["name"], unique=False)
@@ -64,6 +67,7 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index(op.f("ix_users_email"), "users", ["email"], unique=True)
+    op.create_index("ix_users_role", "users", ["role"], unique=False)
     op.create_index(
         "ix_users_searchable", "users", ["searchable"], unique=False, postgresql_where=sa.text("searchable = true")
     )
@@ -84,6 +88,7 @@ def upgrade() -> None:
         sa.Column("title", sa.String(length=255), nullable=False),
         sa.Column("description", sa.String(length=5000), nullable=False),
         sa.Column("location", sa.String(length=255), nullable=True),
+        sa.Column("banner", sa.String(length=255), nullable=True),
         sa.Column("posted_by", sa.UUID(), nullable=True),
         sa.Column("organization_id", sa.UUID(), nullable=False),
         sa.Column("is_open", sa.Boolean(), server_default="1", nullable=False),
@@ -198,6 +203,7 @@ def downgrade() -> None:
     op.drop_table("follows")
     op.drop_index(op.f("ix_users_username"), table_name="users")
     op.drop_index("ix_users_searchable", table_name="users", postgresql_where=sa.text("searchable = true"))
+    op.drop_index("ix_users_role", table_name="users")
     op.drop_index(op.f("ix_users_email"), table_name="users")
     op.drop_table("users")
     op.drop_index(op.f("ix_organizations_username"), table_name="organizations")

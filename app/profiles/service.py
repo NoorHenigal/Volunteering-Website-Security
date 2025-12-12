@@ -53,10 +53,10 @@ class ProfileService(BaseService):
             if profile_user.profile_visibility == "followers":
                 raise HTTPException(status_code=403, detail="Must follow user to view profile")
 
-            # Fallback for any other case (shouldn't be reached if logic is consistent)
+            # Fallback for any other case (shouldn't be reached)
             return await self._to_public_profile(profile_user)
 
-        # Build full profile - calculate counts only when needed
+        # Build full profile, calculate counts only when needed
         follower_count = await self.follow_repo.get_follower_count(profile_user.id)
         following_count = await self.follow_repo.get_following_count(profile_user.id)
 
@@ -158,7 +158,8 @@ class ProfileService(BaseService):
             return []
 
         follows = await self.follow_repo.get_followers(user.id)
-        return [await self._to_public_profile(f.follower) for f in follows]
+        users = [f.follower for f in follows]
+        return await self._to_public_profiles_batch(users)
 
     async def get_following(
         self,
@@ -172,7 +173,8 @@ class ProfileService(BaseService):
             return []
 
         follows = await self.follow_repo.get_following(user.id)
-        return [await self._to_public_profile(f.followed) for f in follows]
+        users = [f.followed for f in follows]
+        return await self._to_public_profiles_batch(users)
 
     async def _can_view_followers(self, user: User, viewer: User | None) -> bool:
         """Check if viewer can see followers/following lists."""
@@ -199,3 +201,29 @@ class ProfileService(BaseService):
             follower_count=follower_count,
             following_count=following_count,
         )
+
+    async def _to_public_profiles_batch(self, users: list[User]) -> list[PublicProfileSchema]:
+        """Convert multiple Users to PublicProfileSchema with batch count fetching.
+
+        This eliminates N+1 queries by fetching all counts in 2 queries instead of 2N.
+        """
+        if not users:
+            return []
+
+        user_ids = [u.id for u in users]
+        counts = await self.follow_repo.get_counts_for_users(user_ids)
+
+        return [
+            PublicProfileSchema(
+                id=user.id,
+                username=user.username,
+                first_name=user.first_name,
+                last_name=user.last_name,
+                profile_picture=user.profile_picture,
+                bio=user.bio,
+                role=user.role,
+                follower_count=counts.get(user.id, (0, 0))[0],
+                following_count=counts.get(user.id, (0, 0))[1],
+            )
+            for user in users
+        ]

@@ -5,15 +5,18 @@ from typing import Annotated
 from fastapi import APIRouter, File, HTTPException, Response, UploadFile, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import selectinload
+from starlette.concurrency import run_in_threadpool
 
 from app.core.base_schemas import ListResponse, error_responses, request_body_from_model
 from app.core.context import ContextDep, render_template, ui_auth_required
-from app.core.dependencies import OrganizationServiceDep, ProfileServiceDep
-from app.core.htmx import trigger_toast
-from app.core.router_helpers import handle_htmx_redirect
+from app.core.context_types import list_view_context
+from app.core.dependencies import ImageServiceDep, OrganizationServiceDep, ProfileServiceDep
+from app.core.htmx import handle_htmx_redirect, trigger_toast
+from app.core.services.images import ImagePreset, ImageProcessingError
 from app.core.types import ProfileVisibilityType, SlugPath, UsernamePath
 from app.db.models import Organization, User
 from app.db.repositories import OrganizationRepository, UserRepository
+from app.organizations.router import _render_organization_detail
 from app.organizations.schemas import OrganizationResponse
 from app.profiles.schemas import (
     FollowResponseSchema,
@@ -21,7 +24,6 @@ from app.profiles.schemas import (
     ProfileUpdateSchema,
     PublicProfileSchema,
 )
-from app.uploads.service import ImageProcessingError, process_profile_picture
 
 router = APIRouter(tags=["Profiles"])
 
@@ -45,22 +47,25 @@ async def _get_follow_list(
             else f"People {profile_user.first_name if profile_user else username} follows"
         )
 
-        return await render_template(
-            ctx.request,
-            "pages/shared.html",
-            view="list",
-            user=ctx.user,
-            # Resource list context
-            resource_type=list_type,
+        context = list_view_context(
             items=profiles,
-            profile_user=profile_user,
             page_title=title,
+            resource_type=list_type,
             create_url=f"/{username}",
             create_text="Back to profile",
             create_color="blue",
             show_create=False,
             empty_message=f"No {list_type} yet" if list_type == "followers" else "Not following anyone yet",
             grid_cols="space-y-4",
+        )
+
+        return await render_template(
+            ctx.request,
+            "pages/shared.html",
+            view="list",
+            user=ctx.user,
+            profile_user=profile_user,
+            **context,
         )
     return await ctx.success_response(data=ListResponse[PublicProfileSchema](items=profiles))
 
@@ -110,9 +115,17 @@ async def edit_profile_page(ctx: ContextDep, user: User, service: ProfileService
 
 @router.get("/settings/privacy", include_in_schema=False)
 @ui_auth_required
-async def privacy_settings_page(ctx: ContextDep, user: User) -> Response:
+async def privacy_settings_page(ctx: ContextDep, user: User, service: ProfileServiceDep) -> Response:
     """Show privacy settings page."""
-    return await render_template(ctx.request, "pages/profile.html", view="privacy", user=user)
+    profile = await service.get_profile(user.username, user)
+    return await render_template(
+        ctx.request,
+        "pages/profile.html",
+        view="privacy",
+        user=user,
+        profile_user=user,
+        profile=profile,
+    )
 
 
 @router.get(
@@ -174,21 +187,7 @@ async def view_profile(
 
     if org:
         if ctx.is_ui:
-            # Replicate logic from organizations/router.py:get_organization
-            members = await org_service.get_members(org.id)
-            is_admin = False
-            if ctx.user:
-                is_admin = await org_service.is_admin(ctx.user.id, org.id)
-
-            return await render_template(
-                ctx.request,
-                "pages/organizations.html",
-                user=ctx.user,
-                organization=org,
-                members=members,
-                is_admin=is_admin,
-                is_public_view=False,  # Use the "beautiful" internal view
-            )
+            return await _render_organization_detail(ctx, org, org_service)
         return JSONResponse(content=OrganizationResponse.model_validate(org).model_dump(mode="json"))
 
     return await ctx.error_response("Profile not found", status_code=404)
@@ -251,8 +250,6 @@ async def update_privacy_api(ctx: ContextDep, user: User, service: ProfileServic
 @ui_auth_required
 async def update_privacy_form(ctx: ContextDep, user: User, service: ProfileServiceDep) -> Response:
     """Update privacy settings (UI form)."""
-    # HTML checkboxes send "on" when checked, nothing when unchecked.
-    # This differs from JSON booleans, so we handle manually rather than via parse_body().
     form = await ctx.request.form()
 
     visibility_raw = form.get("profile_visibility")
@@ -271,7 +268,14 @@ async def update_privacy_form(ctx: ContextDep, user: User, service: ProfileServi
 
     if ctx.is_htmx:
         # Re-render the form to show updated state (and keep user on page)
-        response = await ctx.success_response(template="pages/profile.html", view="privacy", block="content", user=user)
+        profile = await service.get_profile(user.username, user)
+        response = await ctx.success_response(
+            template="pages/profile.html",
+            view="privacy",
+            block="content",
+            profile_user=user,
+            profile=profile,
+        )
         return await trigger_toast(response, "Privacy settings updated")
     return await ctx.success_response(redirect_url="/settings/privacy")
 
@@ -317,7 +321,6 @@ async def unfollow_user_api(
 ) -> Response:
     """Unfollow a user (API)."""
     await service.unfollow_user(user, username)
-    # Return appropriate response based on request type (API vs UI)
     if ctx.is_ui:
         return await ctx.success_response(redirect_url=f"/{username}")
     return Response(status_code=204)
@@ -354,6 +357,7 @@ async def upload_profile_picture(
     ctx: ContextDep,
     user: User,
     file: Annotated[UploadFile, File()],
+    image_svc: ImageServiceDep,
 ) -> Response:
     """Upload profile picture. Re-encodes to WebP and resizes to 256x256."""
     if not file.content_type or not file.content_type.startswith("image/"):
@@ -362,7 +366,9 @@ async def upload_profile_picture(
     content = await file.read()
 
     try:
-        filename = process_profile_picture(content, user.id)
+        filename = await run_in_threadpool(
+            image_svc.process_and_save, content, user.id, ImagePreset.AVATAR, crop_circular=True
+        )
     except ImageProcessingError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
 

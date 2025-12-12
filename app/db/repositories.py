@@ -57,6 +57,12 @@ class BaseRepository[T: DeclarativeBase]:
         result = await self.session.execute(query)
         return list(result.scalars().all())
 
+    async def count(self, *filters: ColumnElement[bool]) -> int:
+        """Count entities matching filters."""
+        query = select(func.count()).select_from(self.model).where(*filters)
+        result = await self.session.execute(query)
+        return result.scalar() or 0
+
     async def get_all(
         self,
         skip: int = 0,
@@ -116,6 +122,10 @@ class OrganizationRepository(BaseRepository[Organization]):
     async def get_by_username(self, username: str) -> Organization | None:
         """Get organization by username."""
         return await self.find_one(Organization.username == username)
+
+    async def count_all(self) -> int:
+        """Count all organizations."""
+        return await self.count()
 
     async def get_by_id_with_opportunities(self, org_id: UUID) -> Organization | None:
         """Get organization by ID with opportunities eagerly loaded."""
@@ -179,7 +189,7 @@ class OpportunityRepository(BaseRepository[Opportunity]):
 
     model = Opportunity
 
-    async def get_all_open(self) -> list[Opportunity]:
+    async def get_all_open(self, skip: int = 0, limit: int = 100) -> list[Opportunity]:
         """Get all open opportunities with organization and poster eagerly loaded."""
         return await self.find_many(
             Opportunity.is_open.is_(True),
@@ -187,7 +197,13 @@ class OpportunityRepository(BaseRepository[Opportunity]):
                 selectinload(Opportunity.organization),
                 selectinload(Opportunity.poster),
             ],
+            skip=skip,
+            limit=limit,
         )
+
+    async def count_open(self) -> int:
+        """Count all open opportunities."""
+        return await self.count(Opportunity.is_open.is_(True))
 
     async def get_by_id_with_organization(self, opportunity_id: UUID) -> Opportunity | None:
         """Get opportunity by ID with organization eagerly loaded."""
@@ -290,6 +306,36 @@ class FollowRepository:
         if follow:
             await self.session.delete(follow)
             await self.session.flush()
+
+    async def get_counts_for_users(self, user_ids: list[UUID]) -> dict[UUID, tuple[int, int]]:
+        """Batch fetch follower and following counts for multiple users.
+
+        Returns dict mapping user_id --> (follower_count, following_count).
+        This eliminates N+1 queries when building profile lists.
+        """
+        if not user_ids:
+            return {}
+
+        # Get follower counts (users following each user_id)
+        follower_query = (
+            select(Follow.followed_id, func.count())
+            .where(Follow.followed_id.in_(user_ids))
+            .group_by(Follow.followed_id)
+        )
+        follower_result = await self.session.execute(follower_query)
+        follower_counts: dict[UUID, int] = {row[0]: row[1] for row in follower_result.all()}
+
+        # Get following counts (users each user_id follows)
+        following_query = (
+            select(Follow.follower_id, func.count())
+            .where(Follow.follower_id.in_(user_ids))
+            .group_by(Follow.follower_id)
+        )
+        following_result = await self.session.execute(following_query)
+        following_counts: dict[UUID, int] = {row[0]: row[1] for row in following_result.all()}
+
+        # Combine into result dict
+        return {uid: (follower_counts.get(uid, 0), following_counts.get(uid, 0)) for uid in user_ids}
 
 
 __all__ = [

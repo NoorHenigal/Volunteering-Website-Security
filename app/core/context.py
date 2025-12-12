@@ -98,7 +98,6 @@ class _UIRouteHandler(Protocol):
 
 def ui_auth_required(func: Callable[..., Awaitable[Response]]) -> _UIRouteHandler:
     """Decorator that redirects to login if not authenticated. Injects `user` as second arg."""
-    # Get original signature and remove 'user' param (we inject it)
     original_sig = inspect.signature(func)
     params = [p for p in original_sig.parameters.values() if p.name not in ("user", "_user")]
     new_sig = original_sig.replace(parameters=params)
@@ -225,7 +224,7 @@ class RequestContext:
             return RedirectResponse(url="/auth/login", status_code=303)
 
         return JSONResponse(
-            content={"detail": error_msg},
+            content={"detail": error_msg, "status_code": status_code, "error_code": None},
             status_code=status_code,
         )
 

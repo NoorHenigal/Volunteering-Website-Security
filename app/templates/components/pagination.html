@@ -1,0 +1,30 @@
+{% from "components/icons.html" import icon %}
+{% macro pagination_controls(meta, base_url) %}
+    {% if meta.total_pages > 1 %}
+        <div class="flex justify-center mt-12 animate-slide-up delay-200">
+            <nav class="flex items-center gap-2 bg-white/80 backdrop-blur-sm p-2 rounded-2xl shadow-sm border border-slate-100">
+                {% if meta.page > 1 %}
+                    <a href="{{ base_url }}?page={{ meta.page - 1 }}"
+                       class="p-2 text-slate-500 hover:text-brand-600 hover:bg-slate-50 rounded-xl transition-colors">
+                        {{ icon('chevron-left', 'md') }}
+                    </a>
+                {% else %}
+                    <span class="p-2 text-slate-300 cursor-not-allowed">{{ icon('chevron-left', 'md') }}</span>
+                {% endif %}
+                <div class="flex items-center gap-1 font-bold text-sm text-slate-600 px-2">
+                    <span class="text-brand-600">{{ meta.page }}</span>
+                    <span class="text-slate-300">/</span>
+                    <span>{{ meta.total_pages }}</span>
+                </div>
+                {% if meta.page < meta.total_pages %}
+                    <a href="{{ base_url }}?page={{ meta.page + 1 }}"
+                       class="p-2 text-slate-500 hover:text-brand-600 hover:bg-slate-50 rounded-xl transition-colors">
+                        {{ icon('chevron-right', 'md') }}
+                    </a>
+                {% else %}
+                    <span class="p-2 text-slate-300 cursor-not-allowed">{{ icon('chevron-right', 'md') }}</span>
+                {% endif %}
+            </nav>
+        </div>
+    {% endif %}
+{% endmacro %}

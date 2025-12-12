@@ -15,4 +15,6 @@
     "ALL"
   ],
   "ruff.lineLength": 120,
+  "css.lint.unknownAtRules": "ignore",
+  "css.lint.propertyIgnoredDueToDisplay": "ignore"
 }

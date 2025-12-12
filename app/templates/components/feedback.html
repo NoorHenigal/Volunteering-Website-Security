@@ -1,64 +1,122 @@
 {# Feedback Components #}
-
+{% from "components/icons.html" import icon %}
 {# Alert that auto-dismisses #}
 {% macro alert_fragment(type, message) %}
-<div id="alert" class="bg-{{ type }}-100 border border-{{ type }}-400 text-{{ type }}-700 px-4 py-3 rounded mb-6"
-    x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 3000)">
-    {{ message }}
-</div>
+    {% set color_classes = {
+        "red": "bg-red-50 border-red-200 text-red-800",
+        "green": "bg-green-50 border-green-200 text-green-800",
+        "blue": "bg-blue-50 border-blue-200 text-blue-800",
+        "yellow": "bg-amber-50 border-amber-200 text-amber-800"
+    } %}
+    <div id="alert"
+         class="{{ color_classes.get(type, color_classes['blue']) }} border px-4 py-3 rounded-xl mb-6 flex items-start shadow-sm"
+         x-data="{ show: true }"
+         x-show="show"
+         x-init="setTimeout(() => show = false, 5000)"
+         x-transition:leave="transition ease-in duration-300"
+         x-transition:leave-start="opacity-100 scale-100"
+         x-transition:leave-end="opacity-0 scale-90">
+        <div class="flex-1">{{ message }}</div>
+        <button @click="show = false"
+                class="ml-4 text-current opacity-50 hover:opacity-100">{{ icon('x', 'sm') }}</button>
+    </div>
 {% endmacro %}
-
-{# Alert container with error display - consolidates alert pattern #}
 {% macro alert_container() %}
-<div id="alert-container">
-    {% if error %}
-    {{ alert_fragment('red', error) }}
-    {% endif %}
-</div>
+    <div id="alert-container">
+        {% if error %}{{ alert_fragment('red', error) }}{% endif %}
+    </div>
 {% endmacro %}
-
-{% macro message_box(message, label=None, color='gray') %}
-{# Simple message display box #}
-<div class="bg-{{ color }}-50 rounded-lg p-4">
-    {% if label %}
-    <p class="text-sm font-semibold text-{{ color }}-700 mb-1">{{ label }}</p>
-    {% endif %}
-    <p class="text-{{ color }}-700">{{ message }}</p>
-</div>
+{% macro message_box(message, label=None, color='slate') %}
+    <div class="bg-{{ color }}-50 rounded-xl p-5 border border-{{ color }}-100 relative overflow-hidden">
+        <div class="absolute top-0 right-0 w-20 h-20 bg-{{ color }}-100 rounded-bl-full -mr-10 -mt-10 opacity-50"></div>
+        {% if label %}
+            <p class="text-xs font-bold uppercase tracking-wider text-{{ color }}-600 mb-2 relative z-10">{{ label }}</p>
+        {% endif %}
+        <p class="text-{{ color }}-800 text-sm leading-relaxed relative z-10 italic">"{{ message }}"</p>
+    </div>
 {% endmacro %}
-
 {% macro warning_box() %}
-{# Yellow warning box with icon #}
-<div class="bg-yellow-50 border-l-4 border-yellow-400 p-6 mb-6">
-    <div class="flex">
+    <div class="bg-amber-50 border border-amber-200 rounded-xl p-6 mb-6 flex gap-4">
         <div class="flex-shrink-0">
-            <svg class="h-6 w-6 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
+            <div class="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center text-amber-500">
+                {{ icon('warning', 'lg') }}
+            </div>
         </div>
-        <div class="ml-3">
-            {{ caller() }}
+        <div class="flex-1 pt-1">
+            <div class="text-amber-900 font-medium">{{ caller() }}</div>
         </div>
     </div>
-</div>
 {% endmacro %}
-
-{% macro empty_state(message, action_url=None, action_text=None, action_color='blue', show_action=True) %}
-<div class="bg-white rounded-lg shadow-lg p-12 text-center">
-    <p class="text-xl text-gray-600 mb-6">{{ message }}</p>
-    {% if action_url and action_text and show_action %}
-    <a href="{{ action_url }}"
-        class="bg-{{ action_color }}-600 hover:bg-{{ action_color }}-700 text-white font-bold py-3 px-8 rounded-lg inline-block">
-        {{ action_text }}
-    </a>
-    {% endif %}
-</div>
+{% macro empty_state(message, action_url=None, action_text=None, action_color='brand', show_action=True) %}
+    <div class="bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl p-12 text-center hover:border-brand-200 hover:bg-brand-50/30 transition-all duration-300">
+        <div class="w-16 h-16 bg-white rounded-full mx-auto mb-4 flex items-center justify-center shadow-subtle text-slate-300">
+            {{ icon('inbox', 'xl') }}
+        </div>
+        <p class="text-lg text-slate-600 font-medium mb-6">{{ message }}</p>
+        {% if action_url and action_text and show_action %}
+            <a href="{{ action_url }}"
+               class="inline-flex items-center justify-center px-6 py-2.5 border border-transparent text-sm font-bold rounded-full shadow-lg text-white bg-{{ action_color }}-600 hover:bg-{{ action_color }}-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-{{ action_color }}-500 transition-all transform hover:-translate-y-0.5">
+                {{ action_text }}
+            </a>
+        {% endif %}
+    </div>
 {% endmacro %}
-
-{% macro info_box(color='blue', padding='p-6') %}
-{# Colored info/message box #}
-<div class="bg-{{ color }}-50 border border-{{ color }}-200 rounded-lg {{ padding }}">
-    {{ caller() }}
-</div>
+{% macro info_box(color='brand', padding='p-6') %}
+    <div class="bg-{{ color }}-50 border border-{{ color }}-200 rounded-xl {{ padding }}">{{ caller() }}</div>
+{% endmacro %}
+{% macro modal(open_var, title, subtitle=None, max_width='md', z_index='60') %}
+    <template x-teleport="body">
+        <div x-show="{{ open_var }}"
+             x-cloak
+             class="fixed inset-0 z-[70] overflow-y-auto"
+             aria-labelledby="modal-title"
+             role="dialog"
+             aria-modal="true">
+            {# Backdrop overlay #}
+            <div x-show="{{ open_var }}"
+                 x-transition:enter="ease-out duration-300"
+                 x-transition:enter-start="opacity-0"
+                 x-transition:enter-end="opacity-100"
+                 x-transition:leave="ease-in duration-200"
+                 x-transition:leave-start="opacity-100"
+                 x-transition:leave-end="opacity-0"
+                 class="fixed inset-0 bg-slate-900/75 backdrop-blur-sm transition-opacity z-[60]"></div>
+            {# Modal container #}
+            <div class="flex min-h-full items-center justify-center p-4 sm:p-6 relative z-[70]">
+                <div x-show="{{ open_var }}"
+                     x-transition:enter="ease-out duration-300"
+                     x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+                     x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
+                     x-transition:leave="ease-in duration-200"
+                     x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
+                     x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+                     class="relative transform overflow-hidden rounded-2xl bg-white text-left shadow-xl transition-all w-full max-w-{{ max_width }} max-h-[85vh]"
+                     @click.outside="{{ open_var }} = false">
+                    <div class="bg-white px-4 pb-4 pt-4 sm:px-6 sm:pt-5 sm:pb-4 border-b border-slate-100">
+                        <div class="sm:flex sm:items-start">
+                            <div class="mt-2 text-center sm:mt-0 sm:text-left w-full">
+                                <h3 class="text-lg font-bold leading-6 text-slate-900" id="modal-title">{{ title }}</h3>
+                                {% if subtitle %}<p class="text-sm text-slate-500 mt-1">{{ subtitle }}</p>{% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="overflow-y-auto max-h-[calc(85vh-4rem)]">{{ caller() }}</div>
+                </div>
+            </div>
+        </div>
+    </template>
+{% endmacro %}
+{# Modal action buttons (cancel + submit) #}
+{% macro modal_actions(cancel_var, submit_text='Save', cancel_text='Cancel') %}
+    <div class="mt-6 flex justify-end gap-3">
+        <button type="button"
+                @click="{{ cancel_var }} = false"
+                class="inline-flex w-full justify-center rounded-xl bg-white px-3 py-2 text-sm font-semibold text-slate-900 shadow-sm ring-1 ring-inset ring-slate-300 hover:bg-slate-50 sm:mt-0 sm:w-auto">
+            {{ cancel_text }}
+        </button>
+        <button type="submit"
+                class="inline-flex w-full justify-center rounded-xl bg-brand-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-500 sm:w-auto">
+            {{ submit_text }}
+        </button>
+    </div>
 {% endmacro %}

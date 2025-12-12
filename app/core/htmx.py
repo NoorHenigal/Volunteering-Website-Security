@@ -2,11 +2,16 @@
 
 import contextlib
 import json
+from typing import TYPE_CHECKING
 
 from fastapi import Request, Response
+from fastapi.responses import RedirectResponse
 from jinja2.runtime import new_context
 
 from app.core.templates import templates
+
+if TYPE_CHECKING:
+    from app.core.context import RequestContext
 
 
 def is_htmx(request: Request) -> bool:
@@ -22,6 +27,13 @@ async def htmx_redirect(url: str) -> Response:
 async def htmx_refresh() -> Response:
     """Trigger full page refresh."""
     return Response(content="", headers={"HX-Refresh": "true"})
+
+
+async def handle_htmx_redirect(ctx: RequestContext, url: str) -> Response:
+    """Return HTMX redirect for HTMX requests, standard redirect otherwise."""
+    if ctx.is_htmx:
+        return await htmx_redirect(url)
+    return RedirectResponse(url=url, status_code=303)
 
 
 async def render_block(request: Request, template_name: str, block_name: str, **context: object) -> Response:
@@ -63,7 +75,6 @@ async def trigger_toast(response: Response, message: str, toast_type: str = "suc
             elif not isinstance(existing, dict):
                 existing = {}
         except json.JSONDecodeError:
-            # Header was 'event-name' (not valid JSON)
             existing = {current_header: True}
 
         existing.update(trigger_data)

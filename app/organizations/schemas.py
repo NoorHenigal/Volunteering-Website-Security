@@ -39,8 +39,22 @@ class OrganizationMemberResponse(StrictModel):
     username: str
     first_name: str | None = None
     last_name: str | None = None
-    user_role: str
-    role: str
+    user_role: str  # "volunteer" or "organization" - organization users are "ghost" users
+    role: str  # "admin" or "member" within the organization
+
+    @property
+    def display_name(self) -> str:
+        """Get display name from first/last name or username."""
+        parts = [p for p in [self.first_name, self.last_name] if p]
+        return " ".join(parts) if parts else self.username
+
+    @property
+    def is_visible(self) -> bool:
+        """Whether this member should be visible on public org page.
+
+        Ghost users (user_role='organization') should never be shown.
+        """
+        return self.user_role != "organization"
 
 
 class OrganizationDetailResponse(BaseOut):

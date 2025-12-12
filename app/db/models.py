@@ -109,6 +109,7 @@ class User(Base, FullModelMixin):
         _pg_check("username ~ '^[a-zA-Z0-9_-]+$'", "ck_user_username_pattern"),
         _pg_index("ix_users_searchable", "searchable", where="searchable = true"),
         _pg_check("length(username) >= 3", "ck_user_username_length"),
+        Index("ix_users_role", "role"),
     )
 
     refresh_tokens: Mapped[list[RefreshToken]] = relationship(
@@ -173,7 +174,6 @@ class RefreshToken(Base, FullModelMixin):
     user_id: Mapped[UUID] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    # Argon2id hashes are ~97 chars; String(128) provides comfortable headroom
     token_hash: Mapped[str] = mapped_column(String(128), nullable=False, unique=True)
     expires_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -193,9 +193,12 @@ class Organization(Base, FullModelMixin):
     username: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     description: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    banner: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    logo: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     __table_args__ = (
         _pg_check("username ~ '^[a-zA-Z0-9_-]+$'", "ck_org_username_pattern"),
+        _pg_check("length(username) >= 3", "ck_org_username_length"),
         _pg_check("length(name) >= 1", "ck_org_name_nonempty"),
     )
 
@@ -236,6 +239,7 @@ class Opportunity(Base, FullModelMixin):
     title: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     description: Mapped[str] = mapped_column(String(5000), nullable=False)
     location: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    banner: Mapped[str | None] = mapped_column(String(255), nullable=True)
     posted_by: Mapped[UUID | None] = mapped_column(
         PG_UUID(as_uuid=True),
         ForeignKey("users.id", ondelete="SET NULL"),

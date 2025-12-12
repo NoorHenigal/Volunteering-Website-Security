@@ -7,10 +7,10 @@ from unittest.mock import patch
 from uuid import UUID, uuid4
 
 import pytest
-from fastapi import status
 from httpx import AsyncClient
 from pyfakefs.fake_filesystem import FakeFilesystem
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette import status
 
 from tests.fixtures.api import APIHelper
 from tests.fixtures.data import FixtureContext
@@ -361,12 +361,12 @@ class TestProfilePictureUserFlow:
 
     @pytest.fixture
     def mock_upload_dir(self, fs: FakeFilesystem) -> Generator[Path]:
-        """Mock get_upload_dir to use fake filesystem for integration tests."""
+        """Mock upload directory use fake filesystem for integration tests."""
         import tempfile
 
         upload_dir = Path(tempfile.gettempdir()) / "test_uploads"
         fs.makedirs(str(upload_dir), exist_ok=True)
-        with patch("app.uploads.service.get_upload_dir", return_value=upload_dir):
+        with patch("app.core.config.settings.upload_dir", upload_dir):
             yield upload_dir
 
     @pytest.mark.anyio
@@ -442,7 +442,7 @@ class TestProfilePictureUserFlow:
         assert response1.status_code in (200, 303)
 
         # Get list of files after first upload
-        files_after_first = list(mock_upload_dir.glob("*.webp"))
+        files_after_first = list(mock_upload_dir.rglob("*.webp"))
         assert len(files_after_first) == 1
 
         # Upload second picture
@@ -455,6 +455,6 @@ class TestProfilePictureUserFlow:
         assert response2.status_code in (200, 303)
 
         # Verify old picture was cleaned up
-        files_after_second = list(mock_upload_dir.glob("*.webp"))
+        files_after_second = list(mock_upload_dir.rglob("*.webp"))
         assert len(files_after_second) == 1
         assert files_after_first[0].name != files_after_second[0].name

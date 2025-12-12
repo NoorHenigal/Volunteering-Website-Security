@@ -1,452 +1,243 @@
 {% extends "layouts/base.html" %}
-{% from "components/user.html" import user_avatar, follow_button, follower_stats, bio_section %}
-{% from "components/badges.html" import privacy_badge %}
-{% from "components/forms.html" import htmx_form, radio_option, checkbox_toggle %}
+{% from "components/icons.html" import icon %}
+{% from "components/user.html" import user_avatar, follow_button, follower_stats %}
+{% from "components/badges.html" import privacy_badge, role_badge %}
+{% from "components/forms.html" import htmx_form, radio_option, checkbox_toggle, modal_field %}
+{% from "components/feedback.html" import modal, modal_actions %}
 {% from "components/buttons.html" import back_link, action_buttons %}
-
-{% block title %}
-{% if view == 'privacy' %}
-Privacy Settings
-{% else %}
-{{ profile_user.display_name }} (@{{ profile_user.username }})
-{% endif %}
-{% endblock %}
-
+{% from "components/layout.html" import settings_section_header, profile_hero %}
+{% from "components/image_upload.html" import image_upload_modal %}
+{% block title %}{{ profile_user.display_name }}{% endblock %}
 {% block content %}
-{% if view == 'privacy' %}
-{# Privacy Settings View #}
-<div class="max-w-2xl mx-auto py-8">
-    {{ back_link('/' + user.username, 'Back to profile') }}
-
-    <div class="mt-6 bg-white shadow-lg rounded-lg overflow-hidden">
-        <div class="p-6 border-b border-gray-200">
-            <h1 class="text-2xl font-bold text-gray-900">Privacy Settings</h1>
-            <p class="text-gray-600 mt-1">Control who can see your profile and information</p>
-        </div>
-
-        <form hx-post="/settings/privacy" hx-target="#main-content" hx-swap="innerHTML" class="p-6 space-y-8">
-            <!-- Profile Visibility -->
-            <div>
-                <h2 class="text-lg font-semibold text-gray-900 mb-4">Profile Visibility</h2>
-                <p class="text-sm text-gray-600 mb-4">Choose who can see your full profile information</p>
-
-                <div class="space-y-3">
-                    {{ radio_option('profile_visibility', 'public', '🌐', 'Public', 'Anyone can see your full profile,
-                    including
-                    anonymous visitors', user.profile_visibility == 'public') }}
-                    {{ radio_option('profile_visibility', 'authenticated', '👤', 'Authenticated Users Only', 'Only
-                    logged-in users
-                    can see your full profile', user.profile_visibility == 'authenticated') }}
-                    {{ radio_option('profile_visibility', 'followers', '👥', 'Followers Only', 'Only people who follow
-                    you can see
-                    your full profile', user.profile_visibility == 'followers') }}
-                    {{ radio_option('profile_visibility', 'private', '🔒', 'Private', 'Only you can see your full
-                    profile',
-                    user.profile_visibility == 'private') }}
-                </div>
-            </div>
-
-            <!-- Field Visibility -->
-            <div class="border-t border-gray-200 pt-8">
-                <h2 class="text-lg font-semibold text-gray-900 mb-4">Information Visibility</h2>
-                <p class="text-sm text-gray-600 mb-4">Choose which information to display on your profile</p>
-
-                <div class="space-y-4">
-                    {{ checkbox_toggle('show_email', 'Show Email Address', 'Display your email on your public profile',
-                    user.show_email) }}
-                    {{ checkbox_toggle('show_organizations', 'Show Organizations', "Display organizations you're a
-                    member of",
-                    user.show_organizations) }}
-                </div>
-            </div>
-
-            <!-- Search & Discovery -->
-            <div class="border-t border-gray-200 pt-8">
-                <h2 class="text-lg font-semibold text-gray-900 mb-4">Search & Discovery</h2>
-                <p class="text-sm text-gray-600 mb-4">Control how others can find you</p>
-
-                <div class="space-y-4">
-                    {{ checkbox_toggle('searchable', 'Appear in Search Results', 'Allow your profile to appear when
-                    others search
-                    for users', user.searchable) }}
-                </div>
-            </div>
-
-            <!-- Submit Button -->
-            <div class="border-t border-gray-200 pt-6">
-                {{ action_buttons('Save Settings', '/' + user.username, 'blue') }}
-            </div>
-        </form>
-    </div>
-</div>
-
-{% else %}
-{# Profile View (Default) #}
-<div class="max-w-4xl mx-auto" {% if user and user.id==profile_user.id %}x-data="avatarCropper()" {% endif %}>
-    <!-- Crop Modal -->
-    <div x-show="show" x-transition.opacity class="fixed inset-0 bg-black/70 flex items-center justify-center z-50"
-        style="display: none;">
-        <div class="bg-white rounded-lg shadow-xl max-w-lg w-full mx-4 overflow-hidden" @click.outside="close()">
-            <div class="p-4 border-b border-gray-200">
-                <h3 class="text-lg font-semibold text-gray-900">Adjust Profile Picture</h3>
-                <p class="text-sm text-gray-500">Drag to position, use slider to zoom</p>
-            </div>
-
-            <div class="relative bg-gray-100 overflow-hidden" style="height: 400px">
-                <div class="absolute inset-0 flex items-center justify-center overflow-hidden"
-                    @mousedown="startDrag($event)" @mousemove="drag($event)" @mouseup="endDrag()"
-                    @mouseleave="endDrag()" @touchstart="startDrag($event)" @touchmove="drag($event)"
-                    @touchend="endDrag()">
-                    <img x-ref="cropImage" :src="imageSrc"
-                        :style="`transform: translate(${imageX}px, ${imageY}px) scale(${scale}); transform-origin: center center;`"
-                        class="max-w-none cursor-move select-none" alt="Preview" draggable="false"
-                        style="pointer-events: none;" />
-                </div>
-
-                <!-- Circular crop overlay -->
-                <div class="absolute inset-0 pointer-events-none">
-                    <div class="absolute rounded-full border-4 border-white shadow-lg"
-                        style="left: 50%; top: 50%; transform: translate(-50%, -50%); width: 250px; height: 250px; box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);">
-                    </div>
-                </div>
-            </div>
-
-            <div class="p-4 border-t border-gray-200">
-                <label class="block text-sm font-medium text-gray-700 mb-2">Zoom</label>
-                <input type="range" min="0.1" max="3" step="0.01" x-model.number="scale"
-                    class="w-full accent-blue-600" />
-            </div>
-
-            <div class="p-4 border-t border-gray-200 flex gap-3">
-                <button type="button"
-                    class="flex-1 px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg font-medium transition-colors"
-                    @click="close()">
-                    Cancel
-                </button>
-                <button type="button"
-                    class="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
-                    @click="save()">
-                    Save
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Profile Card -->
-    <div class="bg-white shadow-lg rounded-lg overflow-hidden">
-        <div class="p-6 sm:p-8">
-            <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-                {{ user_avatar(profile_user, 'lg') }}
-                <div class="text-center sm:text-left flex-1">
-                    <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-                        <div>
-                            <h1 class="text-3xl font-bold text-gray-900">
-                                {{ profile_user.display_name }}
-                            </h1>
-                            <p class="text-lg text-gray-500 font-medium">
-                                @{{ profile_user.username }}
-                            </p>
-                            <div class="mt-2 flex items-center gap-2 flex-wrap justify-center sm:justify-start">
-                                <span
-                                    class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
-                                    {{ profile_user.role | title }}
-                                </span>
-                                {% if user and user.id == profile_user.id and profile %}
-                                {{ privacy_badge(profile.profile_visibility) }}
+    <div {% if user and user.id==profile_user.id %}x-data="profileManager()"{% endif %}>
+        <div class="animate-enter">
+            {{ profile_hero() }}
+            <div class="relative max-w-6xl mx-auto px-4 sm:px-6 -mt-24 md:-mt-28">
+                <div class="flex flex-col md:flex-row gap-6 items-start">
+                    <div class="w-full md:w-80 flex-shrink-0">
+                        <div class="bg-white rounded-3xl shadow-premium p-8 border border-slate-100 text-center relative overflow-hidden group">
+                            <div class="relative inline-block mx-auto mb-6 group/avatar">
+                                {% if user and user.id == profile_user.id %}
+                                    <div x-data="imageUploader({ endpointUrl: '/settings/profile/picture', aspectRatio: 1 })">
+                                        {% call image_upload_modal('avatar-upload', 'Update Profile Picture', '/settings/profile/picture', aspect_ratio=1) %}
+                                            <div class="w-40 h-40 rounded-full p-1 bg-white ring-2 ring-brand-100 shadow-lg">
+                                                <div class="relative w-full h-full group">
+                                                    <div class="w-full h-full rounded-full overflow-hidden bg-white shadow-xl">
+                                                        {% if profile_user.profile_picture %}
+                                                            <img src="/static/uploads/avatars/{{ profile_user.profile_picture }}"
+                                                                 alt="{{ profile_user.username }}"
+                                                                 class="w-full h-full object-cover">
+                                                        {% else %}
+                                                            <div class="w-full h-full rounded-full bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center text-4xl font-bold text-white">
+                                                                {{ profile_user.first_name[0] if profile_user.first_name else
+                                                                profile_user.username[0] | upper }}
+                                                            </div>
+                                                        {% endif %}
+                                                    </div>
+                                                    <button type="button"
+                                                            @click="triggerSelect()"
+                                                            class="absolute -bottom-2 -right-2 flex items-center justify-center">
+                                                        <div class="h-10 w-10 rounded-full bg-slate-900 text-white flex items-center justify-center shadow-lg ring-4 ring-white hover:bg-slate-800 transition-colors cursor-pointer">
+                                                            {{ icon('pencil', 'sm') }}
+                                                        </div>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        {% endcall %}
+                                    </div>
+                                {% else %}
+                                    <div class="w-40 h-40 rounded-full p-1 bg-white ring-2 ring-brand-100 shadow-lg">
+                                        <div class="w-full h-full rounded-full overflow-hidden shadow-xl">
+                                            {% if profile_user.profile_picture %}
+                                                <img src="/static/uploads/avatars/{{ profile_user.profile_picture }}"
+                                                     alt="{{ profile_user.display_name }}"
+                                                     class="w-full h-full object-cover">
+                                            {% else %}
+                                                <div class="w-full h-full rounded-full bg-gradient-to-br from-slate-200 to-slate-300 flex items-center justify-center text-slate-500 font-bold text-4xl">
+                                                    {{ profile_user.first_name[0] }}{{ profile_user.last_name[0] }}
+                                                </div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
                                 {% endif %}
                             </div>
-                        </div>
-                        <div class="flex justify-center sm:justify-end items-center gap-2">
-                            {% if user and user.id == profile_user.id %}
-                            <label for="profile-picture-input"
-                                class="inline-flex items-center px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium cursor-pointer transition-colors">
-                                <svg class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                                </svg>
-                                Photo
-                            </label>
-                            {% elif user and profile and profile.is_following is not none %}
-                            <div id="follow-button-container">
-                                {% block follow_button scoped %}
-                                {{ follow_button(profile_user.username, profile.is_following) }}
-                                {% endblock %}
+                            <h1 class="text-3xl font-extrabold text-slate-900 tracking-tight leading-tight mb-2">
+                                {{
+                                profile_user.display_name }}
+                            </h1>
+                            <p class="text-brand-600 font-semibold text-base mb-4">@{{ profile_user.username }}</p>
+                            <div class="flex flex-col items-center gap-2 mb-8 text-sm text-slate-500">
+                                {{ role_badge(profile_user.role) }}
+                                <div class="flex items-center gap-1.5 mt-2">
+                                    <span class="text-slate-400">{{ icon('calendar', 'sm') }}</span>
+                                    <span>Joined {{ profile_user.created_at.strftime("%b %Y") }}</span>
+                                </div>
+                                {% if (profile and profile.email and user.show_email) or (user and user.id ==
+                                    profile_user.id) %}
+                                    {% if profile and profile.email %}
+                                        <div class="flex items-center gap-1.5 truncate max-w-full px-2"
+                                             title="{{ profile.email }}">
+                                            <span class="text-slate-400 flex-shrink-0">{{ icon('mail', 'sm') }}</span>
+                                            <span class="truncate">{{ profile.email }}</span>
+                                        </div>
+                                    {% endif %}
+                                {% endif %}
                             </div>
+                            {% if profile %}
+                                <div class="flex items-center justify-center gap-6 border-t border-slate-100 pt-6 mb-6 text-sm">
+                                    <a href="/{{ profile_user.username }}/followers"
+                                       class="hover:text-brand-600 transition-colors group/stat">
+                                        <span class="block font-bold text-xl text-slate-900 group-hover/stat:text-brand-600 transition-colors">{{
+                                        profile.follower_count }}</span>
+                                        <span class="text-slate-500">Followers</span>
+                                    </a>
+                                    <span class="text-slate-200 text-2xl font-light">|</span>
+                                    <a href="/{{ profile_user.username }}/following"
+                                       class="hover:text-brand-600 transition-colors group/stat">
+                                        <span class="block font-bold text-xl text-slate-900 group-hover/stat:text-brand-600 transition-colors">{{
+                                        profile.following_count }}</span>
+                                        <span class="text-slate-500">Following</span>
+                                    </a>
+                                </div>
+                            {% endif %}
+                            {% if user and user.id == profile_user.id %}
+                                <div class="flex flex-col gap-3">
+                                    <button type="button"
+                                            @click="editProfileOpen = true"
+                                            class="w-full py-3 px-4 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 transition-all shadow-md hover:shadow-lg text-sm flex items-center justify-center gap-2">
+                                        {{ icon('pencil', 'sm') }}
+                                        Edit Profile
+                                    </button>
+                                    <button type="button"
+                                            @click="privacyOpen = true"
+                                            class="w-full py-3 px-4 bg-white border border-slate-200 text-slate-700 font-bold rounded-xl hover:bg-slate-50 transition-colors text-sm flex items-center justify-center gap-2">
+                                        <span class="text-slate-400">{{ icon('lock', 'sm') }}</span>
+                                        Privacy
+                                    </button>
+                                </div>
+                            {% elif user and profile and profile.is_following is not none %}
+                                <div id="follow-button-container">
+                                    {% block follow_button scoped %}{{ follow_button(profile_user.username, profile.is_following, 'lg') }}{% endblock %}
+                                </div>
                             {% endif %}
                         </div>
                     </div>
-
-                    <!-- Follower Stats -->
-                    {% if profile %}
-                    <div class="mt-4">
-                        {{ follower_stats(profile.follower_count, profile.following_count, profile_user.username) }}
+                    <div class="flex-1 min-w-0 space-y-8 md:mt-12">
+                        {% if profile and (profile.bio or profile.description) %}
+                            <div class="bg-white rounded-3xl shadow-sm border border-slate-100 p-8 md:p-10">
+                                {% if profile.bio %}
+                                    <h2 class="text-2xl font-bold text-slate-900 mb-4 leading-tight">"{{ profile.bio }}"</h2>
+                                {% endif %}
+                                {% if profile.description %}
+                                    <div class="prose prose-slate prose-lg max-w-none text-slate-600 leading-relaxed whitespace-pre-wrap">
+                                        {{
+                                        profile.description }}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        {% elif user and user.id == profile_user.id %}
+                            <div class="bg-slate-50 border border-dashed border-slate-200 rounded-3xl p-12 text-center cursor-pointer hover:bg-slate-100 transition-colors"
+                                 @click="editProfileOpen = true">
+                                <p class="text-slate-500 font-medium mb-3 text-lg">
+                                    Your profile is looking a bit empty! Tell the
+                                    world
+                                    who you are.
+                                </p>
+                                <button type="button"
+                                        class="inline-flex items-center text-brand-600 font-bold hover:underline text-lg">
+                                    Write your bio <span class="ml-1">{{ icon('arrow-right', 'md') }}</span>
+                                </button>
+                            </div>
+                        {% endif %}
+                        <div class="grid grid-cols-2 lg:grid-cols-3 gap-6">
+                            <div class="bg-gradient-to-br from-orange-50 to-amber-50 rounded-3xl p-6 border border-orange-100 flex flex-col justify-between h-36">
+                                <span class="text-orange-900/40 font-bold text-xs uppercase tracking-wider">Impact</span>
+                                <div class="flex items-baseline gap-1">
+                                    <span class="text-4xl font-extrabold text-orange-600">850</span>
+                                    <span class="text-sm font-bold text-orange-400">pts</span>
+                                </div>
+                            </div>
+                            <div class="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-3xl p-6 border border-blue-100 flex flex-col justify-between h-36">
+                                <span class="text-blue-900/40 font-bold text-xs uppercase tracking-wider">Events</span>
+                                <div class="flex items-baseline gap-1">
+                                    <span class="text-4xl font-extrabold text-blue-600">12</span>
+                                </div>
+                            </div>
+                            <div class="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-3xl p-6 border border-emerald-100 flex flex-col justify-between h-36 col-span-2 lg:col-span-1">
+                                <span class="text-emerald-900/40 font-bold text-xs uppercase tracking-wider">Hours</span>
+                                <div class="flex items-baseline gap-1">
+                                    <span class="text-4xl font-extrabold text-emerald-600">48</span>
+                                    <span class="text-sm font-bold text-emerald-400">hrs</span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    {% endif %}
-
-                    <!-- Bio Section -->
-                    {% if profile %}
-                    <div id="bio-section">
-                        {% block bio_display %}
-                        {{ bio_section(profile.bio, profile.description, user and user.id == profile_user.id) }}
-                        {% endblock %}
-                    </div>
-                    {% endif %}
                 </div>
             </div>
-
-            {% if user and user.id == profile_user.id %}
-            <input type="file" id="profile-picture-input" accept="image/*" class="hidden"
-                @change="handleFileSelect($event)" />
-            {% endif %}
-
-            <!-- Edit Profile Section (for own profile) -->
-            {% if user and user.id == profile_user.id and edit_mode %}
-            <div class="mt-8 border-t border-gray-200 pt-6" id="edit-profile-container">
-                {% block edit_profile_form %}
-                <h2 class="text-xl font-semibold text-gray-900 mb-4">Edit Profile</h2>
-                <form hx-post="/settings/profile" class="mt-4 space-y-4">
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label for="first_name" class="block text-sm font-medium text-gray-700">First Name</label>
-                            <input type="text" name="first_name" id="first_name"
-                                value="{{ profile_user.first_name or '' }}"
-                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
-                        </div>
-                        <div>
-                            <label for="last_name" class="block text-sm font-medium text-gray-700">Last Name</label>
-                            <input type="text" name="last_name" id="last_name"
-                                value="{{ profile_user.last_name or '' }}"
-                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
-                        </div>
-                    </div>
-
-                    <div>
-                        <label for="display_name" class="block text-sm font-medium text-gray-700">Display Name</label>
-                        <input type="text" name="display_name" id="display_name"
-                            value="{{ profile_user.custom_display_name or '' }}"
-                            placeholder="Defaults to First Last if empty"
-                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
-                        <p class="mt-1 text-xs text-gray-500">This is how your name will appear publicly.</p>
-                    </div>
-
-                    <div>
-                        <label for="bio" class="block text-sm font-medium text-gray-700">Bio</label>
-                        <div class="mt-1">
-                            <input type="text" name="bio" id="bio" value="{{ profile.bio or '' }}"
-                                class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                                placeholder="Short bio (max 200 chars)">
-                        </div>
-                    </div>
-
-                    <div>
-                        <label for="description" class="block text-sm font-medium text-gray-700">About Me</label>
-                        <div class="mt-1">
-                            <textarea id="description" name="description" rows="4"
-                                class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                                placeholder="Tell us more about yourself...">{{ profile.description or '' }}</textarea>
-                        </div>
-                    </div>
-
-                    <div class="flex justify-end gap-3 pt-4">
-                        <a href="/{{ user.username }}"
-                            class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">
-                            Cancel
-                        </a>
-                        <button type="submit"
-                            class="px-4 py-2 bg-blue-600 border border-transparent rounded-md shadow-sm text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                            Save Changes
-                        </button>
-                    </div>
-                </form>
-                {% endblock %}
-            </div>
-            {% endif %}
-
-            <div class="mt-8 border-t border-gray-200 pt-6">
-                <h2 class="text-xl font-semibold text-gray-900 mb-4">About</h2>
-                <div class="grid sm:grid-cols-2 gap-4 text-sm text-gray-600">
-                    <div>
-                        <span class="font-medium">Member since:</span>
-                        {{ profile_user.created_at.strftime('%B %Y') }}
-                    </div>
-                    {% if profile and profile.email %}
-                    <div>
-                        <span class="font-medium">Email:</span>
-                        {{ profile.email }}
-                    </div>
-                    {% endif %}
-                </div>
-            </div>
-
-            <!-- Quick Actions (for own profile) -->
-            {% if user and user.id == profile_user.id %}
-            <div class="mt-6 border-t border-gray-200 pt-6">
-                <h2 class="text-xl font-semibold text-gray-900 mb-4">Settings</h2>
-                <div class="flex flex-wrap gap-3">
-                    <a href="/settings/profile"
-                        class="inline-flex items-center px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium transition-colors">
-                        <svg class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                        </svg>
-                        Edit Profile
-                    </a>
-                    <a href="/settings/privacy"
-                        class="inline-flex items-center px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium transition-colors">
-                        <svg class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                        </svg>
-                        Privacy Settings
-                    </a>
-                </div>
-            </div>
-            {% endif %}
         </div>
+        {% if user and user.id == profile_user.id %}
+            {% call modal('editProfileOpen', 'Edit Profile', 'Update your personal information.', 'md') %}
+                <form hx-post="/settings/profile"
+                      hx-ext="response-targets"
+                      hx-target-error="#edit-profile-error"
+                      class="p-5 sm:p-6 space-y-4">
+                    <div id="edit-profile-error"></div>
+                    <div class="grid grid-cols-2 gap-4">
+                        {{ modal_field('First Name', 'first_name', 'text', profile_user.first_name or '') }}
+                        {{ modal_field('Last Name', 'last_name', 'text', profile_user.last_name or '') }}
+                    </div>
+                    {{ modal_field('Display Name', 'display_name', 'text', profile_user.custom_display_name or '', 'e.g. ' ~
+                                        profile_user.first_name ~ ' ' ~ profile_user.last_name) }}
+                    {{ modal_field('Bio tagline', 'bio', 'text', profile.bio or '', 'Impact maker, volunteer enthusiast...') }}
+                    {{ modal_field('About Me', 'description', 'textarea', profile.description or '', 'Share your story...', 5) }}
+                    {{ modal_actions('editProfileOpen', 'Save Changes') }}
+                </form>
+            {% endcall %}
+            {% call modal('privacyOpen', 'Privacy Settings', 'Control who can see your profile and information.', 'lg') %}
+                <form hx-post="/settings/privacy"
+                      hx-target="#main-content"
+                      hx-swap="none"
+                      hx-ext="response-targets"
+                      hx-target-error="#privacy-error"
+                      class="p-5 sm:p-6 space-y-5"
+                      @htmx:after-request="privacyOpen = false; window.location.reload()">
+                    <div id="privacy-error"></div>
+                    <div class="grid gap-6 md:grid-cols-2 items-start">
+                        <div>
+                            {{ settings_section_header('Profile Visibility', 'eye', 'blue') }}
+                            <div class="mt-2 grid grid-cols-1 gap-3">
+                                {{ radio_option('profile_visibility', 'public', '🌐', 'Public', 'Visible to everyone',
+                                                                user.profile_visibility == 'public') }}
+                                {{ radio_option('profile_visibility', 'authenticated', '👤', 'Auth Only', 'Platform members',
+                                                                user.profile_visibility == 'authenticated') }}
+                                {{ radio_option('profile_visibility', 'followers', '👥', 'Followers', 'Only followers',
+                                                                user.profile_visibility == 'followers') }}
+                                {{ radio_option('profile_visibility', 'private', '🔒', 'Private', 'Only you', user.profile_visibility ==
+                                                                'private') }}
+                            </div>
+                        </div>
+                        <div>
+                            {{ settings_section_header('Info Visibility', 'info-circle', 'purple') }}
+                            <div class="mt-2 space-y-2">
+                                {{ checkbox_toggle('show_email', 'Show Email', 'Display email on profile', user.show_email) }}
+                                {{ checkbox_toggle('show_organizations', 'Show Orgs', "Display memberships",
+                                                                user.show_organizations) }}
+                                {{ checkbox_toggle('searchable', 'Searchable', 'Appear in search', user.searchable) }}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="pt-4 border-t border-slate-100">{{ modal_actions('privacyOpen', 'Save Privacy Settings') }}</div>
+                </form>
+            {% endcall %}
+        {% endif %}
     </div>
-</div>
-
-<script>
-    document.addEventListener("alpine:init", () => {
-        if (!document.querySelector('[x-data="avatarCropper()"]')) return;
-        Alpine.data("avatarCropper", () => ({
-            show: false,
-            saving: false,
-            imageSrc: '',
-            imageX: 0,
-            imageY: 0,
-            scale: 1,
-            isDragging: false,
-            dragStartX: 0,
-            dragStartY: 0,
-            imageStartX: 0,
-            imageStartY: 0,
-            sourceImage: null,
-
-            handleFileSelect(event) {
-                const file = event.target.files[0];
-                if (!file || !file.type.startsWith('image/')) return;
-
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    const img = new Image();
-                    img.onload = () => {
-                        this.sourceImage = img;
-                        this.imageSrc = e.target.result;
-                        this.resetPosition();
-                        this.show = true;
-                    };
-                    img.src = e.target.result;
-                };
-                reader.readAsDataURL(file);
-            },
-
-            resetPosition() {
-                this.imageX = 0;
-                this.imageY = 0;
-                if (!this.sourceImage) return;
-
-                const cropSize = 250;
-                const minScale = Math.max(cropSize / this.sourceImage.width, cropSize / this.sourceImage.height);
-                this.scale = Math.max(minScale, 0.5);
-            },
-
-            startDrag(event) {
-                this.isDragging = true;
-                const clientX = event.touches ? event.touches[0].clientX : event.clientX;
-                const clientY = event.touches ? event.touches[0].clientY : event.clientY;
-                this.dragStartX = clientX;
-                this.dragStartY = clientY;
-                this.imageStartX = this.imageX;
-                this.imageStartY = this.imageY;
-                event.preventDefault();
-            },
-
-            drag(event) {
-                if (!this.isDragging) return;
-                const clientX = event.touches ? event.touches[0].clientX : event.clientX;
-                const clientY = event.touches ? event.touches[0].clientY : event.clientY;
-                this.imageX = this.imageStartX + (clientX - this.dragStartX);
-                this.imageY = this.imageStartY + (clientY - this.dragStartY);
-                event.preventDefault();
-            },
-
-            endDrag() {
-                this.isDragging = false;
-            },
-
-            close() {
-                this.show = false;
-                this.imageSrc = '';
-                this.sourceImage = null;
-                document.getElementById('profile-picture-input').value = '';
-            },
-
-            async save() {
-                if (!this.sourceImage || this.saving) return;
-                this.saving = true;
-
-                try {
-                    const blob = await this.cropToBlob();
-                    const formData = new FormData();
-                    formData.append('file', blob, 'avatar.png');
-
-                    const response = await fetch('/settings/profile/picture', {
-                        method: 'POST',
-                        body: formData
-                    });
-
-                    if (response.ok) {
-                        window.location.reload();
-                    } else {
-                        const data = await response.json().catch(() => ({}));
-                        alert(data.detail || 'Failed to upload image');
-                    }
-                } catch (err) {
-                    alert('Failed to upload image');
-                } finally {
-                    this.saving = false;
-                    this.close();
-                }
-            },
-
-            cropToBlob() {
-                return new Promise((resolve) => {
-                    const cropSize = 250;
-                    const outputSize = 512;
-                    const canvas = document.createElement('canvas');
-                    canvas.width = outputSize;
-                    canvas.height = outputSize;
-                    const ctx = canvas.getContext('2d');
-
-                    const displayedWidth = this.sourceImage.width * this.scale;
-                    const displayedHeight = this.sourceImage.height * this.scale;
-                    const containerCenterX = 200;
-                    const containerCenterY = 200;
-
-                    const imageLeft = containerCenterX + this.imageX - displayedWidth / 2;
-                    const imageTop = containerCenterY + this.imageY - displayedHeight / 2;
-
-                    const cropLeft = containerCenterX - cropSize / 2;
-                    const cropTop = containerCenterY - cropSize / 2;
-
-                    const srcX = (cropLeft - imageLeft) / this.scale;
-                    const srcY = (cropTop - imageTop) / this.scale;
-                    const srcSize = cropSize / this.scale;
-
-                    ctx.drawImage(
-                        this.sourceImage,
-                        srcX, srcY, srcSize, srcSize,
-                        0, 0, outputSize, outputSize
-                    );
-
-                    canvas.toBlob(resolve, 'image/png', 1.0);
-                });
-            }
-        }));
-    });
-</script>
-{% endif %}
+    <script>
+        document.addEventListener("alpine:init", () => {
+            if (!document.querySelector('[x-data="profileManager()"]')) return;
+            Alpine.data("profileManager", () => ({
+                editProfileOpen: false,
+                privacyOpen: false,
+            }));
+        });
+    </script>
 {% endblock %}

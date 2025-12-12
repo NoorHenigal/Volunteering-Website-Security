@@ -1,50 +1,181 @@
 {# Layout Components #}
-
 {% from "components/buttons.html" import back_link %}
-
+{% from "components/icons.html" import icon %}
 {% macro section_title(title, border_top=True) %}
-<div class="{% if border_top %}border-t pt-6 mt-6{% endif %}">
-    <h2 class="text-xl font-bold text-gray-800 mb-3">{{ title }}</h2>
-</div>
+    <div class="{% if border_top %}border-t border-slate-200 pt-8 mt-8{% endif %} mb-6">
+        <h2 class="text-xl font-bold text-slate-900 tracking-tight">{{ title }}</h2>
+    </div>
 {% endmacro %}
-
 {% macro detail_header(back_url, back_text, title, subtitle=None) %}
-{# Standard detail page header with back link and title #}
-<div class="mb-6">
-    {{ back_link(back_url, back_text) }}
-</div>
-<div class="mb-6">
-    <h1 class="text-4xl font-bold text-gray-800 mb-2">{{ title }}</h1>
-    {% if subtitle %}
-    <p class="text-xl text-gray-600">{{ subtitle }}</p>
-    {% endif %}
-</div>
+    <div class="mb-8 animate-enter">
+        <div class="mb-4">{{ back_link(back_url, back_text) }}</div>
+        <div class="flex flex-col gap-2">
+            <h1 class="text-3xl md:text-4xl font-bold text-slate-900 tracking-tight">{{ title }}</h1>
+            {% if subtitle %}<p class="text-lg text-slate-500 font-medium">{{ subtitle }}</p>{% endif %}
+        </div>
+    </div>
 {% endmacro %}
-
 {% macro form_header(back_url, back_text, title) %}
-{# Standard form page header with back link and title #}
-<div class="mb-6">
-    {{ back_link(back_url, back_text) }}
-</div>
-<h1 class="text-3xl font-bold text-gray-800 mb-6">{{ title }}</h1>
+    <div class="mb-8 animate-enter">
+        <div class="mb-6">{{ back_link(back_url, back_text) }}</div>
+        <h1 class="text-3xl font-bold text-slate-900 tracking-tight">{{ title }}</h1>
+    </div>
 {% endmacro %}
-
-{% macro page_header(title, action_url=None, action_text=None, action_color='blue', show_action=True) %}
-<div class="flex justify-between items-center mb-8">
-    <h1 class="text-4xl font-bold text-gray-800">{{ title }}</h1>
-    {% if action_url and action_text and show_action %}
-    <a href="{{ action_url }}"
-        class="bg-{{ action_color }}-600 hover:bg-{{ action_color }}-700 text-white font-bold py-2 px-6 rounded-lg">
-        {{ action_text }}
-    </a>
-    {% endif %}
-</div>
+{% macro page_header(title, action_url=None, action_text=None, action_color='brand', show_action=True) %}
+    <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-8 animate-enter">
+        <h1 class="text-3xl md:text-4xl font-bold text-slate-900 tracking-tight">{{ title }}</h1>
+        {% if action_url and action_text and show_action %}
+            <a href="{{ action_url }}"
+               class="inline-flex items-center justify-center px-6 py-2.5 border border-transparent text-sm font-medium rounded-full shadow-lg text-white bg-{{ action_color }}-600 hover:bg-{{ action_color }}-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-{{ action_color }}-500 transition-all transform hover:-translate-y-0.5">
+                {{ action_text }}
+            </a>
+        {% endif %}
+    </div>
 {% endmacro %}
-
 {% macro location_display(location) %}
-{% if location %}
-<span class="text-gray-600">
-    <span class="font-semibold">Location:</span> {{ location }}
-</span>
-{% endif %}
+    {% if location %}
+        <div class="flex items-center text-slate-500 text-sm">
+            <span class="flex-shrink-0 mr-1.5 text-slate-400">{{ icon('location-marker', 'sm') }}</span>
+            <span>{{ location }}</span>
+        </div>
+    {% endif %}
+{% endmacro %}
+{% macro hero_section(min_height='160px', rounded='3rem') %}
+    <div class="relative bg-slate-900 rounded-[{{ rounded }}] overflow-hidden shadow-2xl mb-6 min-h-[{{ min_height }}] flex items-end">
+        <div class="absolute inset-0 opacity-40">
+            <div class="absolute top-0 right-0 w-[800px] h-[800px] bg-brand-500 rounded-full mix-blend-screen filter blur-[120px] opacity-20 animate-pulse">
+            </div>
+            <div class="absolute bottom-0 left-0 w-[600px] h-[600px] bg-purple-600 rounded-full mix-blend-screen filter blur-[100px] opacity-20">
+            </div>
+        </div>
+        <div class="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 brightness-100 contrast-150 mix-blend-overlay">
+        </div>
+        <div class="relative z-10 w-full p-8 md:p-12 bg-gradient-to-t from-slate-900/95 via-slate-900/60 to-transparent">
+            {{ caller() }}
+        </div>
+    </div>
+{% endmacro %}
+{% macro page_hero(
+    min_height='400px',
+    gradient_from='brand-900',
+    gradient_via='slate-900',
+    gradient_to='black',
+    banner_image=None,
+    show_noise=True,
+    show_blobs=False,
+    rounded='rounded-b-[3rem]',
+    admin_controls=None
+    ) %}
+    <div class="relative min-h-[{{ min_height }}] -mx-4 md:-mx-8 -mt-24 md:-mt-28 mb-12 group/hero overflow-hidden {{ rounded }}">
+        {# Background Image/Gradient #}
+        <div class="absolute inset-0 z-0">
+            {% if banner_image %}
+                <img src="{{ banner_image }}"
+                     alt="Banner"
+                     class="w-full h-full object-cover">
+                <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-[2px]"></div>
+            {% else %}
+                <div class="absolute inset-0 bg-gradient-to-br from-{{ gradient_from }} via-{{ gradient_via }} to-{{ gradient_to }}">
+                </div>
+                {% if show_noise %}
+                    <div class="absolute inset-0 opacity-30 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] contrast-150 brightness-100 mix-blend-overlay">
+                    </div>
+                {% endif %}
+            {% endif %}
+            {# Decorative blobs (home page style) #}
+            {% if show_blobs %}
+                <div class="absolute -top-24 -right-24 w-96 h-96 bg-brand-400 rounded-full mix-blend-multiply filter blur-3xl opacity-50 animate-blob">
+                </div>
+                <div class="absolute -bottom-24 -left-24 w-96 h-96 bg-purple-400 rounded-full mix-blend-multiply filter blur-3xl opacity-50 animate-blob animation-delay-2000">
+                </div>
+            {% endif %}
+            <div class="absolute inset-0 bg-gradient-to-t from-slate-900/90 via-slate-900/40 to-transparent"></div>
+        </div>
+        {# Admin Controls (banner upload etc) #}
+        {% if admin_controls %}
+            <div class="absolute top-28 right-4 md:right-8 z-20 opacity-0 group-hover/hero:opacity-100 transition-opacity">
+                {{ admin_controls }}
+            </div>
+        {% endif %}
+        <div class="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-full min-h-[{{ min_height }}] flex flex-col justify-end pb-12 pt-32">
+            {{ caller() }}
+        </div>
+    </div>
+{% endmacro %}
+{% macro profile_hero(
+    gradient_from='brand-700',
+    gradient_via='indigo-800',
+    gradient_to='slate-900',
+    show_noise=True
+    ) %}
+    <div class="relative h-40 md:h-56 rounded-b-[2.5rem] overflow-hidden -mx-4 md:-mx-8 -mt-24 md:-mt-28 z-0">
+        <div class="absolute inset-0 bg-gradient-to-br from-brand-600 via-indigo-800 to-slate-900"></div>
+        {% if show_noise %}
+            <div class="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-30 brightness-100 contrast-150 mix-blend-overlay">
+            </div>
+        {% endif %}
+        <div class="absolute top-0 right-0 w-full h-full bg-gradient-to-t from-black/30 to-transparent"></div>
+    </div>
+{% endmacro %}
+{% macro list_page_header(
+    title,
+    highlight_word,
+    tagline,
+    gradient_from='brand-600',
+    gradient_to='indigo-600',
+    search_placeholder='Search...',
+    search_focus_color='brand-500',
+    action_url=None,
+    action_text=None,
+    action_color='brand',
+    show_action=True
+    ) %}
+    <div class="mb-12 text-center md:text-left md:flex justify-between items-end">
+        <div>
+            <h1 class="text-4xl md:text-5xl font-extrabold text-slate-900 tracking-tight mb-4">
+                {{ title }} <span class="bg-clip-text text-transparent bg-gradient-to-r from-{{ gradient_from }} to-{{ gradient_to }}">{{ highlight_word }}</span>
+            </h1>
+            <p class="text-lg text-slate-600 max-w-2xl">{{ tagline }}</p>
+        </div>
+        <div class="mt-6 md:mt-0 flex gap-3">
+            <div class="relative group">
+                <input type="text"
+                       placeholder="{{ search_placeholder }}"
+                       class="pl-10 pr-4 py-3 bg-white border-2 border-slate-100 rounded-2xl focus:border-{{ search_focus_color }} focus:ring-0 w-full md:w-64 transition-all shadow-sm group-hover:bg-slate-50">
+                <span class="absolute left-3 top-3.5 text-slate-400 group-hover:text-{{ search_focus_color }} transition-colors">{{ icon('search', 'md') }}</span>
+            </div>
+            {% if show_action and action_url and action_text %}
+                <a href="{{ action_url }}"
+                   class="flex items-center gap-2 px-6 py-3 bg-{{ action_color }}-600 text-white rounded-2xl font-bold hover:bg-{{ action_color }}-700 transition-all shadow-lg hover:shadow-{{ action_color }}-500/30 transform hover:-translate-y-0.5">
+                    {{ icon('plus', 'md') }}
+                    {{ action_text }}
+                </a>
+            {% endif %}
+        </div>
+    </div>
+{% endmacro %}
+{% macro location_badge(location) %}
+    {% if location %}
+        <span class="inline-flex items-center px-3 py-1 rounded-full bg-white/10 backdrop-blur-md text-white/90 text-sm font-medium border border-white/10">
+            <span class="mr-1.5 opacity-70">{{ icon('location-marker', 'sm') }}</span>
+            {{ location }}
+        </span>
+    {% endif %}
+{% endmacro %}
+{% macro detail_row(label, icon_name=None) %}
+    <div>
+        <span class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">{{ label }}</span>
+        <div class="flex items-center gap-2 text-slate-900 font-medium">
+            {% if icon_name %}<span class="text-slate-400">{{ icon(icon_name, 'md') }}</span>{% endif %}
+            {{ caller() }}
+        </div>
+    </div>
+{% endmacro %}
+{% macro settings_section_header(title, icon_name, color='blue') %}
+    <h4 class="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
+        <span class="w-6 h-6 rounded bg-{{ color }}-100 text-{{ color }}-600 flex items-center justify-center">
+            {{ icon(icon_name, 'sm') }}
+        </span>
+        {{ title }}
+    </h4>
 {% endmacro %}
