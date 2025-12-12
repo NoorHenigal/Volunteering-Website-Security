@@ -90,12 +90,12 @@
                                         {{ form_input('email', 'email', 'you@example.com', true, '', id='email', autocomplete='username', inputmode='email', autocapitalize='none', spellcheck='false') }}
                                     </div>
                                     <div>
-                                        {{ form_label('Username', 'username', true) }}
-                                        {{ form_input('username', 'text', 'johndoe', true, '', id='username', autocomplete='nickname', autocapitalize='none', spellcheck='false') }}
-                                    </div>
-                                    <div>
                                         {{ form_label('Password', 'password', true) }}
                                         {{ form_input('password', 'password', 'Min 8 characters', true, '', id='password', autocomplete='new-password') }}
+                                    </div>
+                                    <div>
+                                        {{ form_label('Username', 'username', true) }}
+                                        {{ form_input('username', 'text', 'johndoe', true, '', id='username', autocomplete='nickname', autocapitalize='none', spellcheck='false') }}
                                     </div>
                                     <div class="pt-1">{{ primary_button('Create Account', 'submit', 'brand') }}</div>
                                 </div>
@@ -118,12 +118,12 @@
                                         {{ form_input('email', 'email', 'contact@org.com', true, '', id='org_email', autocomplete='username', inputmode='email', autocapitalize='none', spellcheck='false') }}
                                     </div>
                                     <div>
-                                        {{ form_label('Username', 'username', true) }}
-                                        {{ form_input('username', 'text', 'helping-hands', true, '', id='org_username', autocomplete='nickname', autocapitalize='none', spellcheck='false') }}
-                                    </div>
-                                    <div>
                                         {{ form_label('Password', 'password', true) }}
                                         {{ form_input('password', 'password', 'Min 8 characters', true, '', id='org_password', autocomplete='new-password') }}
+                                    </div>
+                                    <div>
+                                        {{ form_label('Username', 'username', true) }}
+                                        {{ form_input('username', 'text', 'helping-hands', true, '', id='org_username', autocomplete='nickname', autocapitalize='none', spellcheck='false') }}
                                     </div>
                                     <div class="pt-1">{{ primary_button('Create Organization', 'submit', 'brand') }}</div>
                                 </div>

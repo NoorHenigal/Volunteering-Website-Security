@@ -22,20 +22,20 @@ AccountType = Literal["volunteer", "organization"]
 class VolunteerRegisterSchema(BaseCreate):
     """Volunteer registration."""
 
-    email: EmailStr
-    password: str = Field(min_length=8)
     first_name: str = Field(min_length=1)
     last_name: str = Field(min_length=1)
+    email: EmailStr
+    password: str = Field(min_length=8)
     username: str = Field(min_length=3, pattern=r"^[a-zA-Z0-9_-]+$")
 
 
 class OrganizationRegisterSchema(BaseCreate):
     """Organization registration."""
 
+    name: str = Field(min_length=1)
     email: EmailStr
     password: str = Field(min_length=8)
     username: str = Field(min_length=3, pattern=r"^[a-zA-Z0-9_-]+$")  # Profile URL
-    name: str = Field(min_length=1)  # Display name
 
 
 class LoginSchema(StrictModel):

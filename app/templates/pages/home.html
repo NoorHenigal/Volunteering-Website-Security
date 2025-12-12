@@ -21,10 +21,10 @@
                         Ready to make a difference today? You are logged in as a <span class="text-white underline decoration-brand-300 underline-offset-4">{{ user.role|title }}</span>.
                     </p>
                     <div class="flex flex-wrap gap-4">
-                        <a href="/auth/status"
+                        <a href="/{{ user.username }}"
                            class="bg-white text-brand-700 px-8 py-3.5 rounded-full text-base font-bold hover:bg-brand-50 shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1 flex items-center gap-2">
                             {{ icon('user', 'md') }}
-                            Dashboard
+                            My Profile
                         </a>
                         {% if user.role == 'volunteer' %}
                             <a href="/opportunities"

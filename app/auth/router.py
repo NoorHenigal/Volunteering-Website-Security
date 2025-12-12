@@ -65,9 +65,9 @@ async def register_volunteer(
             )
 
             if ctx.is_htmx:
-                response = await htmx_redirect("/auth/status")
+                response = await htmx_redirect("/")
             else:
-                response = await ctx.success_response(redirect_url="/auth/status")
+                response = await ctx.success_response(redirect_url="/")
 
             set_auth_cookies(response, tokens.access_token)
             return response
@@ -121,9 +121,9 @@ async def register_organization(
             )
 
             if ctx.is_htmx:
-                response = await htmx_redirect("/auth/status")
+                response = await htmx_redirect("/")
             else:
-                response = await ctx.success_response(redirect_url="/auth/status")
+                response = await ctx.success_response(redirect_url="/")
 
             set_auth_cookies(response, tokens.access_token)
             return response
@@ -283,9 +283,3 @@ async def get_current_user(ctx: Annotated[RequestContext, Depends(get_context)])
     """Get current user details."""
     user = ctx.require_authenticated()
     return await ctx.success_response(data=UserResponse.model_validate(user))
-
-
-@router.get("/status", include_in_schema=False)
-async def status_page(ctx: Annotated[RequestContext, Depends(get_context)]) -> Response:
-    """Show status page (UI only)."""
-    return await ctx.success_response(template="pages/auth_status.html")
