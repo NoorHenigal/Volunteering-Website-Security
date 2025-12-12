@@ -1,7 +1,4 @@
-"""Business logic for organizations.
-
-This service layer consolidates logic shared between API and UI handlers.
-"""
+"""Organization business logic."""
 
 from uuid import UUID
 
@@ -23,9 +20,12 @@ class OrganizationService(BaseService):
         self._org_repo = OrganizationRepository(db)
         self._role_repo = UserOrganizationRoleRepository(db)
 
-    async def list_all(self) -> list[Organization]:
-        """Get all organizations."""
-        return await self._org_repo.get_all()
+    async def list_all(self, page: int = 1, limit: int = 100) -> tuple[list[Organization], int]:
+        """Get all organizations with pagination."""
+        skip = (page - 1) * limit
+        items = await self._org_repo.get_all(skip=skip, limit=limit)
+        total = await self._org_repo.count_all()
+        return items, total
 
     async def get_by_id(self, organization_id: UUID) -> Organization:
         """Get organization by ID or raise 404."""
@@ -40,20 +40,17 @@ class OrganizationService(BaseService):
         self,
         *,
         name: str,
+        username: str,
         description: str | None,
         admin_user_id: UUID,
     ) -> Organization:
-        """Create a new organization with the creator as admin.
-
-        Args:
-            name: Organization name
-            description: Optional description
-            admin_user_id: User ID to assign as admin
-
-        Returns:
-            Created Organization
-        """
-        return await self._org_repo.create_with_admin(name, description, admin_user_id)
+        """Create organization with creator as admin."""
+        org = Organization(
+            name=name,
+            username=username,
+            description=description,
+        )
+        return await self._org_repo.create_with_admin(org, admin_user_id)
 
     async def update(
         self,
@@ -62,21 +59,24 @@ class OrganizationService(BaseService):
         name: str | None = None,
         description: str | None = None,
     ) -> Organization:
-        """Update an organization.
-
-        Args:
-            organization: Organization to update
-            name: New name (optional)
-            description: New description (optional)
-
-        Returns:
-            Updated Organization
-        """
+        """Update organization name and/or description."""
         if name is not None:
             organization.name = name
         if description is not None:
             organization.description = description
 
+        return await self._org_repo.update(organization)
+
+    async def update_banner(self, organization_id: UUID, filename: str) -> Organization:
+        """Update organization banner."""
+        organization = await self.get_by_id(organization_id)
+        organization.banner = filename
+        return await self._org_repo.update(organization)
+
+    async def update_logo(self, organization_id: UUID, filename: str) -> Organization:
+        """Update organization logo."""
+        organization = await self.get_by_id(organization_id)
+        organization.logo = filename
         return await self._org_repo.update(organization)
 
     async def get_members(self, organization_id: UUID) -> list[OrganizationMemberResponse]:
@@ -89,6 +89,7 @@ class OrganizationService(BaseService):
                 username=r.user.username,
                 first_name=r.user.first_name,
                 last_name=r.user.last_name,
+                user_role=r.user.role,
                 role=r.role,
             )
             for r in member_roles

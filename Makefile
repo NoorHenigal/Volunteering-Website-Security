@@ -1,7 +1,11 @@
 include Docker/.env
 export
 
-.PHONY: pg-volatile pg-persistent export-schema
+.PHONY: pg-volatile pg-persistent export-schema build-css
+
+# Build Tailwind CSS
+build-css:
+	tailwindcss -i app/static/css/input.css -o app/static/css/output.css --minify
 
 # Start the volatile (in-memory) database
 pg-volatile:

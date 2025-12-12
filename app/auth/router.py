@@ -1,12 +1,20 @@
-"""Authentication routes - unified API and UI."""
+"""Authentication routes."""
 
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Response
+from fastapi.exceptions import RequestValidationError
 from pydantic import ValidationError
 
 from app.auth import service
-from app.auth.schemas import LoginSchema, RegisterSchema, TokenResponse, UserResponse
+from app.auth.schemas import (
+    LoginSchema,
+    OrganizationRegisterSchema,
+    OrganizationResponse,
+    TokenResponse,
+    UserResponse,
+    VolunteerRegisterSchema,
+)
 from app.core.base_schemas import ErrorResponse, request_body_from_model
 from app.core.context import RequestContext, get_context, validation_error_response
 from app.core.htmx import htmx_redirect
@@ -16,57 +24,115 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 
 @router.post(
-    "/register",
+    "/register/volunteer",
     response_model=UserResponse | None,
     responses={201: {"model": UserResponse}, 400: {"model": ErrorResponse}, 409: {"model": ErrorResponse}},
-    openapi_extra=request_body_from_model(RegisterSchema),
+    openapi_extra=request_body_from_model(VolunteerRegisterSchema),
 )
-async def register(
+async def register_volunteer(
     ctx: Annotated[RequestContext, Depends(get_context)],
 ) -> Response:
-    """Register new user - handles both API and UI requests."""
+    """Register new volunteer account."""
     try:
         reg_data = await ctx.parse_body(
-            RegisterSchema,
+            VolunteerRegisterSchema,
             {
                 "email": "email",
                 "password": "password",
-                "role": "role",
                 "first_name": "first_name",
                 "last_name": "last_name",
                 "username": "username",
             },
         )
         if not reg_data:
-            return ctx.error_response("Invalid content type", status_code=400)
-    except ValidationError as e:
+            return await ctx.error_response("Invalid content type", status_code=400)
+    except (ValidationError, RequestValidationError) as e:
+        if ctx.is_ui:
+            return await ctx.error_response(e, template="pages/auth.html", block="content", active_tab="volunteer")
         return validation_error_response(e)
 
     try:
-        user = await service.register_user(reg_data, ctx.db)
+        user = await service.register_volunteer(reg_data, ctx.db)
 
         # For UI, also log them in
         if ctx.is_ui:
-            tokens = await service.login_user(
+            tokens = await service.login_entity(
                 ctx.db,
                 reg_data.email,
                 reg_data.password,
+                "volunteer",
                 ctx.request.headers.get("user-agent"),
             )
 
             if ctx.is_htmx:
-                response = htmx_redirect("/auth/status")
+                response = await htmx_redirect("/")
             else:
-                response = ctx.success_response(redirect_url="/auth/status")
+                response = await ctx.success_response(redirect_url="/")
 
             set_auth_cookies(response, tokens.access_token)
             return response
 
-        return ctx.success_response(data=user, status_code=201)
+        return await ctx.success_response(data=user, status_code=201)
 
     except Exception as e:
         if ctx.is_ui:
-            return ctx.error_response(e, template="register.html", block="register_form")
+            return await ctx.error_response(e, template="pages/auth.html", block="content", active_tab="volunteer")
+        raise
+
+
+@router.post(
+    "/register/organization",
+    response_model=OrganizationResponse | None,
+    responses={201: {"model": OrganizationResponse}, 400: {"model": ErrorResponse}, 409: {"model": ErrorResponse}},
+    openapi_extra=request_body_from_model(OrganizationRegisterSchema),
+)
+async def register_organization(
+    ctx: Annotated[RequestContext, Depends(get_context)],
+) -> Response:
+    """Register new organization account."""
+    try:
+        reg_data = await ctx.parse_body(
+            OrganizationRegisterSchema,
+            {
+                "email": "email",
+                "password": "password",
+                "username": "username",
+                "name": "name",
+            },
+        )
+        if not reg_data:
+            return await ctx.error_response("Invalid content type", status_code=400)
+    except (ValidationError, RequestValidationError) as e:
+        if ctx.is_ui:
+            return await ctx.error_response(e, template="pages/auth.html", block="content", active_tab="organization")
+        return validation_error_response(e)
+
+    try:
+        org = await service.register_organization(reg_data, ctx.db)
+
+        # For UI, also log them in
+        if ctx.is_ui:
+            tokens = await service.login_entity(
+                ctx.db,
+                reg_data.email,
+                reg_data.password,
+                "organization",
+                ctx.request.headers.get("user-agent"),
+            )
+
+            if ctx.is_htmx:
+                response = await htmx_redirect("/")
+            else:
+                response = await ctx.success_response(redirect_url="/")
+
+            set_auth_cookies(response, tokens.access_token)
+            return response
+
+        return await ctx.success_response(data=org, status_code=201)
+
+    except Exception as e:
+        if ctx.is_ui:
+            return await ctx.error_response(e, template="pages/auth.html", block="content", active_tab="organization")
         raise
 
 
@@ -79,52 +145,109 @@ async def register(
 async def login(
     ctx: Annotated[RequestContext, Depends(get_context)],
 ) -> Response:
-    """Login - handles both API and UI requests."""
+    """Login - handles both volunteer and organization accounts."""
     try:
         login_data = await ctx.parse_body(
             LoginSchema,
-            {"email": "email", "password": "password"},
+            {"email": "email", "password": "password", "account_type": "account_type"},
         )
         if not login_data:
-            return ctx.error_response("Invalid content type", status_code=400)
-    except ValidationError as e:
+            return await ctx.error_response("Invalid content type", status_code=400)
+    except (ValidationError, RequestValidationError) as e:
+        if ctx.is_ui:
+            return await ctx.error_response(e, template="pages/auth.html", block="content")
         return validation_error_response(e)
 
     try:
-        tokens = await service.login_user(
+        tokens = await service.login_entity(
             ctx.db,
             login_data.email,
             login_data.password,
+            login_data.account_type,
             ctx.request.headers.get("user-agent"),
         )
 
         if ctx.is_ui:
             if ctx.is_htmx:
-                response = htmx_redirect("/auth/status")
+                response = await htmx_redirect("/")
             else:
-                response = ctx.success_response(redirect_url="/auth/status")
+                response = await ctx.success_response(redirect_url="/")
 
             set_auth_cookies(response, tokens.access_token)
             return response
 
-        return ctx.success_response(data=tokens)
+        return await ctx.success_response(data=tokens)
 
     except Exception as e:
         if ctx.is_ui:
-            return ctx.error_response(e, template="login.html", block="login_form")
+            return await ctx.error_response(e, template="pages/auth.html", block="content")
         raise
 
 
 @router.get("/login", include_in_schema=False)
 async def login_page(ctx: Annotated[RequestContext, Depends(get_context)]) -> Response:
     """Show login page (UI only)."""
-    return ctx.success_response(template="login.html")
+    form_config = {
+        "title": "Welcome Back",
+        "subtitle": "Sign in to your account",
+        "container_id": "login-container",
+        "action": "/auth/login",
+        "fields": [
+            {
+                "name": "email",
+                "type": "email",
+                "label": "Email",
+                "placeholder": "you@example.com",
+                "required": True,
+                "show_label": True,
+            },
+            {
+                "name": "password",
+                "type": "password",
+                "label": "Password",
+                "placeholder": "",
+                "required": True,
+                "show_label": True,
+            },
+            {
+                "name": "account_type",
+                "type": "select",
+                "label": "Account Type",
+                "placeholder": "Select account type",
+                "required": True,
+                "show_label": True,
+                "options": [("volunteer", "Volunteer"), ("organization", "Organization")],
+                "default": "volunteer",
+            },
+        ],
+        "submit_text": "Sign In",
+        "footer_text": "Don't have an account?",
+        "footer_link": "/auth/register",
+        "footer_link_text": "Create one",
+    }
+    return await ctx.success_response(template="pages/auth.html", form_config=form_config, view="login")
 
 
 @router.get("/register", include_in_schema=False)
 async def register_page(ctx: Annotated[RequestContext, Depends(get_context)]) -> Response:
-    """Show registration page (UI only)."""
-    return ctx.success_response(template="register.html")
+    """Show registration page with tabbed interface (UI only)."""
+    # Configuration for volunteer registration form
+    volunteer_form = {
+        "action": "/auth/register/volunteer",
+    }
+
+    # Configuration for organization registration form
+    organization_form = {
+        "action": "/auth/register/organization",
+    }
+
+    return await ctx.success_response(
+        template="pages/auth.html",
+        view="register",
+        volunteer_form=volunteer_form,
+        organization_form=organization_form,
+        active_tab="volunteer",
+    )
 
 
 @router.post(
@@ -139,9 +262,13 @@ async def logout(ctx: Annotated[RequestContext, Depends(get_context)]) -> Respon
         await service.logout(refresh_token, ctx.db)
 
     if ctx.is_ui:
-        response = htmx_redirect("/auth/login") if ctx.is_htmx else ctx.success_response(redirect_url="/auth/login")
+        response = (
+            await htmx_redirect("/auth/login")
+            if ctx.is_htmx
+            else await ctx.success_response(redirect_url="/auth/login")
+        )
     else:
-        response = ctx.success_response(data=None)
+        response = await ctx.success_response(data=None)
 
     clear_auth_cookies(response)
     return response
@@ -155,10 +282,4 @@ async def logout(ctx: Annotated[RequestContext, Depends(get_context)]) -> Respon
 async def get_current_user(ctx: Annotated[RequestContext, Depends(get_context)]) -> Response:
     """Get current user details."""
     user = ctx.require_authenticated()
-    return ctx.success_response(data=UserResponse.model_validate(user))
-
-
-@router.get("/status", include_in_schema=False)
-async def status_page(ctx: Annotated[RequestContext, Depends(get_context)]) -> Response:
-    """Show status page (UI only)."""
-    return ctx.success_response(template="status.html")
+    return await ctx.success_response(data=UserResponse.model_validate(user))

@@ -7,9 +7,14 @@
     "workflows": "context",
     "opportunities": "global",
     "organizations": "contract",
-    "profiles" : "client"
+    "profile": "client",
+    "profiles": "client"
   },
   "ruff.nativeServer": true,
-  "ruff.lint.select": ["ALL"],
+  "ruff.lint.select": [
+    "ALL"
+  ],
   "ruff.lineLength": 120,
+  "css.lint.unknownAtRules": "ignore",
+  "css.lint.propertyIgnoredDueToDisplay": "ignore"
 }

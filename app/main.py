@@ -1,16 +1,20 @@
 """Main FastAPI application."""
 
+import logging
 import os
+import sys
+from collections.abc import Awaitable, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response
+from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.middleware.gzip import GZipMiddleware
 
 from app.auth.router import router as auth_router
 from app.core.config import settings
@@ -40,8 +44,9 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None]:
     # Startup: Run pre-flight checks
     try:
         await run_preflight_checks()
-    except StartupCheckError:
-        # Error already logged, exit immediately without traceback
+    except StartupCheckError as e:
+        sys.stderr.write(f"Startup check failed: {e}\n")
+        sys.stderr.flush()
         os._exit(1)
 
     # If TEST_RUN_DURATION is set, schedule automatic shutdown
@@ -74,6 +79,33 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.add_middleware(GZipMiddleware, minimum_size=1000)
+
+
+log = logging.getLogger(__name__)
+
+
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
+    """Add security headers to all responses."""
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    return response
+
+
+@app.exception_handler(Exception)
+async def generic_exception_handler(_request: Request, _exc: Exception) -> JSONResponse:
+    """Handle unhandled exceptions - log but don't leak stack traces."""
+    log.exception("Unhandled exception")
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error", "status_code": 500, "error_code": None},
+    )
+
+
 # Mount static files
 BASE_DIR = Path(__file__).resolve().parent
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
@@ -82,7 +114,7 @@ app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="stat
 @app.get("/", include_in_schema=False)
 async def home(ctx: ContextDep) -> Response:
     """Home page."""
-    return render_template(ctx.request, "index.html", user=ctx.user)
+    return await render_template(ctx.request, "pages/home.html", user=ctx.user)
 
 
 app.include_router(auth_router)

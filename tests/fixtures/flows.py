@@ -28,14 +28,13 @@ class FlowHelper:
         self.api = api
 
     async def create_user(self, role: RoleType = "volunteer") -> AuthenticatedUser:
-        """Create and login a new user (self-contained, no conftest dependency)."""
-        data = RegisterSchemaFactory.build(role=role)
+        """Create and login a new volunteer user."""
+        data = RegisterSchemaFactory.build()
         resp = await self.api.client.post(
-            "/auth/register",
+            "/auth/register/volunteer",
             json={
                 "email": data.email,
                 "password": data.password,
-                "role": role,
                 "first_name": data.first_name,
                 "last_name": data.last_name,
                 "username": data.username,
@@ -45,12 +44,23 @@ class FlowHelper:
 
         tokens_resp = await self.api.client.post(
             "/auth/login",
-            json={"email": data.email, "password": data.password},
+            json={"email": data.email, "password": data.password, "account_type": "volunteer"},
         )
         assert tokens_resp.status_code == 200, f"Login failed: {tokens_resp.text}"
         tokens: dict[str, str] = tokens_resp.json()
 
-        return AuthenticatedUser(email=data.email, password=data.password, tokens=tokens, role=role)
+        return AuthenticatedUser(
+            id=UUID(tokens.get("sub"))
+            if tokens.get("sub")
+            else UUID(int=0),  # Fallback if sub missing, but should be there
+            first_name=data.first_name,
+            last_name=data.last_name,
+            email=data.email,
+            password=data.password,
+            username=data.username,
+            tokens=tokens,
+            role=role,
+        )
 
     async def apply(
         self,
@@ -118,6 +128,7 @@ class FlowHelper:
             auth=user,
             json={
                 "name": name or data.name,
+                "username": data.username,
                 "description": description or data.description,
             },
         )

@@ -1,4 +1,4 @@
-"""Application lifecycle management: startup checks and lifespan utilities."""
+"""Startup checks and application lifecycle."""
 
 import asyncio
 import logging
@@ -6,6 +6,7 @@ import os
 import signal
 from contextlib import suppress
 
+import psutil
 from alembic.config import Config
 from alembic.runtime.migration import MigrationContext
 from alembic.script import ScriptDirectory
@@ -18,8 +19,30 @@ from app.db.session import sync_engine
 log = logging.getLogger(__name__)
 
 
+ARGON2_PROFILE_INCOMPATIBLE_MSG = (
+    "Host machine does not meet requirements for configured Argon2 profile "
+    "(ARGON2_PROFILE=RFC_9106_HIGH_MEMORY). See Argon2-Info.md."
+)
+
+
 class StartupCheckError(Exception):
     """Raised when a startup check fails."""
+
+
+def _check_argon2_profile_compatibility() -> None:
+    if settings.argon2_profile != "RFC_9106_HIGH_MEMORY":
+        return
+
+    total_ram_bytes = int(psutil.virtual_memory().total)
+    total_ram_gib = total_ram_bytes / (1024**3)
+    cpu_cores = os.cpu_count() or 1
+
+    min_ram_gib = 6
+    min_cpu_cores = 2
+
+    if total_ram_gib < min_ram_gib or cpu_cores < min_cpu_cores:
+        msg = ARGON2_PROFILE_INCOMPATIBLE_MSG
+        raise StartupCheckError(msg)
 
 
 def _check_database_connection() -> None:
@@ -65,23 +88,21 @@ async def run_preflight_checks() -> None:
 
     This function is async to support demo data seeding.
     """
+    if os.getenv("SKIP_PREFLIGHT_CHECKS") == "1":
+        return
+
     log.info("Running startup checks...")
 
-    try:
-        _check_database_connection()
-        _check_migrations()
+    _check_argon2_profile_compatibility()
+    _check_database_connection()
+    _check_migrations()
 
-        # Seed demo data if enabled
-        if settings.demo_data:
-            log.info("DEMO_DATA enabled, checking demo data...")
-            await seed_demo_data()
+    # Seed demo data if enabled
+    if settings.demo_data:
+        log.info("DEMO_DATA enabled, checking demo data...")
+        await seed_demo_data()
 
-        log.info("All startup checks passed\n")
-
-    except StartupCheckError:
-        log.exception("Startup check failed")
-        log.warning("Application cannot start. Fix the issue above and try again.\n")
-        raise
+    log.info("All startup checks passed\n")
 
 
 async def auto_shutdown(duration: int) -> None:

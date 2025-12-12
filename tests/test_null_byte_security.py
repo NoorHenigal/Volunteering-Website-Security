@@ -6,12 +6,14 @@ import pytest
 from fastapi import status
 from pydantic import ValidationError
 
-from app.auth.schemas import RegisterSchema
+from app.auth.schemas import VolunteerRegisterSchema
 from app.opportunities.schemas import OpportunityCreate
 from app.organizations.schemas import OrganizationCreate
 from app.profiles.schemas import ProfileUpdateSchema
 from tests.fixtures.api import APIHelper
 from tests.fixtures.flows import FlowHelper
+
+TEST_PWD = "TestPass123!"
 
 
 class TestNullByteRejection:
@@ -31,11 +33,10 @@ class TestNullByteRejection:
         """Test that registration rejects null bytes in email field."""
         for null_string in self.NULL_BYTE_STRINGS:
             response = await api.client.post(
-                "/auth/register",
+                "/auth/register/volunteer",
                 json={
                     "email": f"test{null_string}@example.com",
                     "password": "TestPass123!",
-                    "role": "volunteer",
                     "first_name": "Test",
                     "last_name": "User",
                     "username": "testuser123",
@@ -52,11 +53,10 @@ class TestNullByteRejection:
         """Test that registration rejects null bytes in password field."""
         for null_string in self.NULL_BYTE_STRINGS:
             response = await api.client.post(
-                "/auth/register",
+                "/auth/register/volunteer",
                 json={
                     "email": "test@example.com",
                     "password": f"TestPass{null_string}123!",
-                    "role": "volunteer",
                     "first_name": "Test",
                     "last_name": "User",
                     "username": "testuser123",
@@ -73,11 +73,10 @@ class TestNullByteRejection:
         for null_string in self.NULL_BYTE_STRINGS:
             # Test first_name
             response = await api.client.post(
-                "/auth/register",
+                "/auth/register/volunteer",
                 json={
                     "email": "test@example.com",
                     "password": "TestPass123!",
-                    "role": "volunteer",
                     "first_name": f"Test{null_string}",
                     "last_name": "User",
                     "username": "testuser123",
@@ -90,11 +89,10 @@ class TestNullByteRejection:
 
             # Test last_name
             response = await api.client.post(
-                "/auth/register",
+                "/auth/register/volunteer",
                 json={
                     "email": "test@example.com",
                     "password": "TestPass123!",
-                    "role": "volunteer",
                     "first_name": "Test",
                     "last_name": f"User{null_string}",
                     "username": "testuser123",
@@ -110,11 +108,10 @@ class TestNullByteRejection:
         """Test that registration rejects null bytes in username field."""
         for null_string in self.NULL_BYTE_STRINGS:
             response = await api.client.post(
-                "/auth/register",
+                "/auth/register/volunteer",
                 json={
                     "email": "test@example.com",
                     "password": "TestPass123!",
-                    "role": "volunteer",
                     "first_name": "Test",
                     "last_name": "User",
                     "username": f"testuser{null_string}",
@@ -128,7 +125,7 @@ class TestNullByteRejection:
     @pytest.mark.anyio
     async def test_organization_creation_rejects_null_bytes(self, api: APIHelper, flows: FlowHelper) -> None:
         """Test that organization creation rejects null bytes."""
-        org_user = await flows.create_user("organization")
+        org_user = await flows.create_user("volunteer")
 
         for null_string in self.NULL_BYTE_STRINGS:
             # Test name field
@@ -136,6 +133,7 @@ class TestNullByteRejection:
                 "/organizations",
                 json={
                     "name": f"TestOrg{null_string}",
+                    "username": "testorg",
                     "description": "Test description",
                 },
                 headers=org_user.auth_header,
@@ -150,6 +148,7 @@ class TestNullByteRejection:
                 "/organizations",
                 json={
                     "name": "TestOrg",
+                    "username": "testorg",
                     "description": f"Test{null_string}",
                 },
                 headers=org_user.auth_header,
@@ -162,7 +161,7 @@ class TestNullByteRejection:
     @pytest.mark.anyio
     async def test_opportunity_creation_rejects_null_bytes(self, api: APIHelper, flows: FlowHelper) -> None:
         """Test that opportunity creation rejects null bytes."""
-        org_user = await flows.create_user("organization")
+        org_user = await flows.create_user("volunteer")
         org = await flows.create_org(org_user)
 
         for null_string in self.NULL_BYTE_STRINGS:
@@ -199,12 +198,11 @@ class TestNullByteRejection:
     @pytest.mark.anyio
     async def test_pydantic_schema_validation_rejects_null_bytes(self) -> None:
         """Test that Pydantic schemas reject null bytes at validation level."""
-        # Test RegisterSchema
+        # Test VolunteerRegisterSchema
         with pytest.raises(ValidationError):
-            RegisterSchema(
+            VolunteerRegisterSchema(
                 email="test\x00@example.com",
                 password="TestPass123!",  # noqa: S106
-                role="volunteer",
                 first_name="Test",
                 last_name="User",
                 username="testuser",
@@ -212,7 +210,11 @@ class TestNullByteRejection:
 
         # Test OrganizationCreate
         with pytest.raises(ValidationError):
-            OrganizationCreate(name="Test\x00Org", description="Test")
+            OrganizationCreate(
+                name="Test\x00Org",
+                username="testorg",
+                description="Test",
+            )
 
         # Test OpportunityCreate - this will fail because we need a valid UUID
         # but we're testing the string fields

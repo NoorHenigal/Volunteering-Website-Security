@@ -1,4 +1,4 @@
-"""Profile schemas for user profiles and follow functionality."""
+"""Profile and follow schemas."""
 
 from datetime import datetime
 from uuid import UUID
@@ -25,12 +25,15 @@ __all__ = [
 
 
 class ProfileUpdateSchema(BaseUpdate):
-    """Schema for updating user bio/description."""
+    """Update profile bio and description."""
 
     bio: BioField = None
     description: LongDescriptionField = None
+    display_name: str | None = None
+    first_name: str | None = None
+    last_name: str | None = None
 
-    @field_validator("bio", "description", mode="before")
+    @field_validator("bio", "description", "display_name", "first_name", "last_name", mode="before")
     @classmethod
     def strip_whitespace(cls, v: str | None) -> str | None:
         """Strip whitespace and convert empty strings to None."""
@@ -41,7 +44,7 @@ class ProfileUpdateSchema(BaseUpdate):
 
 
 class PrivacySettingsSchema(BaseUpdate):
-    """Schema for updating privacy settings."""
+    """Update privacy settings."""
 
     profile_visibility: ProfileVisibilityField | None = None
     show_email: bool | None = None
@@ -50,7 +53,7 @@ class PrivacySettingsSchema(BaseUpdate):
 
 
 class BaseProfileSchema(UserFieldsMixin, StrictModel):
-    """Base profile fields visible at all privacy levels."""
+    """Minimal profile fields."""
 
     id: UUID
 
@@ -58,7 +61,7 @@ class BaseProfileSchema(UserFieldsMixin, StrictModel):
 
 
 class PublicProfileSchema(BaseProfileSchema):
-    """Public profile - visible to anyone (anonymous or authenticated)."""
+    """Public profile visible to anyone."""
 
     bio: str | None = None
     role: str
@@ -67,7 +70,7 @@ class PublicProfileSchema(BaseProfileSchema):
 
 
 class FullProfileSchema(PublicProfileSchema):
-    """Full profile - visible to owner, followers (based on settings), or authenticated users."""
+    """Full profile with privacy-controlled fields."""
 
     email: str | None = None  # Only if show_email=True
     description: str | None = None
@@ -77,7 +80,7 @@ class FullProfileSchema(PublicProfileSchema):
 
 
 class FollowResponseSchema(StrictModel):
-    """Response for follow operations."""
+    """Follow relationship details."""
 
     follower_id: UUID
     followed_id: UUID

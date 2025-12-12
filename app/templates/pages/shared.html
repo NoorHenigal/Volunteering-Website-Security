@@ -1,0 +1,163 @@
+{% extends "layouts/base.html" %}
+{% from "components/icons.html" import icon %}
+{% from "components/layout.html" import page_header, form_header, section_title %}
+{% from "components/feedback.html" import empty_state, warning_box, alert_fragment %}
+{% from "components/cards.html" import organization_card, opportunity_card, page_card, page_card_tight %}
+{% from "components/forms.html" import form_label, form_input, form_textarea, form_select, htmx_form %}
+{% from "components/buttons.html" import action_buttons, back_link %}
+{% block title %}
+    {% if view == 'list' %}
+        {{ page_title }}
+    {% elif view == 'form' %}
+        {% if resource %}
+            Edit
+        {% else %}
+            Create
+        {% endif %}
+        {{ resource_type|title }}
+    {% else %}
+        {{ detail_config.title }}
+    {% endif %}
+{% endblock %}
+{% block content %}
+    {% if view == 'list' %}
+        <div class="max-w-7xl mx-auto">
+            {{ page_header(page_title, create_url, create_text, create_color, show_create) }}
+            <div id="{{ resource_type }}-list" class="animate-enter">
+                {% block resource_cards %}
+                    {% if items %}
+                        <div class="grid gap-6 md:gap-8 {{ grid_cols }}">
+                            {% for item in items %}
+                                {% block resource_card scoped %}
+                                    {% if resource_type == 'organization' %}
+                                        {{ organization_card(item) }}
+                                    {% elif resource_type == 'opportunity' %}
+                                        {{ opportunity_card(item) }}
+                                    {% elif resource_type == 'applicant' %}
+                                        {% from "components/cards.html" import applicant_card %}
+                                        {{ applicant_card(item, opportunity) }}
+                                    {% elif resource_type == 'follower' or resource_type == 'following' %}
+                                        {% from "components/cards.html" import user_card %}
+                                        {{ user_card(item, user, item.is_following if item.is_following is defined else false) }}
+                                    {% elif resource_type == 'application' %}
+                                        {% from "components/cards.html" import application_card %}
+                                        {% call application_card(item, show_opportunity=true, show_actions=true) %}
+                                            {% if item.status == 'pending' %}
+                                                <div class="flex justify-end">
+                                                    {% from "components/buttons.html" import withdraw_button %}
+                                                    {{ withdraw_button(item.id, 'sm') }}
+                                                </div>
+                                            {% endif %}
+                                        {% endcall %}
+                                    {% endif %}
+                                {% endblock %}
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        {{ empty_state(empty_message, create_url, create_text, create_color, show_create) }}
+                    {% endif %}
+                {% endblock %}
+            </div>
+        </div>
+    {% elif view == 'form' %}
+        {% call page_card('2xl') %}
+            <div id="form-container">
+                {% block form_content %}
+                    {{ form_header(back_url, 'Back to ' + page_title, form_title) }}
+                    <div id="alert-container">
+                        {% if error %}{{ alert_fragment('red', error) }}{% endif %}
+                    </div>
+                    {% if show_warning %}
+                        {% call warning_box() %}
+                            <h3 class="text-lg font-bold text-amber-900">{{ warning_title }}</h3>
+                            <p class="mt-2 text-sm text-amber-800">{{ warning_message }}</p>
+                            <div class="mt-4">
+                                <a href="{{ warning_action_url }}"
+                                   class="inline-flex items-center px-5 py-2.5 bg-brand-600 text-white font-bold rounded-full hover:bg-brand-700 transition-all shadow-md transform hover:-translate-y-0.5">
+                                    <span class="mr-2">{{ icon('plus', 'md') }}</span>
+                                    {{ warning_action_text }}
+                                </a>
+                            </div>
+                        {% endcall %}
+                        <p class="mt-8 text-center">{{ back_link(back_url, 'Back to ' + page_title) }}</p>
+                    {% else %}
+                        {% call htmx_form(form_action, '#form-container', 'innerHTML') %}
+                            <div class="space-y-6">
+                                {% for field in form_fields %}
+                                    <div>
+                                        {{ form_label(field.label, field.name, field.required) }}
+                                        {% if field.type == 'text' %}
+                                            {{ form_input(field.name, 'text', field.placeholder, field.required, field.value if resource else '') }}
+                                        {% elif field.type == 'textarea' %}
+                                            {{ form_textarea(field.name, field.rows or 6, field.placeholder, field.required, field.value if resource
+                                                                                        else '') }}
+                                        {% elif field.type == 'select' %}
+                                            {{ form_select(field.name, field.options, field.placeholder, field.required, field.selected_value) }}
+                                        {% endif %}
+                                    </div>
+                                {% endfor %}
+                                {{ action_buttons(submit_text, back_url, submit_color) }}
+                            </div>
+                        {% endcall %}
+                    {% endif %}
+                {% endblock %}
+            </div>
+        {% endcall %}
+    {% else %}
+        {% call page_card(detail_config.max_width) %}
+            {% if detail_config.show_back_link %}
+                <div class="mb-8">{{ back_link(detail_config.back_url, detail_config.back_text) }}</div>
+            {% endif %}
+            <div class="{% if detail_config.header_actions %}flex flex-col md:flex-row md:items-start md:justify-between gap-6{% endif %} mb-10 pb-8 border-b border-slate-100">
+                <div class="flex-1">
+                    <h1 class="text-3xl md:text-4xl font-bold text-slate-900 tracking-tight mb-4">{{ detail_config.title }}</h1>
+                    {% if detail_config.subtitle %}
+                        <p class="text-slate-500 text-lg leading-relaxed max-w-3xl">{{ detail_config.subtitle }}</p>
+                    {% endif %}
+                    {% if detail_config.badges %}
+                        <div class="flex flex-wrap items-center gap-3 mt-6">
+                            {% for badge in detail_config.badges %}{{ badge }}{% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+                {% if detail_config.header_actions %}
+                    <div class="flex-shrink-0 flex gap-3">{{ detail_config.header_actions }}</div>
+                {% endif %}
+            </div>
+            {% if detail_config.description %}
+                <div class="mb-12">
+                    {% if detail_config.description_title %}
+                        <h2 class="text-xl font-bold text-slate-900 mb-4">{{ detail_config.description_title }}</h2>
+                    {% endif %}
+                    <div class="prose prose-slate max-w-none text-slate-600 leading-relaxed whitespace-pre-wrap">
+                        {{ detail_config.description }}
+                    </div>
+                </div>
+            {% endif %}
+            {% if detail_config.details %}
+                <div class="mb-12">
+                    {{ section_title('Details', False) }}
+                    <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {% for detail in detail_config.details %}
+                            <div class="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                                <span class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">{{ detail.label }}</span>
+                                <span class="block text-slate-900 font-semibold">{{ detail.value }}</span>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            {% endif %}
+            {% for section in detail_config.sections %}
+                {% if section.show_title %}{{ section_title(section.title, section.border_top) }}{% endif %}
+                <div class="{% if section.border_top %}{% else %}mb-12{% endif %}"
+                     id="{{ section.id }}">
+                    {% block section scoped %}{{ section.content }}{% endblock %}
+                </div>
+            {% endfor %}
+            {% if detail_config.actions %}
+                <div class="border-t border-slate-100 pt-8 mt-8 bg-slate-50/50 -mx-8 -mb-8 px-8 pb-8 rounded-b-2xl"
+                     id="actions-section">{{ detail_config.actions }}</div>
+            {% endif %}
+        {% endcall %}
+    {% endif %}
+{% endblock %}

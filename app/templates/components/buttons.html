@@ -1,0 +1,87 @@
+{# Button Components #}
+{% from "components/icons.html" import icon as render_icon %}
+{% macro button_solid(text, href=None, color='brand', size='md', full_width=False, icon_html=None) %}
+    {% set size_classes = {
+        "sm": "text-xs font-semibold py-2 px-4",
+        "md": "text-sm font-semibold py-2.5 px-6",
+        "lg": "text-base font-bold py-3.5 px-8"
+    } %}
+    {% set base = size_classes.get(size, size_classes['md']) %}
+    {% set width = 'w-full' if full_width else '' %}
+    {% set color_class = 'bg-slate-900 hover:bg-slate-800' if color == 'black' else 'bg-' ~ color ~ '-600 hover:bg-' ~ color ~ '-700' %}
+    {% if color == 'brand' %}
+        {% set color_class = "bg-gradient-to-r from-brand-600 to-brand-700 hover:from-brand-700 hover:to-brand-800 shadow-lg hover:shadow-brand-500/30" %}
+    {% endif %}
+    {% if href %}
+        <a href="{{ href }}"
+           class="{{ width }} {{ base }} inline-flex items-center justify-center gap-2 rounded-full text-white transition-all transform hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-{{ color }}-500 {{ color_class }}">
+            {{ text }}
+            {% if icon_html %}{{ icon_html|safe }}{% endif %}
+        </a>
+    {% else %}
+        <button type="submit"
+                class="{{ width }} {{ base }} inline-flex items-center justify-center gap-2 rounded-full text-white transition-all transform hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-{{ color }}-500 {{ color_class }}">
+            {{ text }}
+            {% if icon_html %}{{ icon_html|safe }}{% endif %}
+            <span class="htmx-indicator ml-2">{{ render_icon('spinner', 'sm', 'animate-spin text-white') }}</span>
+        </button>
+    {% endif %}
+{% endmacro %}
+{% macro primary_button(text, type='submit', color='brand', full_width=True) %}
+    {{ button_solid(text, color=color, full_width=full_width) }}
+{% endmacro %}
+{% macro secondary_button(url, text='Cancel', full_width=False) %}
+    {# Secondary/cancel button style #}
+    <a href="{{ url }}"
+       class="{% if full_width %}flex-1{% endif %} bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold py-2.5 px-6 rounded-full text-center inline-block transition-all hover:shadow-sm">
+        {{ text }}
+    </a>
+{% endmacro %}
+{% macro action_buttons(submit_text, cancel_url, submit_color='brand') %}
+    <div class="flex gap-4 pt-4">
+        <button type="submit"
+                class="flex-1 bg-gradient-to-r from-brand-600 to-brand-700 hover:from-brand-700 hover:to-brand-800 text-white font-bold py-3 px-6 rounded-full shadow-lg hover:shadow-brand-500/30 transition-all transform hover:-translate-y-0.5">
+            {{ submit_text }}
+        </button>
+        <a href="{{ cancel_url }}"
+           class="flex-1 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold py-3 px-6 rounded-full text-center hover:shadow-sm transition-all">
+            Cancel
+        </a>
+    </div>
+{% endmacro %}
+{% macro back_link(url, text, extra_classes='') %}
+    <a href="{{ url }}"
+       onclick="if(document.referrer && document.referrer.indexOf(window.location.host) !== -1) { history.back(); return false; }"
+       class="group inline-flex items-center text-sm font-semibold transition-colors {{ extra_classes if extra_classes else 'text-slate-500 hover:text-brand-600' }}">
+        <span class="mr-1 transition-transform group-hover:-translate-x-1">{{ render_icon('arrow-left', 'sm') }}</span>
+        {{ text }}
+    </a>
+{% endmacro %}
+{% macro withdraw_button(application_id, size='md') %}
+    {% set size_classes = {"sm": "py-1.5 px-3 text-xs", "md": "py-2 px-4 text-sm"} %}
+    <form action="/applications/{{ application_id }}/withdraw"
+          method="POST"
+          class="inline">
+        <button type="submit"
+                class="inline-flex items-center gap-2 bg-white border border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 font-semibold {{ size_classes.get(size, size_classes['md']) }} rounded-full transition-all shadow-sm">
+            {{ render_icon('x', 'xs') }}
+            Withdraw
+        </button>
+    </form>
+{% endmacro %}
+{# HTMX button with loading state #}
+{% macro htmx_button(text, action, method="post", target="this", color="brand") %}
+    {% set color_class = "bg-gradient-to-r from-brand-600 to-brand-700 hover:from-brand-700 hover:to-brand-800" %}
+    {% if color != "brand" and color != "blue" %}
+        {% set color_class = 'bg-' ~ color ~ '-600 hover:bg-' ~ color ~ '-700' %}
+    {% endif %}
+    <button hx-
+            {{ method }}
+            None="{{ action }}"
+            hx-target="{{ target }}"
+            hx-swap="outerHTML"
+            class="{{ color_class }} text-white font-bold py-2 px-4 rounded-full shadow-md inline-flex items-center gap-2 transition-all transform hover:-translate-y-0.5">
+        {{ text }}
+        <span class="htmx-indicator hidden">{{ render_icon('spinner', 'sm', 'animate-spin text-white') }}</span>
+    </button>
+{% endmacro %}

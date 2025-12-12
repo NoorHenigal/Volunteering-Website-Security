@@ -1,4 +1,4 @@
-"""Strict typed configuration settings and logging."""
+"""Application configuration."""
 
 import logging
 from datetime import timedelta
@@ -10,7 +10,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    """Application settings with strict typing."""
+    """Application settings from environment variables."""
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -52,9 +52,18 @@ class Settings(BaseSettings):
     # Demo Data
     demo_data: bool = Field(default=False, alias="DEMO_DATA")
 
+    # Argon2
+    argon2_profile: Literal["RFC_9106_LOW_MEMORY", "RFC_9106_HIGH_MEMORY"] = Field(
+        default="RFC_9106_HIGH_MEMORY",
+        alias="ARGON2_PROFILE",
+    )
+
+    # Uploads (optional override)
+    upload_dir: Path | None = Field(default=None, alias="UPLOAD_DIR")
+
     @property
     def database_url(self) -> str:
-        """Generate database URL (psycopg driver works for both sync and async)."""
+        """PostgreSQL connection URL."""
         return (
             f"postgresql+psycopg://{self.postgres_user}:{self.postgres_password}"
             f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
@@ -62,17 +71,16 @@ class Settings(BaseSettings):
 
     @property
     def access_token_expiry(self) -> timedelta:
-        """Get access token expiry as timedelta."""
+        """Access token expiry as timedelta."""
         return timedelta(minutes=self.access_token_expire_minutes)
 
     @property
     def refresh_token_expiry(self) -> timedelta:
-        """Get refresh token expiry as timedelta."""
+        """Refresh token expiry as timedelta."""
         return timedelta(days=self.refresh_token_expire_days)
 
 
 def _create_settings() -> Settings:
-    """Create settings instance with helpful error handling."""
     try:
         return Settings()
     except Exception as e:
@@ -85,9 +93,7 @@ def _create_settings() -> Settings:
 settings: Settings = _create_settings()
 
 
-# Logging Configuration
 def _configure_logging() -> logging.Logger:
-    """Configure and return the application logger."""
     level = logging.DEBUG if settings.log_level == "debug" else logging.WARNING
     logging.basicConfig(level=level, format="[%(levelname)s] %(message)s", force=True)
     return logging.getLogger("app")

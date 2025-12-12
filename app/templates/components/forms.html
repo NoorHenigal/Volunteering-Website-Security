@@ -1,0 +1,127 @@
+{# Form Components #}
+{% from "components/icons.html" import icon %}
+{% macro form_label(text, for_id=None, required=False) %}
+    <label {% if for_id %}for="{{ for_id }}"{% endif %}
+           class="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">
+        {{ text }}
+        {% if required %}<span class="text-brand-500">*</span>{% endif %}
+    </label>
+{% endmacro %}
+{% macro form_input(name, type='text', placeholder='', required=False, value='', id=None, style='default', autocomplete=None, inputmode=None, autocapitalize=None, spellcheck=None) %}
+    {% set style_classes = {
+        "default": "w-full px-5 py-3 border border-slate-200 rounded-xl bg-slate-50 text-slate-900 placeholder-slate-400 focus:bg-white focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 transition-all duration-200 outline-none",
+        "modal": "block w-full rounded-xl border-slate-200 bg-slate-50 p-3 focus:ring-brand-500 focus:border-brand-500 font-medium"
+    } %}
+    <input type="{{ type }}"
+           id="{{ id or name }}"
+           name="{{ name }}"
+           value="{{ value }}"
+           {% if autocomplete is not none %}autocomplete="{{ autocomplete }}"{% endif %}
+           {% if inputmode is not none %}inputmode="{{ inputmode }}"{% endif %}
+           {% if autocapitalize is not none %}autocapitalize="{{ autocapitalize }}"{% endif %}
+           {% if spellcheck is not none %}spellcheck="{{ spellcheck }}"{% endif %}
+           {% if required %}required{% endif %}
+           class="{{ style_classes.get(style, style_classes['default']) }}"
+           placeholder="{{ placeholder }}">
+{% endmacro %}
+{% macro form_textarea(name, rows=6, placeholder='', required=False, value='', id=None, style='default') %}
+    {% set style_classes = {
+        "default": "w-full px-5 py-3 border border-slate-200 rounded-xl bg-slate-50 text-slate-900 placeholder-slate-400 focus:bg-white focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 transition-all duration-200 outline-none resize-y",
+        "modal": "block w-full rounded-xl border-slate-200 bg-slate-50 p-3 focus:ring-brand-500 focus:border-brand-500 font-medium resize-none"
+    } %}
+    <textarea id="{{ id or name }}"
+              name="{{ name }}"
+              rows="{{ rows }}"
+              {% if required %}required{% endif %}
+              class="{{ style_classes.get(style, style_classes['default']) }}"
+              placeholder="{{ placeholder }}">{{ value }}</textarea>
+{% endmacro %}
+{% macro form_select(name, options, placeholder='Select an option', required=False, selected_value=None, id=None) %}
+    <div class="relative">
+        <select name="{{ name }}"
+                id="{{ id or name }}"
+                {% if required %}required{% endif %}
+                class="appearance-none w-full px-5 py-3 border border-slate-200 rounded-xl bg-slate-50 text-slate-900 focus:bg-white focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 transition-all duration-200 outline-none">
+            <option value="">{{ placeholder }}</option>
+            {% for value, label in options %}
+                <option value="{{ value }}" {% if selected_value==value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-slate-500">
+            {{ icon('chevron-down', 'sm') }}
+        </div>
+    </div>
+{% endmacro %}
+{% macro htmx_form(action, target="#main-content", swap="outerHTML") %}
+    <form hx-post="{{ action }}"
+          hx-target="{{ target }}"
+          hx-swap="{{ swap }}"
+          hx-indicator=".htmx-indicator"
+          hx-ext="response-targets"
+          hx-target-4
+          None="{{ target }}">
+        {{ caller() }}
+    </form>
+{% endmacro %}
+{% from "components/feedback.html" import alert_container, alert_fragment %}
+{% macro auth_form_card(title, subtitle, container_id) %}
+    <div class="max-w-lg mx-auto animate-enter w-full">
+        <div id="{{ container_id }}">
+            <div class="bg-white rounded-2xl shadow-premium p-8 border border-slate-100">
+                <div class="text-center mb-6">
+                    <div class="inline-flex items-center justify-center p-3 rounded-xl bg-brand-50 text-brand-600 mb-4">
+                        {{ icon('fingerprint', 'lg') }}
+                    </div>
+                    <h2 class="text-3xl font-bold text-slate-900 mb-2">{{ title }}</h2>
+                    <p class="text-slate-500 text-base">{{ subtitle }}</p>
+                </div>
+                {{ alert_container() }}
+                {{ caller() }}
+            </div>
+        </div>
+    </div>
+{% endmacro %}
+{% macro radio_option(name, value, icon, label, description, checked=False) %}
+    <label class="flex items-start p-4 border rounded-xl cursor-pointer transition-all duration-200 {% if checked %}bg-brand-50/50 border-brand-200 ring-1 ring-brand-200{% else %}hover:bg-slate-50 border-slate-200{% endif %}">
+        <div class="flex items-center h-5">
+            <input type="radio"
+                   name="{{ name }}"
+                   value="{{ value }}"
+                   {% if checked %}checked{% endif %}
+                   class="h-4 w-4 text-brand-600 border-slate-300 focus:ring-brand-500">
+        </div>
+        <div class="ml-3">
+            <span class="block font-semibold text-slate-900 text-sm flex items-center gap-2">
+                <span>{{ icon }}</span> {{ label }}
+            </span>
+            <span class="block text-xs text-slate-500 mt-0.5">{{ description }}</span>
+        </div>
+    </label>
+{% endmacro %}
+{% macro checkbox_toggle(name, label, description, checked=False) %}
+    <label class="flex items-center justify-between p-4 border rounded-xl cursor-pointer transition-all duration-200 {% if checked %}bg-brand-50/30 border-brand-200{% else %}hover:bg-slate-50 border-slate-200{% endif %}">
+        <div>
+            <span class="block font-semibold text-slate-900 text-sm">{{ label }}</span>
+            <span class="block text-xs text-slate-500 mt-0.5">{{ description }}</span>
+        </div>
+        <div class="relative inline-flex items-center cursor-pointer">
+            <input type="checkbox"
+                   name="{{ name }}"
+                   value="on"
+                   {% if checked %}checked{% endif %}
+                   class="sr-only peer">
+            <div class="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-brand-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-brand-600">
+            </div>
+        </div>
+    </label>
+{% endmacro %}
+{% macro modal_field(label, name, type='text', value='', placeholder='', rows=None) %}
+    <div>
+        <label class="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">{{ label }}</label>
+        {% if type == 'textarea' %}
+            {{ form_textarea(name, rows=rows or 5, placeholder=placeholder, value=value, style='modal') }}
+        {% else %}
+            {{ form_input(name, type=type, placeholder=placeholder, value=value, style='modal') }}
+        {% endif %}
+    </div>
+{% endmacro %}

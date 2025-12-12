@@ -1,0 +1,128 @@
+{# User Components #}
+{% from "components/icons.html" import icon %}
+{% macro avatar_initials(first_name=None, last_name=None, username=None, profile_picture=None, size='md') %}
+    {% set size_classes = {
+        "xs": "h-6 w-6 text-[10px]",
+        "sm": "h-8 w-8 text-xs",
+        "md": "h-10 w-10 text-sm",
+        "lg": "h-12 w-12 text-base",
+        "xl": "h-16 w-16 text-lg",
+        "2xl": "h-24 w-24 text-2xl"
+    } %}
+    {% set initials = ((first_name[0] if first_name else (username[0] if username else '?')) ~ (last_name[0] if last_name else ''))|upper %}
+    {% if profile_picture %}
+        <img src="/static/uploads/avatars/{{ profile_picture }}"
+             alt="Avatar"
+             class="{{ size_classes.get(size, size_classes['md']) }} rounded-full object-cover shadow-md border-2 border-white ring-1 ring-slate-100">
+    {% else %}
+        <div class="{{ size_classes.get(size, size_classes['md']) }} rounded-full bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center text-white font-bold shadow-md border-2 border-white ring-1 ring-slate-100 uppercase">
+            {{ initials }}
+        </div>
+    {% endif %}
+{% endmacro %}
+{% macro user_avatar(user, size='md') %}
+    {% set size_classes = {"sm": "h-8 w-8 text-xs", "md": "h-10 w-10 text-sm", "lg": "h-16 w-16 text-lg", "xl": "h-24 w-24 text-2xl"} %}
+    {% set initials = user.initials if user else "??" %}
+    {% if user and user.profile_picture %}
+        <img src="/static/uploads/avatars/{{ user.profile_picture }}"
+             alt="{{ user.first_name }}'s avatar"
+             class="{{ size_classes.get(size, size_classes['md']) }} rounded-full object-cover shadow-md border-2 border-white ring-1 ring-slate-100">
+    {% else %}
+        <div class="{{ size_classes.get(size, size_classes['md']) }} rounded-full bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center text-white font-bold shadow-md border-2 border-white ring-1 ring-slate-100 uppercase tracking-widest">
+            {{ initials }}
+        </div>
+    {% endif %}
+{% endmacro %}
+{% macro user_info_row(label, value) %}
+    <div class="flex justify-between items-center py-3 border-b border-slate-50 last:border-0">
+        <span class="text-slate-500 font-medium text-sm">{{ label }}</span>
+        <span class="text-slate-900 font-semibold">{{ value }}</span>
+    </div>
+{% endmacro %}
+{% macro follow_button(username, is_following, size='md') %}
+    {% set size_classes = {"sm": "px-3 py-1 text-xs", "md": "px-4 py-2 text-sm", "lg": "px-6 py-2.5 text-base"} %}
+    {% if is_following %}
+        <form action="/{{ username }}/unfollow" method="POST" class="inline">
+            <button type="submit"
+                    class="{{ size_classes.get(size, size_classes['md']) }} rounded-full font-bold border border-slate-200 bg-white hover:bg-red-50 hover:text-red-600 hover:border-red-200 text-slate-600 transition-all shadow-sm">
+                Unfollow
+            </button>
+        </form>
+    {% else %}
+        <form action="/{{ username }}/follow" method="POST" class="inline">
+            <button type="submit"
+                    class="{{ size_classes.get(size, size_classes['md']) }} rounded-full font-bold bg-brand-600 hover:bg-brand-700 text-white transition-all shadow-md hover:shadow-lg transform hover:-translate-y-0.5">
+                Follow
+            </button>
+        </form>
+    {% endif %}
+{% endmacro %}
+{% macro follower_stats(follower_count, following_count, username, show_links=True) %}
+    <div class="flex gap-8 text-sm">
+        {% if show_links %}
+            <a href="/{{ username }}/followers"
+               class="text-slate-600 hover:text-brand-600 transition-colors group">
+                <span class="font-bold text-slate-900 text-lg group-hover:text-brand-700">{{ follower_count }}</span>
+                <span class="text-slate-500 ml-1">Followers</span>
+            </a>
+            <a href="/{{ username }}/following"
+               class="text-slate-600 hover:text-brand-600 transition-colors group">
+                <span class="font-bold text-slate-900 text-lg group-hover:text-brand-700">{{ following_count }}</span>
+                <span class="text-slate-500 ml-1">Following</span>
+            </a>
+        {% else %}
+            <div class="text-slate-600">
+                <span class="font-bold text-slate-900 text-lg">{{ follower_count }}</span>
+                <span class="text-slate-500 ml-1">Followers</span>
+            </div>
+            <div class="text-slate-600">
+                <span class="font-bold text-slate-900 text-lg">{{ following_count }}</span>
+                <span class="text-slate-500 ml-1">Following</span>
+            </div>
+        {% endif %}
+    </div>
+{% endmacro %}
+{% macro bio_section(bio, description, can_edit=False) %}
+    {% if bio or description or can_edit %}
+        <div class="mt-6">
+            {% if bio %}<p class="text-slate-800 font-medium text-lg leading-relaxed">{{ bio }}</p>{% endif %}
+            {% if description %}
+                <div x-data="{ expanded: false }" class="mt-3">
+                    <p class="text-slate-600 leading-relaxed" x-show="!expanded">
+                        {{ description[:200] }}
+                        {% if description|length > 200 %}...{% endif %}
+                    </p>
+                    <p class="text-slate-600 leading-relaxed"
+                       x-show="expanded"
+                       style="display: none">{{ description }}</p>
+                    {% if description|length > 200 %}
+                        <button @click="expanded = !expanded"
+                                class="text-brand-600 hover:text-brand-800 text-sm font-bold mt-2 flex items-center gap-1">
+                            <span x-show="!expanded">Read more</span>
+                            <span x-show="expanded" style="display: none;">Show less</span>
+                            <span x-show="!expanded">{{ icon('chevron-down', 'sm') }}</span>
+                            <span x-show="expanded" style="display: none;">{{ icon('chevron-up', 'sm') }}</span>
+                        </button>
+                    {% endif %}
+                </div>
+            {% endif %}
+            {% if can_edit and not bio and not description %}
+                <div class="bg-slate-50 border border-dashed border-slate-300 rounded-xl p-6 text-center mt-4">
+                    <p class="text-slate-500 text-sm mb-2">Tell the world about yourself!</p>
+                    <a href="/settings/profile"
+                       class="inline-flex items-center text-brand-600 hover:text-brand-800 font-semibold text-sm">
+                        Add a bio
+                        <span class="ml-1">{{ icon('arrow-right', 'sm') }}</span>
+                    </a>
+                </div>
+            {% endif %}
+        </div>
+    {% endif %}
+{% endmacro %}
+{% macro datetime_display(date, prefix='') %}
+    <span class="text-xs font-medium text-slate-400 uppercase tracking-wide">{{ prefix }}{{ date.strftime("%B %d, %Y") 
+    }}</span>
+{% endmacro %}
+{% macro date_display(date, fmt='%B %d, %Y', prefix='') %}
+    <span class="text-sm text-slate-500">{{ prefix }}{{ date.strftime(fmt) }}</span>
+{% endmacro %}

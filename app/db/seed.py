@@ -1,9 +1,4 @@
-"""Database seeding utilities for demo data generation.
-
-This module provides functionality to seed the database with realistic demo data
-using the Faker library. All data is dynamically generated - no hardcoded values.
-The seeding is idempotent and will only run once.
-"""
+"""Database seeding utilities for demo data generation."""
 
 import logging
 
@@ -17,20 +12,12 @@ from app.db.session import AsyncSessionLocal
 
 log = logging.getLogger(__name__)
 
-
-# Seed for reproducible data
 FAKER_SEED = 42
 
 
 async def seed_demo_data() -> None:
-    """Seed the database with demo data if it doesn't already exist.
-
-    This function is idempotent - it checks for existing demo data and skips
-    seeding if found. All operations are performed in a single transaction.
-    All data is dynamically generated using Faker.
-    """
+    """Seed the database with demo data if it doesn't already exist."""
     async with AsyncSessionLocal() as session:
-        # Check if any data already exists
         result = await session.execute(select(Organization).limit(1))
         if result.scalar_one_or_none():
             log.info("✓ Demo data already exists, skipping seeding")
@@ -39,28 +26,18 @@ async def seed_demo_data() -> None:
         log.info("Seeding demo data...")
 
         try:
-            # Initialize Faker with seed for reproducibility
             fake = Faker()
             Faker.seed(FAKER_SEED)
-
-            # Create entities in order of dependencies
-            orgs = await _create_organizations(session, fake)
             users = await _create_users(session, fake)
-            await _create_user_org_roles(session, fake, users, orgs)
-            opportunities = await _create_opportunities(session, fake, users, orgs)
-            await _create_applications(session, fake, users, opportunities)
-            follows_count = await _create_follows(session, fake, users)
 
-            # Commit all changes
+            orgs, used_user_count = await _create_organizations_with_sequence(session, fake, users)
+            opportunities = await _create_opportunities(session, fake, orgs)
+            volunteers = users[used_user_count:]
+
+            await _create_applications(session, fake, volunteers, opportunities)
+            await _create_follows(session, fake, users)
             await session.commit()
             log.info("✓ Demo data seeded successfully")
-            log.info(
-                "  Created: %d organizations, %d users, %d opportunities, %d follows",
-                len(orgs),
-                len(users),
-                len(opportunities),
-                follows_count,
-            )
 
         except Exception:
             await session.rollback()
@@ -68,207 +45,169 @@ async def seed_demo_data() -> None:
             raise
 
 
-async def _create_organizations(session: AsyncSession, fake: Faker) -> list[Organization]:
-    """Create demo organizations with dynamic data.
-
-    Args:
-        session: Database session
-        fake: Faker instance
-
-    Returns:
-        List of created organizations
-    """
-    organizations = []
-
-    # Create 4-6 organizations with dynamic names and descriptions
-    num_orgs = fake.random_int(min=4, max=6)
-    for _ in range(num_orgs):
-        org = Organization(
-            name=fake.company(),
-            description=fake.catch_phrase() + ". " + fake.bs().capitalize() + ".",
-        )
-        organizations.append(org)
-
-    session.add_all(organizations)
-    await session.flush()  # Get IDs without committing
-    return organizations
-
-
-def _create_user(
-    fake: Faker,
-    role: str,
-    password_hash: str,
-    visibility_options: list[str],
-    show_email_chance: int,
-    show_orgs_chance: int,
-    searchable_chance: int,
-) -> User:
-    """Create a single demo user with dynamic data.
-
-    Args:
-        fake: Faker instance
-        role: User role ("volunteer" or "organization")
-        password_hash: Pre-hashed password
-        visibility_options: List of visibility options to randomly choose from
-        show_email_chance: Percentage chance of showing email
-        show_orgs_chance: Percentage chance of showing organizations
-        searchable_chance: Percentage chance of being searchable
-
-    Returns:
-        Created User instance (not yet persisted)
-    """
-    return User(
-        email=fake.unique.email(),
-        password_hash=password_hash,
-        role=role,
-        first_name=fake.first_name(),
-        last_name=fake.last_name(),
-        username=fake.unique.user_name(),
-        bio=fake.sentence(nb_words=8) if fake.boolean(chance_of_getting_true=70) else None,
-        description=fake.paragraph(nb_sentences=3) if fake.boolean(chance_of_getting_true=50) else None,
-        profile_visibility=fake.random_element(elements=visibility_options),
-        show_email=fake.boolean(chance_of_getting_true=show_email_chance),
-        show_organizations=fake.boolean(chance_of_getting_true=show_orgs_chance),
-        searchable=fake.boolean(chance_of_getting_true=searchable_chance),
-    )
-
-
 async def _create_users(session: AsyncSession, fake: Faker) -> list[User]:
-    """Create demo users (volunteers and organization admins) with dynamic data.
-
-    Args:
-        session: Database session
-        fake: Faker instance
-
-    Returns:
-        List of created users
-    """
+    """Create 56 demo users (28 Male, 28 Female)."""
     default_password = hash_password("demo123")
-    visibility_options = ["public", "public", "public", "authenticated", "followers", "private"]
+    users = []
+    visibility_sequence = ["public", "authenticated", "private"]
 
-    # Create 8-12 volunteers
-    users = [
-        _create_user(
-            fake,
-            "volunteer",
-            default_password,
-            visibility_options,
-            show_email_chance=30,
-            show_orgs_chance=80,
-            searchable_chance=90,
+    males = []
+    females = []
+
+    for i in range(28):
+        avatar_num = (i % 7) + 1
+        first_name = fake.first_name_male()
+        last_name = fake.last_name()
+        username = f"{first_name}{last_name}{i + 1}"
+
+        user = User(
+            email=f"male_{i + 1}@example.com",
+            password_hash=default_password,
+            role="volunteer",
+            first_name=first_name,
+            last_name=last_name,
+            username=username,
+            profile_picture=f"demo-male-{avatar_num}.webp",
+            bio=fake.sentence(nb_words=8),
+            description=fake.paragraph(nb_sentences=2),
+            profile_visibility=visibility_sequence[i % 3],
+            show_email=True,
+            show_organizations=True,
+            searchable=True,
         )
-        for _ in range(fake.random_int(min=8, max=12))
-    ]
+        males.append(user)
 
-    # Create 4-6 organization admins
-    users.extend(
-        [
-            _create_user(
-                fake,
-                "organization",
-                default_password,
-                visibility_options,
-                show_email_chance=50,
-                show_orgs_chance=90,
-                searchable_chance=95,
-            )
-            for _ in range(fake.random_int(min=4, max=6))
-        ]
-    )
+    for i in range(28):
+        avatar_num = (i % 7) + 1
+        first_name = fake.first_name_female()
+        last_name = fake.last_name()
+        username = f"{first_name}{last_name}{i + 1}"
+
+        user = User(
+            email=f"female_{i + 1}@example.com",
+            password_hash=default_password,
+            role="volunteer",
+            first_name=first_name,
+            last_name=last_name,
+            username=username,
+            profile_picture=f"demo-female-{avatar_num}.webp",
+            bio=fake.sentence(nb_words=8),
+            description=fake.paragraph(nb_sentences=2),
+            profile_visibility=visibility_sequence[i % 3],
+            show_email=True,
+            show_organizations=True,
+            searchable=True,
+        )
+        females.append(user)
+
+    for i in range(28):
+        users.append(males[i])
+        users.append(females[i])
 
     session.add_all(users)
     await session.flush()
-
-    log.info("  Demo user credentials: email=<any demo user email>, password=demo123")
     return users
 
 
-async def _create_user_org_roles(
-    session: AsyncSession,
-    fake: Faker,
-    users: list[User],
-    orgs: list[Organization],
-) -> None:
-    """Create user-organization role relationships dynamically.
+async def _create_organizations_with_sequence(
+    session: AsyncSession, fake: Faker, users: list[User]
+) -> tuple[list[Organization], int]:
+    """Create 18 organizations with 1-2-0 admin visibility sequence.
 
-    Args:
-        session: Database session
-        fake: Faker instance
-        users: List of users
-        orgs: List of organizations
+    Returns:
+        (List[Organization], number_of_users_consumed_as_admins)
     """
-    # Get organization users
-    org_users = [u for u in users if u.role == "organization"]
+    organizations = []
+    user_idx = 0
+    sequence = [1, 2, 0]
 
-    # Skip the marker org (first one)
-    real_orgs = orgs
+    for i in range(18):
+        required_visible = sequence[i % 3]
+        required_two_admins = 2
+        num_admins = 2 if required_visible == required_two_admins else 1
 
-    roles = []
+        current_org_admins: list[User] = []
+        is_ghost_org = required_visible == 0
 
-    # Assign 1-2 admins per organization
-    for i, org in enumerate(real_orgs):
-        # Primary admin
-        primary_admin = org_users[i % len(org_users)]
-        roles.append(
-            UserOrganizationRole(
-                user_id=primary_admin.id,
+        for _ in range(num_admins):
+            admin = users[user_idx]
+            user_idx += 1
+            current_org_admins.append(admin)
+
+        primary_admin = current_org_admins[0]
+        last_name = primary_admin.last_name or "Doe"
+
+        org_name = last_name + " Foundation" if i % 2 == 0 else "The " + last_name + " Initiative"
+
+        slug_base = org_name.lower().replace("the ", "", 1).strip().replace(" ", "_").replace(".", "")
+        org_username = slug_base
+
+        for admin in current_org_admins:
+            if is_ghost_org:
+                admin.role = "organization"
+                admin.username = org_username
+                admin.custom_display_name = org_name
+            else:
+                admin.role = "volunteer"
+
+            session.add(admin)
+
+        banner_num = (i % 10) + 1
+        org_banner = f"demo-{banner_num}.webp"
+
+        org = Organization(
+            name=org_name,
+            description=fake.catch_phrase() + ". " + fake.bs().capitalize() + ".",
+            username=org_username,
+            banner=org_banner,
+            logo=None,
+        )
+        session.add(org)
+        await session.flush()
+
+        for admin in current_org_admins:
+            role = UserOrganizationRole(
+                user_id=admin.id,
                 organization_id=org.id,
                 role="admin",
             )
-        )
+            session.add(role)
 
-        # Randomly add a second admin
-        if fake.boolean(chance_of_getting_true=50) and len(org_users) > 1:
-            secondary_admin = org_users[(i + 1) % len(org_users)]
-            if secondary_admin.id != primary_admin.id:
-                roles.append(
-                    UserOrganizationRole(
-                        user_id=secondary_admin.id,
-                        organization_id=org.id,
-                        role="admin",
-                    )
-                )
+        organizations.append(org)
 
-    session.add_all(roles)
     await session.flush()
+    return organizations, user_idx
 
 
 async def _create_opportunities(
     session: AsyncSession,
     fake: Faker,
-    users: list[User],
     orgs: list[Organization],
 ) -> list[Opportunity]:
-    """Create demo opportunities with dynamic data.
-
-    Args:
-        session: Database session
-        fake: Faker instance
-        users: List of users
-        orgs: List of organizations
-
-    Returns:
-        List of created opportunities
-    """
-    org_users = [u for u in users if u.role == "organization"]
-    real_orgs = orgs
-
+    """Create 18 opportunities (1 per org)."""
     opportunities = []
 
-    # Create 8-15 opportunities
-    num_opps = fake.random_int(min=8, max=15)
+    for i, org in enumerate(orgs):
+        result = await session.execute(
+            select(UserOrganizationRole).where(
+                UserOrganizationRole.organization_id == org.id, UserOrganizationRole.role == "admin"
+            )
+        )
+        admin_role = result.scalars().first()
+        if not admin_role:
+            continue  # Should not happen
 
-    for i in range(num_opps):
-        org = real_orgs[i % len(real_orgs)]
-        poster = org_users[i % len(org_users)]
+        banner_num = (i % 10) + 1
+        opp_banner = f"demo-{banner_num}.webp"
 
         opp = Opportunity(
             title=fake.job(),
             description=fake.paragraph(nb_sentences=3),
             location=fake.city(),
-            posted_by=poster.id,
+            posted_by=admin_role.user_id,
             organization_id=org.id,
-            is_open=fake.boolean(chance_of_getting_true=80),  # 80% open
+            is_open=True,
+            banner=opp_banner,
         )
         opportunities.append(opp)
 
@@ -280,90 +219,48 @@ async def _create_opportunities(
 async def _create_applications(
     session: AsyncSession,
     fake: Faker,
-    users: list[User],
+    volunteers: list[User],
     opportunities: list[Opportunity],
 ) -> None:
-    """Create demo applications with various statuses dynamically.
-
-    Args:
-        session: Database session
-        fake: Faker instance
-        users: List of users
-        opportunities: List of opportunities
-    """
-    volunteers = [u for u in users if u.role == "volunteer"]
-
+    """Create applications."""
     applications = []
-    statuses = ["pending", "accepted", "rejected", "withdrawn"]
+    statuses = ["pending", "accepted", "rejected"]
 
-    # Create 2-4 applications per opportunity
-    app_count = 0
-    for opp in opportunities:
-        num_apps = fake.random_int(min=2, max=4)
-
-        for _ in range(num_apps):
-            volunteer = volunteers[app_count % len(volunteers)]
-
-            # Randomly select status (weighted toward pending and accepted)
-            status = fake.random_element(elements=statuses)
-
-            # 50% chance of having a message
-            message = fake.sentence(nb_words=10) if fake.boolean() else None
-
+    for i, vol in enumerate(volunteers):
+        start_idx = i % len(opportunities)
+        for k in range(2):
+            opp = opportunities[(start_idx + k) % len(opportunities)]
             app = Application(
                 opportunity_id=opp.id,
-                volunteer_id=volunteer.id,
-                status=status,
-                message=message,
+                volunteer_id=vol.id,
+                status=fake.random_element(statuses),
+                message=fake.sentence(),
             )
             applications.append(app)
-            app_count += 1
 
     session.add_all(applications)
     await session.flush()
 
 
-async def _create_follows(
-    session: AsyncSession,
-    fake: Faker,
-    users: list[User],
-) -> int:
-    """Create random follow relationships between users.
-
-    Args:
-        session: Database session
-        fake: Faker instance
-        users: List of users
-
-    Returns:
-        Number of follow relationships created
-    """
+async def _create_follows(session: AsyncSession, fake: Faker, users: list[User]) -> None:
+    """Create follows."""
     follows = []
-    created_pairs: set[tuple[str, str]] = set()
+    created_pairs = set()
 
     for user in users:
-        # Each user follows 2-5 random other users
-        num_to_follow = fake.random_int(min=2, max=5)
-        potential_followees = [u for u in users if u.id != user.id]
+        num_to_follow = (hash(user.username) % 4) + 3
+        potential_targets = [u for u in users if u.id != user.id]
+        targets = fake.random_elements(potential_targets, length=num_to_follow, unique=True)
 
-        # Randomly select users to follow
-        followees = fake.random_elements(
-            elements=potential_followees,
-            length=min(num_to_follow, len(potential_followees)),
-            unique=True,
-        )
-
-        for followee in followees:
-            # Avoid duplicate follows
-            pair = (str(user.id), str(followee.id))
+        for target in targets:
+            pair = (str(user.id), str(target.id))
             if pair not in created_pairs:
                 created_pairs.add(pair)
-                follow = Follow(follower_id=user.id, followed_id=followee.id)
+                follow = Follow(follower_id=user.id, followed_id=target.id)
                 follows.append(follow)
 
     session.add_all(follows)
     await session.flush()
-    return len(follows)
 
 
 __all__ = ["seed_demo_data"]

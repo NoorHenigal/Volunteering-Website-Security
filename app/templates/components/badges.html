@@ -1,0 +1,48 @@
+{% macro application_status_badge(status, size='md') %}
+    {% set size_classes = {"sm": "px-2 py-0.5 text-xs", "md": "px-3 py-1 text-xs", "lg": "px-4 py-1.5 text-sm"} %}
+    {% set status_classes = {
+        "pending": "bg-amber-100 text-amber-800 border-amber-200",
+        "accepted": "bg-green-100 text-green-800 border-green-200",
+        "rejected": "bg-red-50 text-red-600 border-red-200",
+        "withdrawn": "bg-slate-100 text-slate-600 border-slate-200"
+    } %}
+    <span class="inline-flex items-center justify-center rounded-full font-bold uppercase tracking-wider border {{ size_classes.get(size, size_classes['md']) }} {{ status_classes.get(status, 'bg-slate-100 text-slate-800') }}">
+        {{ status|title }}
+    </span>
+{% endmacro %}
+{% macro open_status_badge(is_open, size='sm') %}
+    {% set size_classes = {"xs": "text-[10px] px-2 py-0.5", "sm": "text-xs px-2.5 py-0.5", "md": "text-sm px-3 py-1"} %}
+    <span class="{{ size_classes.get(size, size_classes['sm']) }} rounded-full font-bold uppercase tracking-wider inline-flex items-center gap-1.5 border {% if is_open %}bg-emerald-50 text-emerald-700 border-emerald-200{% else %}bg-slate-50 text-slate-500 border-slate-200{% endif %}">
+        <span class="w-1.5 h-1.5 rounded-full {% if is_open %}bg-emerald-500 animate-pulse{% else %}bg-slate-400{% endif %}"></span>
+        {% if is_open %}
+            Open
+        {% else %}
+            Closed
+        {% endif %}
+    </span>
+{% endmacro %}
+{% macro member_role_badge(role) %}
+    <span class="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide border {% if role == 'admin' %}bg-purple-50 text-purple-700 border-purple-200{% else %}bg-blue-50 text-blue-700 border-blue-200{% endif %}">
+        {{ role }}
+    </span>
+{% endmacro %}
+{% macro role_badge(role) %}
+    {# User role badge #}
+    <span class="inline-flex items-center px-2.5 py-0.5 text-xs font-bold uppercase tracking-wide rounded-full bg-brand-50 text-brand-700 border border-brand-200">
+        {{ role|title }}
+    </span>
+{% endmacro %}
+{% macro privacy_badge(visibility_level, size='sm') %}
+    {% set size_classes = {"xs": "text-[10px] px-2 py-0.5", "sm": "text-xs px-2.5 py-0.5", "md": "text-sm px-3 py-1"} %}
+    {% set visibility_classes = {
+        "public": "bg-emerald-50 text-emerald-700 border-emerald-200",
+        "authenticated": "bg-blue-50 text-blue-700 border-blue-200",
+        "followers": "bg-purple-50 text-purple-700 border-purple-200",
+        "private": "bg-slate-100 text-slate-600 border-slate-200"
+    } %}
+    {% set visibility_icons = {"public": "Globe", "authenticated": "UserCheck", "followers": "Users", "private": "Lock"} %}
+    {# Using text/emoji for icons to avoid SVG bloat here, or could use SVG #}
+    <span class="{{ size_classes.get(size, size_classes['sm']) }} {{ visibility_classes.get(visibility_level, 'bg-slate-100 text-slate-800') }} rounded-full font-bold border inline-flex items-center gap-1.5">
+        <span>{{ visibility_level|title }}</span>
+    </span>
+{% endmacro %}

@@ -1,17 +1,19 @@
-"""Service dependency factories for FastAPI dependency injection.
-
-This module provides typed dependency factories for services, reducing
-boilerplate in route handlers and improving testability.
-"""
+"""Service dependency factories for FastAPI."""
 
 from typing import Annotated
 
 from fastapi import Depends
 
 from app.core.context import RequestContext, get_context
+from app.core.services.images import ImageService
 from app.opportunities.service import ApplicationService, OpportunityService
 from app.organizations.service import OrganizationService
 from app.profiles.service import ProfileService
+
+
+def get_image_service() -> ImageService:
+    """Dependency factory for ImageService."""
+    return ImageService()
 
 
 def get_opportunity_service(ctx: Annotated[RequestContext, Depends(get_context)]) -> OpportunityService:
@@ -35,6 +37,7 @@ def get_profile_service(ctx: Annotated[RequestContext, Depends(get_context)]) ->
 
 
 # Type aliases for cleaner router signatures
+ImageServiceDep = Annotated[ImageService, Depends(get_image_service)]
 OpportunityServiceDep = Annotated[OpportunityService, Depends(get_opportunity_service)]
 ApplicationServiceDep = Annotated[ApplicationService, Depends(get_application_service)]
 OrganizationServiceDep = Annotated[OrganizationService, Depends(get_organization_service)]
@@ -43,10 +46,12 @@ ProfileServiceDep = Annotated[ProfileService, Depends(get_profile_service)]
 
 __all__ = [
     "ApplicationServiceDep",
+    "ImageServiceDep",
     "OpportunityServiceDep",
     "OrganizationServiceDep",
     "ProfileServiceDep",
     "get_application_service",
+    "get_image_service",
     "get_opportunity_service",
     "get_organization_service",
     "get_profile_service",

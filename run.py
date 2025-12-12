@@ -9,10 +9,14 @@ Usage:
 
 import argparse
 import asyncio
+import os
 import sys
 
 from granian import Granian, loops
 from granian.constants import Interfaces
+
+from app.core.config import log as app_log
+from app.core.lifecycle import StartupCheckError, run_preflight_checks
 
 
 @loops.register("auto")
@@ -50,6 +54,14 @@ def main() -> None:
         help="Number of worker processes (default: 1)",
     )
     args = parser.parse_args()
+
+    try:
+        asyncio.run(run_preflight_checks())
+    except StartupCheckError as e:
+        app_log.error("%s", e)
+        sys.exit(1)
+
+    os.environ["SKIP_PREFLIGHT_CHECKS"] = "1"
 
     # Create and configure Granian server
     server = Granian(

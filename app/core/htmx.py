@@ -1,10 +1,17 @@
 """HTMX-specific response utilities."""
 
+import contextlib
 import json
+from typing import TYPE_CHECKING
 
 from fastapi import Request, Response
+from fastapi.responses import RedirectResponse
+from jinja2.runtime import new_context
 
 from app.core.templates import templates
+
+if TYPE_CHECKING:
+    from app.core.context import RequestContext
 
 
 def is_htmx(request: Request) -> bool:
@@ -12,38 +19,45 @@ def is_htmx(request: Request) -> bool:
     return request.headers.get("HX-Request") == "true"
 
 
-def htmx_redirect(url: str) -> Response:
+async def htmx_redirect(url: str) -> Response:
     """Return HTMX redirect response."""
     return Response(content="", headers={"HX-Redirect": url})
 
 
-def htmx_refresh() -> Response:
+async def htmx_refresh() -> Response:
     """Trigger full page refresh."""
     return Response(content="", headers={"HX-Refresh": "true"})
 
 
-def render_block(request: Request, template_name: str, block_name: str, **context: object) -> Response:
-    """Render a specific block from a template (for HTMX responses).
+async def handle_htmx_redirect(ctx: RequestContext, url: str) -> Response:
+    """Return HTMX redirect for HTMX requests, standard redirect otherwise."""
+    if ctx.is_htmx:
+        return await htmx_redirect(url)
+    return RedirectResponse(url=url, status_code=303)
 
-    This is the SECRET SAUCE - render just one block without creating
-    separate fragment files!
-    """
+
+async def render_block(request: Request, template_name: str, block_name: str, **context: object) -> Response:
+    """Render a specific Jinja2 block for HTMX partial updates."""
     template = templates.get_template(template_name)
 
-    # Get the specific block
     block_func = template.blocks.get(block_name)
     if not block_func:
         msg = f"Block '{block_name}' not found in {template_name}"
         raise ValueError(msg)
 
-    # Render just that block
-    ctx = template.new_context({"request": request, **context})
+    # Render full template to process imports, then extract only the requested block
+    ctx = new_context(template.environment, template_name, template.blocks)
+    ctx.vars.update({"request": request, **context})
+
+    with contextlib.suppress(Exception):
+        list(template.root_render_func(ctx))
+
     html = "".join(block_func(ctx))
 
     return Response(content=html, media_type="text/html")
 
 
-def trigger_toast(response: Response, message: str, toast_type: str = "success") -> Response:
+async def trigger_toast(response: Response, message: str, toast_type: str = "success") -> Response:
     """Add HX-Trigger header for toast notification."""
     trigger_data = {
         "show-toast": {
@@ -61,7 +75,6 @@ def trigger_toast(response: Response, message: str, toast_type: str = "success")
             elif not isinstance(existing, dict):
                 existing = {}
         except json.JSONDecodeError:
-            # Header was 'event-name' (not valid JSON)
             existing = {current_header: True}
 
         existing.update(trigger_data)

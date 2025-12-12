@@ -1,0 +1,68 @@
+{% extends "layouts/base.html" %}
+{% from "components/icons.html" import icon %}
+{% from "components/layout.html" import page_header, list_page_header %}
+{% from "components/feedback.html" import empty_state %}
+{% from "components/pagination.html" import pagination_controls %}
+{% block title %}Organizations{% endblock %}
+{% block content %}
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-enter">
+        {{ list_page_header(title='Inspiring',
+                highlight_word='Organizations',
+                tagline='Discover the teams driving change and find a cause that speaks to you.',
+                gradient_from='purple-600',
+                gradient_to='pink-600',
+                search_placeholder='Search organizations...',
+                search_focus_color='purple-500',
+                action_url=create_url,
+                action_text='Register Organization',
+                action_color='purple',
+                show_action=show_create) }}
+        {% if items %}
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                {% for item in items %}
+                    <a href="/{{ item.username }}"
+                       class="group relative bg-white rounded-3xl overflow-hidden shadow-card hover:shadow-premium transition-all duration-300 transform hover:-translate-y-1 border border-slate-100 flex flex-col h-full">
+                        <div class="h-32 bg-slate-100 relative overflow-hidden">
+                            {% if item.banner %}
+                                <img src="/static/uploads/banners/{{ item.banner }}"
+                                     alt="{{ item.name }}"
+                                     class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
+                            {% else %}
+                                <div class="w-full h-full bg-gradient-to-r from-purple-100 to-pink-100"></div>
+                            {% endif %}
+                            <div class="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-50"></div>
+                        </div>
+                        <div class="px-6 pb-6 pt-12 relative flex-1 flex flex-col">
+                            <div class="absolute -top-10 left-6">
+                                <div class="w-20 h-20 rounded-full bg-white shadow-lg p-1">
+                                    {% if item.logo %}
+                                        <img src="/static/uploads/logos/{{ item.logo }}"
+                                             alt="{{ item.name }}"
+                                             class="w-full h-full object-cover rounded-full">
+                                    {% else %}
+                                        <div class="w-full h-full bg-purple-50 rounded-full flex items-center justify-center text-purple-600 font-bold text-2xl">
+                                            {{ item.name[0] | upper }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <h3 class="text-xl font-bold text-slate-900 mb-1 group-hover:text-purple-600 transition-colors">
+                                {{
+                                item.name }}
+                            </h3>
+                            <p class="text-sm text-slate-500 font-medium mb-4">@{{ item.username }}</p>
+                            <p class="text-slate-600 text-sm line-clamp-3 mb-4 flex-1">{{ item.description }}</p>
+                            <div class="flex items-center text-xs font-bold text-slate-400 uppercase tracking-wider mt-auto pt-4 border-t border-slate-50">
+                                <span>View Profile</span>
+                                <span class="ml-auto text-purple-400 group-hover:translate-x-1 transition-transform">{{ icon('arrow-right', 'sm') }}</span>
+                            </div>
+                        </div>
+                    </a>
+                {% endfor %}
+            </div>
+        {% else %}
+            {{ empty_state(empty_message, create_url, create_text, create_color, show_create) }}
+        {% endif %}
+        {% if meta %}{{ pagination_controls(meta, '/organizations') }}{% endif %}
+    </div>
+{% endblock %}
