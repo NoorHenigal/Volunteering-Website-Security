@@ -5,8 +5,9 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from argon2 import PasswordHasher, Type
+from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
+from argon2.profiles import RFC_9106_HIGH_MEMORY, RFC_9106_LOW_MEMORY
 from fastapi import HTTPException, status
 from jose import jwt
 
@@ -23,14 +24,9 @@ from app.core.exceptions import require
 from app.db.models import Organization, RefreshToken, User, UserOrganizationRole
 from app.db.repositories import OrganizationRepository, RefreshTokenRepository, UserRepository
 
-_ph = PasswordHasher(
-    time_cost=2,
-    memory_cost=262144,
-    parallelism=4,
-    hash_len=32,
-    salt_len=16,
-    type=Type.ID,
-)
+_params = RFC_9106_HIGH_MEMORY if settings.argon2_profile == "RFC_9106_HIGH_MEMORY" else RFC_9106_LOW_MEMORY
+
+_ph = PasswordHasher.from_parameters(_params)
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession

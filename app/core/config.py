@@ -52,6 +52,12 @@ class Settings(BaseSettings):
     # Demo Data
     demo_data: bool = Field(default=False, alias="DEMO_DATA")
 
+    # Argon2
+    argon2_profile: Literal["RFC_9106_LOW_MEMORY", "RFC_9106_HIGH_MEMORY"] = Field(
+        default="RFC_9106_HIGH_MEMORY",
+        alias="ARGON2_PROFILE",
+    )
+
     # Uploads (optional override)
     upload_dir: Path | None = Field(default=None, alias="UPLOAD_DIR")
 

@@ -2,6 +2,7 @@
 
 import logging
 import os
+import sys
 from collections.abc import Awaitable, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -43,8 +44,9 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None]:
     # Startup: Run pre-flight checks
     try:
         await run_preflight_checks()
-    except StartupCheckError:
-        # Error already logged, exit immediately without traceback
+    except StartupCheckError as e:
+        sys.stderr.write(f"Startup check failed: {e}\n")
+        sys.stderr.flush()
         os._exit(1)
 
     # If TEST_RUN_DURATION is set, schedule automatic shutdown
