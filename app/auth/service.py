@@ -21,6 +21,7 @@ from app.auth.schemas import (
 )
 from app.core.config import settings
 from app.core.exceptions import require
+from app.core.services.encryption import encrypt_field, hash_email
 from app.db.models import Organization, RefreshToken, User, UserOrganizationRole
 from app.db.repositories import OrganizationRepository, RefreshTokenRepository, UserRepository
 
@@ -58,7 +59,7 @@ def create_jwt_token(entity_id: UUID, role_or_type: str, account_type: AccountTy
     }
     encoded: str = jwt.encode(
         to_encode,
-        settings.secret_key.get_secret_value(),
+        settings.jwt_secret_key.get_secret_value(),
         algorithm=settings.jwt_algorithm,
     )
     return encoded
@@ -116,7 +117,8 @@ async def register_volunteer(data: VolunteerRegisterSchema, db: AsyncSession) ->
     org_repo = OrganizationRepository(db)
 
     # Check if email already exists (in users or orgs)
-    if await user_repo.find_one(User.email == data.email):
+    email_hashed = hash_email(data.email)
+    if await user_repo.find_one(User.email_hash == email_hashed):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered")
 
     # Check if username already exists (in users or orgs)
@@ -127,7 +129,8 @@ async def register_volunteer(data: VolunteerRegisterSchema, db: AsyncSession) ->
 
     # Create new user (role defaults to volunteer)
     new_user = User(
-        email=data.email,
+        email_ciphertext=encrypt_field(data.email),
+        email_hash=email_hashed,
         password_hash=hash_password(data.password),
         first_name=data.first_name,
         last_name=data.last_name,
@@ -140,7 +143,7 @@ async def register_volunteer(data: VolunteerRegisterSchema, db: AsyncSession) ->
 async def authenticate_user(email: str, password: str, db: AsyncSession) -> User:
     """Authenticate user by email/password or raise 401."""
     user_repo = UserRepository(db)
-    user = await user_repo.get_by_email(email)
+    user = await user_repo.get_by_email_hash(hash_email(email))
     if not user or not verify_password(password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -163,7 +166,7 @@ async def issue_user_tokens(user: User, device: str | None, db: AsyncSession) ->
         user_id=user.id,
         token_hash=token_hash,
         expires_at=expires_at,
-        device_info=device,
+        device_info_ciphertext=encrypt_field(device) if device else None,
     )
     await token_repo.create(refresh_token_obj)
 
@@ -175,7 +178,8 @@ async def register_organization(data: OrganizationRegisterSchema, db: AsyncSessi
     user_repo = UserRepository(db)
     org_repo = OrganizationRepository(db)
 
-    if await user_repo.find_one(User.email == data.email):
+    email_hashed = hash_email(data.email)
+    if await user_repo.find_one(User.email_hash == email_hashed):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered")
     if await user_repo.find_one(User.username == data.username):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Username already taken")
@@ -183,7 +187,8 @@ async def register_organization(data: OrganizationRegisterSchema, db: AsyncSessi
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Username already taken")
 
     backend_user = User(
-        email=data.email,
+        email_ciphertext=encrypt_field(data.email),
+        email_hash=email_hashed,
         password_hash=hash_password(data.password),
         username=data.username,
         role="organization",

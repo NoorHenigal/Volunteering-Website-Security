@@ -42,7 +42,7 @@ def decode_access_token(token: str) -> TokenPayload:
     try:
         payload = jwt.decode(
             token,
-            settings.secret_key.get_secret_value(),
+            settings.jwt_secret_key.get_secret_value(),
             algorithms=[settings.jwt_algorithm],
         )
         # Validate required fields exist

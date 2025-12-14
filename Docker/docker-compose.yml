@@ -3,9 +3,9 @@ services:
     container_name: volunteering-db-volatile
     image: postgres:17-alpine
     environment:
-      POSTGRES_DB: ${DB_NAME}
-      POSTGRES_USER: ${DB_USER}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256 --auth-local=scram-sha-256
       POSTGRES_PASSWORD_ENCRYPTION: scram-sha-256
     ports:
@@ -13,23 +13,23 @@ services:
     volumes:
       - type: tmpfs
         target: /var/lib/postgresql/data
-      - ./init-postgres-extensions.sql:/docker-entrypoint-initdb.d/init-postgres-extensions.sql
+      - ./Docker/init-postgres-extensions.sql:/docker-entrypoint-initdb.d/init-postgres-extensions.sql
     restart: unless-stopped
 
   db-persistent:
     container_name: volunteering-db-persistent
     image: postgres:17-alpine
     environment:
-      POSTGRES_DB: ${DB_NAME}
-      POSTGRES_USER: ${DB_USER}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256 --auth-local=scram-sha-256
       POSTGRES_PASSWORD_ENCRYPTION: scram-sha-256
     ports:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./init-postgres-extensions.sql:/docker-entrypoint-initdb.d/init-postgres-extensions.sql
+      - ./Docker/init-postgres-extensions.sql:/docker-entrypoint-initdb.d/init-postgres-extensions.sql
     restart: unless-stopped
 
 volumes:

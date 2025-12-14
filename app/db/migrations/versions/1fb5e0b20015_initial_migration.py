@@ -1,8 +1,8 @@
 """Initial Migration.
 
-Revision ID: 74f828b460c1
+Revision ID: 1fb5e0b20015
 Revises:
-Create Date: 2025-12-14 01:02:12.295422+00:00
+Create Date: 2025-12-14 21:05:59.685320+00:00
 """
 
 from collections.abc import Sequence
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 from alembic import op
 
 # Revision identifiers, used by Alembic.
-revision: str = "74f828b460c1"
+revision: str = "1fb5e0b20015"
 down_revision: str | None = None
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
@@ -47,11 +47,12 @@ def upgrade() -> None:
     op.create_index(op.f("ix_organizations_username"), "organizations", ["username"], unique=True)
     op.create_table(
         "users",
-        sa.Column("email", sa.String(length=255), nullable=False),
+        sa.Column("email_ciphertext", sa.String(length=512), nullable=False),
+        sa.Column("email_hash", sa.String(length=64), nullable=False),
         sa.Column("password_hash", sa.String(length=255), nullable=False),
         sa.Column("is_active", sa.Boolean(), server_default="1", nullable=False),
         sa.Column("role", sa.String(length=50), server_default="volunteer", nullable=False),
-        sa.Column("ip_address", sa.String(length=45), nullable=True),
+        sa.Column("ip_address_ciphertext", sa.String(length=512), nullable=True),
         sa.Column("first_name", sa.String(length=100), nullable=True),
         sa.Column("last_name", sa.String(length=100), nullable=True),
         sa.Column("username", sa.String(length=50), nullable=False),
@@ -75,7 +76,7 @@ def upgrade() -> None:
         sa.CheckConstraint("length(username) >= 3", name="ck_user_username_length"),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index(op.f("ix_users_email"), "users", ["email"], unique=True)
+    op.create_index(op.f("ix_users_email_hash"), "users", ["email_hash"], unique=True)
     op.create_index(
         "ix_users_is_active", "users", ["is_active"], unique=False, postgresql_where=sa.text("is_active = true")
     )
@@ -138,7 +139,7 @@ def upgrade() -> None:
         sa.Column("user_id", sa.UUID(), nullable=False),
         sa.Column("token_hash", sa.String(length=128), nullable=False),
         sa.Column("expires_at", sa.DateTime(timezone=True), nullable=False),
-        sa.Column("device_info", sa.String(length=255), nullable=True),
+        sa.Column("device_info_ciphertext", sa.String(length=512), nullable=True),
         sa.Column("id", sa.UUID(), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
@@ -172,7 +173,7 @@ def upgrade() -> None:
         sa.Column("opportunity_id", sa.UUID(), nullable=False),
         sa.Column("volunteer_id", sa.UUID(), nullable=False),
         sa.Column("status", sa.String(length=50), server_default="pending", nullable=False),
-        sa.Column("message", sa.String(length=1000), nullable=True),
+        sa.Column("message_ciphertext", sa.String(length=2048), nullable=True),
         sa.Column("id", sa.UUID(), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
@@ -228,7 +229,7 @@ def downgrade() -> None:
     op.drop_index("ix_users_searchable", table_name="users", postgresql_where=sa.text("searchable = true"))
     op.drop_index("ix_users_role", table_name="users")
     op.drop_index("ix_users_is_active", table_name="users", postgresql_where=sa.text("is_active = true"))
-    op.drop_index(op.f("ix_users_email"), table_name="users")
+    op.drop_index(op.f("ix_users_email_hash"), table_name="users")
     op.drop_table("users")
     op.drop_index(op.f("ix_organizations_username"), table_name="organizations")
     op.drop_index(op.f("ix_organizations_name"), table_name="organizations")

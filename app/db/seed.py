@@ -7,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.service import hash_password
+from app.core.services.encryption import encrypt_field, hash_email
 from app.db.models import Application, Follow, Opportunity, Organization, User, UserOrganizationRole
 from app.db.session import AsyncSessionLocal
 
@@ -60,8 +61,10 @@ async def _create_users(session: AsyncSession, fake: Faker) -> list[User]:
         last_name = fake.last_name()
         username = f"{first_name}{last_name}{i + 1}"
 
+        email = f"male_{i + 1}@example.com"
         user = User(
-            email=f"male_{i + 1}@example.com",
+            email_ciphertext=encrypt_field(email) or "",
+            email_hash=hash_email(email),
             password_hash=default_password,
             role="volunteer",
             first_name=first_name,
@@ -83,8 +86,10 @@ async def _create_users(session: AsyncSession, fake: Faker) -> list[User]:
         last_name = fake.last_name()
         username = f"{first_name}{last_name}{i + 1}"
 
+        email = f"female_{i + 1}@example.com"
         user = User(
-            email=f"female_{i + 1}@example.com",
+            email_ciphertext=encrypt_field(email) or "",
+            email_hash=hash_email(email),
             password_hash=default_password,
             role="volunteer",
             first_name=first_name,
@@ -234,7 +239,7 @@ async def _create_applications(
                 opportunity_id=opp.id,
                 volunteer_id=vol.id,
                 status=fake.random_element(statuses),
-                message=fake.sentence(),
+                message_ciphertext=encrypt_field(fake.sentence()),
             )
             applications.append(app)
 

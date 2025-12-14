@@ -13,6 +13,8 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 
 os.environ.setdefault("ARGON2_PROFILE", "RFC_9106_LOW_MEMORY")
+# Test encryption key: 64 hex characters (32 bytes)
+os.environ.setdefault("ENCRYPTION_KEY", "0" * 64)
 
 from app.db.models import Base
 from app.db.session import get_db

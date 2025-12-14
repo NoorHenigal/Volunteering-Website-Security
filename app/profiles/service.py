@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import require
 from app.core.service import BaseService
+from app.core.services.encryption import decrypt_field, encrypt_field, hash_email
 from app.db.models import Application, Follow, RefreshToken, User
 from app.db.repositories import FollowRepository, UserRepository
 from app.profiles.schemas import (
@@ -80,7 +81,7 @@ class ProfileService(BaseService):
             role=profile_user.role,
             follower_count=follower_count,
             following_count=following_count,
-            email=profile_user.email if profile_user.show_email else None,
+            email=decrypt_field(profile_user.email_ciphertext) if profile_user.show_email else None,
             description=profile_user.description,
             profile_visibility=profile_user.profile_visibility,  # type: ignore[arg-type]
             is_following=is_following,
@@ -131,7 +132,7 @@ class ProfileService(BaseService):
 
     async def anonymize_user(self, user: User) -> None:
         """Anonymize user PII for erasure while preserving row and FK integrity."""
-        if user.email.startswith("deleted-user-") and user.username.startswith("deleted-user-"):
+        if user.username.startswith("deleted-user-"):
             return
 
         suffix = uuid4().hex
@@ -140,11 +141,12 @@ class ProfileService(BaseService):
             validate_email(email, check_deliverability=False)
         except EmailNotValidError:
             email = f"deleted-user-{suffix}@example.com"
-        user.email = email
+        user.email_ciphertext = encrypt_field(email) or ""
+        user.email_hash = hash_email(email)
         user.username = f"deleted-user-{suffix}"
         user.first_name = None
         user.last_name = None
-        user.ip_address = None
+        user.ip_address_ciphertext = None
         user.bio = None
         user.description = None
         user.profile_picture = None
@@ -155,7 +157,9 @@ class ProfileService(BaseService):
 
         await self.user_repo.update(user)
 
-        await self.db.execute(update(Application).where(Application.volunteer_id == user.id).values(message=None))
+        await self.db.execute(
+            update(Application).where(Application.volunteer_id == user.id).values(message_ciphertext=None)
+        )
         await self.db.flush()
 
     async def update_privacy_settings(self, user: User, data: PrivacySettingsSchema) -> User:

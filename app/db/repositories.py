@@ -101,9 +101,9 @@ class UserRepository(BaseRepository[User]):
             return await super().get_by_id(obj_id)
         return await self.find_one(User.id == obj_id, User.is_active.is_(True))
 
-    async def get_by_email(self, email: str) -> User | None:
-        """Get user by email."""
-        return await self.find_one(User.email == email, User.is_active.is_(True))
+    async def get_by_email_hash(self, email_hash: str) -> User | None:
+        """Get user by email hash."""
+        return await self.find_one(User.email_hash == email_hash, User.is_active.is_(True))
 
     async def get_by_username(self, username: str) -> User | None:
         """Get user by username."""

@@ -5,6 +5,7 @@ from fastapi import status
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.services.encryption import hash_email
 from app.db.models import User
 from tests.fixtures.api import APIHelper
 from tests.fixtures.data import RegisterSchemaFactory
@@ -58,16 +59,16 @@ class TestAuthRoundtrip:
         """Test that registered user is properly stored in database."""
         user = await flows.create_user("organization")
 
-        result = await test_db.execute(select(User).where(User.email == user.email))
+        result = await test_db.execute(select(User).where(User.email_hash == hash_email(user.email)))
         db_user = result.scalar_one_or_none()
         assert db_user is not None
-        assert db_user.email == user.email
+        assert db_user.email == user.email  # Uses decrypted property
 
     @pytest.mark.anyio
     async def test_inactive_user_cannot_login(self, api: APIHelper, test_db: AsyncSession, flows: FlowHelper) -> None:
         """Inactive users should not be able to authenticate."""
         user = await flows.create_user("volunteer")
-        await test_db.execute(update(User).where(User.email == user.email).values(is_active=False))
+        await test_db.execute(update(User).where(User.email_hash == hash_email(user.email)).values(is_active=False))
         await test_db.commit()
         await api.unauthorized(
             "POST",
@@ -85,7 +86,7 @@ class TestAuthRoundtrip:
         """Delete account should deactivate + anonymize immediately, freeing email/username for re-registration."""
         user = await flows.create_user("volunteer")
 
-        result = await test_db.execute(select(User).where(User.email == user.email))
+        result = await test_db.execute(select(User).where(User.email_hash == hash_email(user.email)))
         db_user = result.scalar_one()
         user_id = db_user.id
 

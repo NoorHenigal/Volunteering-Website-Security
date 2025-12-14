@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import forbid, require
 from app.core.service import BaseService
+from app.core.services.encryption import decrypt_field
 from app.db.models import Application, Opportunity, Organization
 from app.db.repositories import OrganizationRepository, UserOrganizationRoleRepository
 from app.organizations.schemas import OrganizationMemberResponse
@@ -136,7 +137,7 @@ class OrganizationService(BaseService):
         return [
             OrganizationMemberResponse(
                 user_id=r.user.id,
-                email=r.user.email,
+                email=decrypt_field(r.user.email_ciphertext) or "",
                 username=r.user.username,
                 first_name=r.user.first_name,
                 last_name=r.user.last_name,
