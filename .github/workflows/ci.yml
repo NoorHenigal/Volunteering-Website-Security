@@ -71,8 +71,9 @@ jobs:
       POSTGRES_DB: volunteeringapp
       POSTGRES_HOST: localhost
       POSTGRES_PORT: 5432
-      JWT_SECRET_KEY: ${{ secrets.APP_TEST_KEY }}
+      JWT_SECRET_KEY: ${{ secrets.JWT_TEST_SECRET_KEY }}
       JWT_ALGORITHM: HS256
+      ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
       ENVIRONMENT: test
 
     steps:
@@ -117,8 +118,9 @@ jobs:
       POSTGRES_DB: volunteeringapp
       POSTGRES_HOST: localhost
       POSTGRES_PORT: 5432
-      JWT_SECRET_KEY: ${{ secrets.APP_TEST_KEY }}
+      JWT_SECRET_KEY: ${{ secrets.JWT_TEST_SECRET_KEY }}
       JWT_ALGORITHM: HS256
+      ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
       ENVIRONMENT: test
 
     steps:
