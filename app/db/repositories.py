@@ -95,13 +95,19 @@ class UserRepository(BaseRepository[User]):
 
     model = User
 
+    async def get_by_id(self, obj_id: UUID, *, include_inactive: bool = False) -> User | None:
+        """Get user by ID (defaults to active-only)."""
+        if include_inactive:
+            return await super().get_by_id(obj_id)
+        return await self.find_one(User.id == obj_id, User.is_active.is_(True))
+
     async def get_by_email(self, email: str) -> User | None:
         """Get user by email."""
-        return await self.find_one(User.email == email)
+        return await self.find_one(User.email == email, User.is_active.is_(True))
 
     async def get_by_username(self, username: str) -> User | None:
         """Get user by username."""
-        return await self.find_one(User.username == username)
+        return await self.find_one(User.username == username, User.is_active.is_(True))
 
 
 class RefreshTokenRepository(BaseRepository[RefreshToken]):
@@ -119,19 +125,41 @@ class OrganizationRepository(BaseRepository[Organization]):
 
     model = Organization
 
+    async def get_by_id(self, obj_id: UUID, *, include_inactive: bool = False) -> Organization | None:
+        """Get organization by ID (defaults to active-only)."""
+        if include_inactive:
+            return await super().get_by_id(obj_id)
+        return await self.find_one(Organization.id == obj_id, Organization.is_active.is_(True))
+
     async def get_by_username(self, username: str) -> Organization | None:
         """Get organization by username."""
-        return await self.find_one(Organization.username == username)
+        return await self.find_one(Organization.username == username, Organization.is_active.is_(True))
+
+    async def get_all(
+        self,
+        skip: int = 0,
+        limit: int = 100,
+        filters: dict[str, str | int | bool | UUID | None] | None = None,
+        *,
+        include_inactive: bool = False,
+    ) -> list[Organization]:
+        """List organizations (defaults to active-only)."""
+        if include_inactive:
+            return await super().get_all(skip=skip, limit=limit, filters=filters)
+        merged = dict(filters or {})
+        merged.setdefault("is_active", True)
+        return await super().get_all(skip=skip, limit=limit, filters=merged)
 
     async def count_all(self) -> int:
         """Count all organizations."""
-        return await self.count()
+        return await self.count(Organization.is_active.is_(True))
 
     async def get_by_id_with_opportunities(self, org_id: UUID) -> Organization | None:
         """Get organization by ID with opportunities eagerly loaded."""
         return await self.find_one(
             Organization.id == org_id,
-            options=[selectinload(Organization.opportunities)],
+            Organization.is_active.is_(True),
+            options=[selectinload(Organization.opportunities.and_(Opportunity.deleted_at.is_(None)))],
         )
 
     async def create_with_admin(self, org: Organization, user_id: UUID) -> Organization:
@@ -178,10 +206,14 @@ class UserOrganizationRoleRepository(BaseRepository[UserOrganizationRole]):
 
     async def get_members_with_users(self, organization_id: UUID) -> list[UserOrganizationRole]:
         """Get all members of an organization with user details eagerly loaded."""
-        return await self.find_many(
-            UserOrganizationRole.organization_id == organization_id,
-            options=[selectinload(UserOrganizationRole.user)],
+        query = (
+            select(UserOrganizationRole)
+            .join(User, UserOrganizationRole.user_id == User.id)
+            .where(UserOrganizationRole.organization_id == organization_id, User.is_active.is_(True))
+            .options(selectinload(UserOrganizationRole.user))
         )
+        result = await self.session.execute(query)
+        return list(result.scalars().all())
 
 
 class OpportunityRepository(BaseRepository[Opportunity]):
@@ -189,10 +221,17 @@ class OpportunityRepository(BaseRepository[Opportunity]):
 
     model = Opportunity
 
+    async def get_by_id(self, obj_id: UUID, *, include_deleted: bool = False) -> Opportunity | None:
+        """Get opportunity by ID (defaults to non-deleted only)."""
+        if include_deleted:
+            return await super().get_by_id(obj_id)
+        return await self.find_one(Opportunity.id == obj_id, Opportunity.deleted_at.is_(None))
+
     async def get_all_open(self, skip: int = 0, limit: int = 100) -> list[Opportunity]:
         """Get all open opportunities with organization and poster eagerly loaded."""
         return await self.find_many(
             Opportunity.is_open.is_(True),
+            Opportunity.deleted_at.is_(None),
             options=[
                 selectinload(Opportunity.organization),
                 selectinload(Opportunity.poster),
@@ -203,12 +242,13 @@ class OpportunityRepository(BaseRepository[Opportunity]):
 
     async def count_open(self) -> int:
         """Count all open opportunities."""
-        return await self.count(Opportunity.is_open.is_(True))
+        return await self.count(Opportunity.is_open.is_(True), Opportunity.deleted_at.is_(None))
 
     async def get_by_id_with_organization(self, opportunity_id: UUID) -> Opportunity | None:
         """Get opportunity by ID with organization eagerly loaded."""
         return await self.find_one(
             Opportunity.id == opportunity_id,
+            Opportunity.deleted_at.is_(None),
             options=[selectinload(Opportunity.organization)],
         )
 
@@ -231,10 +271,14 @@ class ApplicationRepository(BaseRepository[Application]):
 
     async def get_by_opportunity_with_volunteer(self, opportunity_id: UUID) -> list[Application]:
         """Get all applications for an opportunity with volunteer details eagerly loaded."""
-        return await self.find_many(
-            Application.opportunity_id == opportunity_id,
-            options=[selectinload(Application.volunteer)],
+        query = (
+            select(Application)
+            .join(User, Application.volunteer_id == User.id)
+            .where(Application.opportunity_id == opportunity_id, User.is_active.is_(True))
+            .options(selectinload(Application.volunteer))
         )
+        result = await self.session.execute(query)
+        return list(result.scalars().all())
 
     async def get_by_volunteer_and_opportunity(self, volunteer_id: UUID, opportunity_id: UUID) -> Application | None:
         """Get application by volunteer and opportunity."""
@@ -271,25 +315,45 @@ class FollowRepository:
 
     async def get_followers(self, user_id: UUID) -> list[Follow]:
         """Get all followers of a user with follower details loaded."""
-        query = select(Follow).where(Follow.followed_id == user_id).options(selectinload(Follow.follower))
+        query = (
+            select(Follow)
+            .join(User, Follow.follower_id == User.id)
+            .where(Follow.followed_id == user_id, User.is_active.is_(True))
+            .options(selectinload(Follow.follower))
+        )
         result = await self.session.execute(query)
         return list(result.scalars().all())
 
     async def get_following(self, user_id: UUID) -> list[Follow]:
         """Get all users that a user follows with followed details loaded."""
-        query = select(Follow).where(Follow.follower_id == user_id).options(selectinload(Follow.followed))
+        query = (
+            select(Follow)
+            .join(User, Follow.followed_id == User.id)
+            .where(Follow.follower_id == user_id, User.is_active.is_(True))
+            .options(selectinload(Follow.followed))
+        )
         result = await self.session.execute(query)
         return list(result.scalars().all())
 
     async def get_follower_count(self, user_id: UUID) -> int:
         """Count followers of a user."""
-        query = select(func.count()).select_from(Follow).where(Follow.followed_id == user_id)
+        query = (
+            select(func.count())
+            .select_from(Follow)
+            .join(User, Follow.follower_id == User.id)
+            .where(Follow.followed_id == user_id, User.is_active.is_(True))
+        )
         result = await self.session.execute(query)
         return result.scalar() or 0
 
     async def get_following_count(self, user_id: UUID) -> int:
         """Count users that a user follows."""
-        query = select(func.count()).select_from(Follow).where(Follow.follower_id == user_id)
+        query = (
+            select(func.count())
+            .select_from(Follow)
+            .join(User, Follow.followed_id == User.id)
+            .where(Follow.follower_id == user_id, User.is_active.is_(True))
+        )
         result = await self.session.execute(query)
         return result.scalar() or 0
 
@@ -319,7 +383,9 @@ class FollowRepository:
         # Get follower counts (users following each user_id)
         follower_query = (
             select(Follow.followed_id, func.count())
+            .join(User, Follow.follower_id == User.id)
             .where(Follow.followed_id.in_(user_ids))
+            .where(User.is_active.is_(True))
             .group_by(Follow.followed_id)
         )
         follower_result = await self.session.execute(follower_query)
@@ -328,7 +394,9 @@ class FollowRepository:
         # Get following counts (users each user_id follows)
         following_query = (
             select(Follow.follower_id, func.count())
+            .join(User, Follow.followed_id == User.id)
             .where(Follow.follower_id.in_(user_ids))
+            .where(User.is_active.is_(True))
             .group_by(Follow.follower_id)
         )
         following_result = await self.session.execute(following_query)

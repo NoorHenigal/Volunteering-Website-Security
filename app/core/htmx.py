@@ -47,7 +47,13 @@ async def render_block(request: Request, template_name: str, block_name: str, **
 
     # Render full template to process imports, then extract only the requested block
     ctx = new_context(template.environment, template_name, template.blocks)
-    ctx.vars.update({"request": request, **context})
+    ctx.vars.update(
+        {
+            "request": request,
+            "csrf_token": getattr(request.state, "csrf_token", None) or request.cookies.get("csrf_token"),
+            **context,
+        }
+    )
 
     with contextlib.suppress(Exception):
         list(template.root_render_func(ctx))

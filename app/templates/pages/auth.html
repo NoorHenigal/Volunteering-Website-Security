@@ -2,7 +2,7 @@
 {% from "components/icons.html" import icon %}
 {% from "components/forms.html" import htmx_form, form_input, form_select, form_label %}
 {% from "components/buttons.html" import primary_button %}
-{% from "components/feedback.html" import alert_container %}
+{% from "components/feedback.html" import alert_container with context %}
 {% block title %}
     {% if view == 'register' %}
         Create Account
@@ -31,8 +31,10 @@
 {% block body_class %}
     h-full bg-white font-sans antialiased selection:bg-brand-200 selection:text-brand-900
 {% endblock %}
-{% block body_content %}
-    <div id="main-content" class="h-full">
+{% block main_padding %}pt-0 pb-0 px-0{% endblock %}
+{% block container_class %}max-w-none mx-0 w-full{% endblock %}
+{% block content %}
+    <div class="h-full">
         {# Split-screen auth layout #}
         <div class="flex min-h-screen"
              x-data="{ activeTab: '{{ active_tab|default("volunteer") }}' }">
@@ -201,4 +203,4 @@
             </div>
         </div>
     </div>
-{% endblock body_content %}
+{% endblock content %}

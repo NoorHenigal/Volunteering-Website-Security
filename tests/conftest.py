@@ -3,6 +3,7 @@
 All domain helpers and factories are in tests/fixtures/
 """
 
+import os
 from collections.abc import AsyncGenerator
 from typing import cast
 
@@ -10,6 +11,8 @@ import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
+
+os.environ.setdefault("ARGON2_PROFILE", "RFC_9106_LOW_MEMORY")
 
 from app.db.models import Base
 from app.db.session import get_db

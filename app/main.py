@@ -1,7 +1,9 @@
 """Main FastAPI application."""
 
+import contextlib
 import logging
 import os
+import secrets
 import sys
 from collections.abc import Awaitable, Callable
 from contextlib import asynccontextmanager
@@ -88,7 +90,43 @@ log = logging.getLogger(__name__)
 @app.middleware("http")
 async def add_security_headers(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
     """Add security headers to all responses."""
+    has_auth_header = request.headers.get("authorization") is not None
+    cookie_token = request.cookies.get("csrf_token")
+    has_cookie_auth = (
+        request.cookies.get("access_token") is not None or request.cookies.get("refresh_token") is not None
+    )
+
+    if not has_auth_header:
+        if request.method in ("POST", "PUT", "PATCH", "DELETE") and has_cookie_auth:
+            header_token = request.headers.get("X-CSRF-Token")
+            form_token: str | None = None
+            content_type = request.headers.get("content-type", "")
+            if not header_token and (
+                "application/x-www-form-urlencoded" in content_type or "multipart/form-data" in content_type
+            ):
+                with contextlib.suppress(Exception):
+                    form = await request.form()
+                    form_token = str(form.get("csrf_token")) if form.get("csrf_token") is not None else None
+
+            sent_token = header_token or form_token
+            if not cookie_token or not sent_token or sent_token != cookie_token:
+                return Response(status_code=403, content="Forbidden", media_type="text/plain")
+
+        if not cookie_token:
+            request.state.csrf_token = secrets.token_urlsafe(32)
+
     response = await call_next(request)
+
+    if getattr(request.state, "csrf_token", None) and not request.cookies.get("csrf_token"):
+        response.set_cookie(
+            key="csrf_token",
+            value=request.state.csrf_token,
+            httponly=False,
+            secure=settings.cookie_secure,
+            samesite=settings.cookie_samesite,
+            domain=settings.cookie_domain,
+        )
+
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["X-XSS-Protection"] = "1; mode=block"

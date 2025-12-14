@@ -1,8 +1,8 @@
 """Initial Migration.
 
-Revision ID: a87655c0d81c
+Revision ID: 74f828b460c1
 Revises:
-Create Date: 2025-12-12 01:42:18.726367+00:00
+Create Date: 2025-12-14 01:02:12.295422+00:00
 """
 
 from collections.abc import Sequence
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 from alembic import op
 
 # Revision identifiers, used by Alembic.
-revision: str = "a87655c0d81c"
+revision: str = "74f828b460c1"
 down_revision: str | None = None
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
@@ -25,6 +25,7 @@ def upgrade() -> None:
         sa.Column("username", sa.String(length=50), nullable=False),
         sa.Column("name", sa.String(length=255), nullable=False),
         sa.Column("description", sa.String(length=1000), nullable=True),
+        sa.Column("is_active", sa.Boolean(), server_default="1", nullable=False),
         sa.Column("banner", sa.String(length=255), nullable=True),
         sa.Column("logo", sa.String(length=255), nullable=True),
         sa.Column("id", sa.UUID(), nullable=False),
@@ -35,12 +36,20 @@ def upgrade() -> None:
         sa.CheckConstraint("length(username) >= 3", name="ck_org_username_length"),
         sa.PrimaryKeyConstraint("id"),
     )
+    op.create_index(
+        "ix_organizations_is_active",
+        "organizations",
+        ["is_active"],
+        unique=False,
+        postgresql_where=sa.text("is_active = true"),
+    )
     op.create_index(op.f("ix_organizations_name"), "organizations", ["name"], unique=False)
     op.create_index(op.f("ix_organizations_username"), "organizations", ["username"], unique=True)
     op.create_table(
         "users",
         sa.Column("email", sa.String(length=255), nullable=False),
         sa.Column("password_hash", sa.String(length=255), nullable=False),
+        sa.Column("is_active", sa.Boolean(), server_default="1", nullable=False),
         sa.Column("role", sa.String(length=50), server_default="volunteer", nullable=False),
         sa.Column("ip_address", sa.String(length=45), nullable=True),
         sa.Column("first_name", sa.String(length=100), nullable=True),
@@ -67,6 +76,9 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index(op.f("ix_users_email"), "users", ["email"], unique=True)
+    op.create_index(
+        "ix_users_is_active", "users", ["is_active"], unique=False, postgresql_where=sa.text("is_active = true")
+    )
     op.create_index("ix_users_role", "users", ["role"], unique=False)
     op.create_index(
         "ix_users_searchable", "users", ["searchable"], unique=False, postgresql_where=sa.text("searchable = true")
@@ -89,6 +101,7 @@ def upgrade() -> None:
         sa.Column("description", sa.String(length=5000), nullable=False),
         sa.Column("location", sa.String(length=255), nullable=True),
         sa.Column("banner", sa.String(length=255), nullable=True),
+        sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("posted_by", sa.UUID(), nullable=True),
         sa.Column("organization_id", sa.UUID(), nullable=False),
         sa.Column("is_open", sa.Boolean(), server_default="1", nullable=False),
@@ -108,6 +121,13 @@ def upgrade() -> None:
         ["is_open"],
         unique=False,
         postgresql_where=sa.text("is_open = true"),
+    )
+    op.create_index(
+        "ix_opportunities_not_deleted",
+        "opportunities",
+        ["deleted_at"],
+        unique=False,
+        postgresql_where=sa.text("deleted_at IS NULL"),
     )
     op.create_index("ix_opportunities_org_open", "opportunities", ["organization_id", "is_open"], unique=False)
     op.create_index(op.f("ix_opportunities_organization_id"), "opportunities", ["organization_id"], unique=False)
@@ -196,6 +216,9 @@ def downgrade() -> None:
     op.drop_index(op.f("ix_opportunities_posted_by"), table_name="opportunities")
     op.drop_index(op.f("ix_opportunities_organization_id"), table_name="opportunities")
     op.drop_index("ix_opportunities_org_open", table_name="opportunities")
+    op.drop_index(
+        "ix_opportunities_not_deleted", table_name="opportunities", postgresql_where=sa.text("deleted_at IS NULL")
+    )
     op.drop_index("ix_opportunities_is_open", table_name="opportunities", postgresql_where=sa.text("is_open = true"))
     op.drop_index("ix_opportunities_created_at", table_name="opportunities")
     op.drop_table("opportunities")
@@ -204,9 +227,13 @@ def downgrade() -> None:
     op.drop_index(op.f("ix_users_username"), table_name="users")
     op.drop_index("ix_users_searchable", table_name="users", postgresql_where=sa.text("searchable = true"))
     op.drop_index("ix_users_role", table_name="users")
+    op.drop_index("ix_users_is_active", table_name="users", postgresql_where=sa.text("is_active = true"))
     op.drop_index(op.f("ix_users_email"), table_name="users")
     op.drop_table("users")
     op.drop_index(op.f("ix_organizations_username"), table_name="organizations")
     op.drop_index(op.f("ix_organizations_name"), table_name="organizations")
+    op.drop_index(
+        "ix_organizations_is_active", table_name="organizations", postgresql_where=sa.text("is_active = true")
+    )
     op.drop_table("organizations")
     # ### end Alembic commands ###

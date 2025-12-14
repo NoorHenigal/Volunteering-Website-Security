@@ -131,6 +131,17 @@ detail_row, page_hero %}
                                                                     </a>
                                                                 </div>
                                                             </div>
+                                                            <div class="bg-white rounded-3xl p-6 border border-red-100 shadow-sm">
+                                                                <h3 class="text-sm font-bold text-slate-900 mb-1">Danger Zone</h3>
+                                                                <p class="text-sm text-slate-500 mb-4">
+                                                                    Deleting an opportunity will close it and mark it as deleted. Pending applications will be withdrawn.
+                                                                </p>
+                                                                <button hx-post="/opportunities/{{ opportunity.id }}/delete"
+                                                                        hx-confirm="Are you sure you want to delete this opportunity?"
+                                                                        class="inline-flex items-center justify-center px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl transition-colors">
+                                                                    Delete Opportunity
+                                                                </button>
+                                                            </div>
                                                         {% endif %}
                                                     </div>
                                                     <div class="space-y-6">

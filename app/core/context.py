@@ -39,6 +39,7 @@ async def render_template(
     # Otherwise, render the full template
     ctx = dict(context)
     ctx.setdefault("request", request)
+    ctx.setdefault("csrf_token", getattr(request.state, "csrf_token", None) or request.cookies.get("csrf_token"))
     return templates.TemplateResponse(
         request,
         name,
@@ -199,7 +200,11 @@ class RequestContext:
         **template_ctx: object,
     ) -> Response:
         """Return JSON error for API, template with error for UI."""
-        error_msg = str(error)
+        if isinstance(error, HTTPException):
+            error_msg = str(error.detail)
+            status_code = error.status_code
+        else:
+            error_msg = str(error)
 
         if self.is_ui:
             if template:

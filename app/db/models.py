@@ -82,6 +82,7 @@ class User(Base, FullModelMixin):
     __tablename__ = "users"
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="1")
     role: Mapped[str] = mapped_column(String(50), nullable=False, default="volunteer", server_default="volunteer")
     ip_address: Mapped[str | None] = mapped_column(String(45), nullable=True)
     first_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
@@ -108,6 +109,7 @@ class User(Base, FullModelMixin):
         ),
         _pg_check("username ~ '^[a-zA-Z0-9_-]+$'", "ck_user_username_pattern"),
         _pg_index("ix_users_searchable", "searchable", where="searchable = true"),
+        _pg_index("ix_users_is_active", "is_active", where="is_active = true"),
         _pg_check("length(username) >= 3", "ck_user_username_length"),
         Index("ix_users_role", "role"),
     )
@@ -193,6 +195,7 @@ class Organization(Base, FullModelMixin):
     username: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     description: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="1")
     banner: Mapped[str | None] = mapped_column(String(255), nullable=True)
     logo: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
@@ -200,6 +203,7 @@ class Organization(Base, FullModelMixin):
         _pg_check("username ~ '^[a-zA-Z0-9_-]+$'", "ck_org_username_pattern"),
         _pg_check("length(username) >= 3", "ck_org_username_length"),
         _pg_check("length(name) >= 1", "ck_org_name_nonempty"),
+        _pg_index("ix_organizations_is_active", "is_active", where="is_active = true"),
     )
 
     opportunities: Mapped[list[Opportunity]] = relationship(
@@ -240,6 +244,7 @@ class Opportunity(Base, FullModelMixin):
     description: Mapped[str] = mapped_column(String(5000), nullable=False)
     location: Mapped[str | None] = mapped_column(String(255), nullable=True)
     banner: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
     posted_by: Mapped[UUID | None] = mapped_column(
         PG_UUID(as_uuid=True),
         ForeignKey("users.id", ondelete="SET NULL"),
@@ -251,6 +256,7 @@ class Opportunity(Base, FullModelMixin):
 
     __table_args__ = (
         _pg_index("ix_opportunities_is_open", "is_open", where="is_open = true"),
+        _pg_index("ix_opportunities_not_deleted", "deleted_at", where="deleted_at IS NULL"),
         Index("ix_opportunities_org_open", "organization_id", "is_open"),
         Index("ix_opportunities_created_at", "created_at"),
         _pg_check("length(title) >= 1", "ck_opp_title_nonempty"),

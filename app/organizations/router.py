@@ -302,3 +302,33 @@ async def upload_organization_logo(
     )
     org = await org_svc.update_logo(organization_id, filename)
     return OrganizationResponse.model_validate(org)
+
+
+@router.delete(
+    "/organizations/{organization_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses=error_responses(auth=True, forbidden=True, not_found=True),
+)
+async def delete_organization(
+    organization_id: UUID,
+    ctx: ContextDep,
+    org_svc: OrganizationServiceDep,
+) -> Response:
+    """Soft-delete an organization (admins only)."""
+    user = ctx.require_authenticated()
+    await org_svc.require_admin(user.id, organization_id)
+    await org_svc.soft_delete(organization_id)
+    return Response(status_code=204)
+
+
+@router.post("/organizations/{organization_id}/delete", include_in_schema=False)
+async def delete_organization_post(
+    organization_id: UUID,
+    ctx: ContextDep,
+    org_svc: OrganizationServiceDep,
+) -> Response:
+    """Soft-delete an organization via UI POST (admins only)."""
+    user = ctx.require_authenticated()
+    await org_svc.require_admin(user.id, organization_id)
+    await org_svc.soft_delete(organization_id)
+    return await handle_htmx_redirect(ctx, "/organizations")
