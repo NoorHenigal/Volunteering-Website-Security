@@ -40,5 +40,15 @@ htmlcov/
 *.log
 .hypothesis
 
-# Production Assests (created locally too, if in a dev environment)
-app/static/uploads/
+# Ignore all uploaded files by default
+app/static/uploads/*
+
+# Re-allow directory traversal
+!app/static/uploads/**/
+
+# Allow demo avatar images
+!app/static/uploads/avatars/demo-female-*.webp
+!app/static/uploads/avatars/demo-male-*.webp
+
+# Allow demo banners
+!app/static/uploads/banners/demo-*.webp

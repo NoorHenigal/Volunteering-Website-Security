@@ -223,11 +223,48 @@
                                 {{ checkbox_toggle('show_organizations', 'Show Orgs', "Display memberships",
                                                                 user.show_organizations) }}
                                 {{ checkbox_toggle('searchable', 'Searchable', 'Appear in search', user.searchable) }}
+                                <button type="button"
+                                        @mouseenter="deleteAccountHover = true"
+                                        @mouseleave="deleteAccountHover = false"
+                                        @click="deleteAccountOpen = true"
+                                        class="w-full flex items-center justify-between p-4 border rounded-xl cursor-pointer transition-all duration-200 bg-red-50/40 border-red-200 hover:bg-red-50 hover:border-red-300">
+                                    <div class="text-left">
+                                        <span class="block font-semibold text-red-800 text-sm"
+                                              x-text="deleteAccountHover ? 'Delete Account?' : 'Delete Account'"></span>
+                                        <span class="block text-xs text-red-700/80 mt-0.5">Deactivate your account and sign out</span>
+                                    </div>
+                                    <div class="relative inline-flex items-center">
+                                        <span class="text-red-500">{{ icon('x', 'sm') }}</span>
+                                    </div>
+                                </button>
                             </div>
                         </div>
                     </div>
                     <div class="pt-4 border-t border-slate-100">{{ modal_actions('privacyOpen', 'Save Privacy Settings') }}</div>
                 </form>
+            {% endcall %}
+            {% call modal('deleteAccountOpen', 'Delete Account', 'This will deactivate your account and sign you out.', 'md') %}
+                <div class="p-5 sm:p-6 space-y-4">
+                    <div class="rounded-xl border border-red-200 bg-red-50/50 p-4">
+                        <h4 class="text-sm font-bold text-red-900 mb-1">What happens next</h4>
+                        <p class="text-sm text-red-800/80">
+                            Your account will be deactivated immediately. You will be signed out. Your profile and content will no longer be visible.
+                        </p>
+                    </div>
+                    <div class="flex justify-end gap-3">
+                        <button type="button"
+                                @click="deleteAccountOpen = false"
+                                class="inline-flex w-full justify-center rounded-xl bg-white px-3 py-2 text-sm font-semibold text-slate-900 shadow-sm ring-1 ring-inset ring-slate-300 hover:bg-slate-50 sm:mt-0 sm:w-auto">
+                            Back
+                        </button>
+                        <button type="button"
+                                hx-post="/settings/account/delete"
+                                hx-swap="none"
+                                class="inline-flex w-full justify-center rounded-xl bg-red-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-700 sm:mt-0 sm:w-auto">
+                            Yes, delete
+                        </button>
+                    </div>
+                </div>
             {% endcall %}
         {% endif %}
     </div>
@@ -237,6 +274,8 @@
             Alpine.data("profileManager", () => ({
                 editProfileOpen: false,
                 privacyOpen: false,
+                deleteAccountOpen: false,
+                deleteAccountHover: false,
             }));
         });
     </script>

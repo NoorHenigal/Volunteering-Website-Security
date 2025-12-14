@@ -62,6 +62,7 @@
     <form action="/applications/{{ application_id }}/withdraw"
           method="POST"
           class="inline">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <button type="submit"
                 class="inline-flex items-center gap-2 bg-white border border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 font-semibold {{ size_classes.get(size, size_classes['md']) }} rounded-full transition-all shadow-sm">
             {{ render_icon('x', 'xs') }}

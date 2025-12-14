@@ -319,6 +319,40 @@ async def withdraw_application(
     return Response(status_code=204)
 
 
+@router.delete(
+    "/opportunities/{opportunity_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses=error_responses(auth=True, forbidden=True, not_found=True),
+)
+async def delete_opportunity(
+    opportunity_id: UUID,
+    ctx: ContextDep,
+    opp_svc: OpportunityServiceDep,
+    org_svc: OrganizationServiceDep,
+) -> Response:
+    """Soft-delete an opportunity (admins only)."""
+    user = ctx.require_authenticated()
+    opportunity = await opp_svc.get_by_id_including_deleted(opportunity_id)
+    await org_svc.require_admin(user.id, opportunity.organization_id)
+    await opp_svc.soft_delete(opportunity_id)
+    return Response(status_code=204)
+
+
+@router.post("/opportunities/{opportunity_id}/delete", include_in_schema=False)
+async def delete_opportunity_post(
+    opportunity_id: UUID,
+    ctx: ContextDep,
+    opp_svc: OpportunityServiceDep,
+    org_svc: OrganizationServiceDep,
+) -> Response:
+    """Soft-delete an opportunity via UI POST (admins only)."""
+    user = ctx.require_authenticated()
+    opportunity = await opp_svc.get_by_id_including_deleted(opportunity_id)
+    await org_svc.require_admin(user.id, opportunity.organization_id)
+    await opp_svc.soft_delete(opportunity_id)
+    return await handle_htmx_redirect(ctx, "/opportunities")
+
+
 @router.post("/applications/{application_id}/withdraw", include_in_schema=False)
 async def withdraw_application_post(
     application_id: UUID,

@@ -1,13 +1,16 @@
 """Profile and follow business logic."""
 
 import logging
+from uuid import uuid4
 
+from email_validator import EmailNotValidError, validate_email
 from fastapi import HTTPException, status
+from sqlalchemy import delete, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import require
 from app.core.service import BaseService
-from app.db.models import Follow, User
+from app.db.models import Application, Follow, RefreshToken, User
 from app.db.repositories import FollowRepository, UserRepository
 from app.profiles.schemas import (
     FullProfileSchema,
@@ -114,6 +117,46 @@ class ProfileService(BaseService):
             setattr(user, field, value)
 
         return await self.user_repo.update(user)
+
+    async def deactivate_user(self, user: User) -> None:
+        """Soft-delete a user account by deactivating, anonymizing, and revoking refresh tokens."""
+        if user.is_active:
+            user.is_active = False
+            await self.user_repo.update(user)
+
+        await self.anonymize_user(user)
+
+        await self.db.execute(delete(RefreshToken).where(RefreshToken.user_id == user.id))
+        await self.db.flush()
+
+    async def anonymize_user(self, user: User) -> None:
+        """Anonymize user PII for erasure while preserving row and FK integrity."""
+        if user.email.startswith("deleted-user-") and user.username.startswith("deleted-user-"):
+            return
+
+        suffix = uuid4().hex
+        email = f"deleted-user-{suffix}@example.invalid"
+        try:
+            validate_email(email, check_deliverability=False)
+        except EmailNotValidError:
+            email = f"deleted-user-{suffix}@example.com"
+        user.email = email
+        user.username = f"deleted-user-{suffix}"
+        user.first_name = None
+        user.last_name = None
+        user.ip_address = None
+        user.bio = None
+        user.description = None
+        user.profile_picture = None
+        user.custom_display_name = None
+        user.profile_visibility = "private"
+        user.searchable = False
+        user.show_email = False
+
+        await self.user_repo.update(user)
+
+        await self.db.execute(update(Application).where(Application.volunteer_id == user.id).values(message=None))
+        await self.db.flush()
 
     async def update_privacy_settings(self, user: User, data: PrivacySettingsSchema) -> User:
         """Update user privacy settings."""

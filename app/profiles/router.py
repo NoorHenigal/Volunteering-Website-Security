@@ -1,17 +1,20 @@
 """Profile routes."""
 
+from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, File, HTTPException, Response, UploadFile, status
 from fastapi.responses import JSONResponse
+from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from starlette.concurrency import run_in_threadpool
 
 from app.core.base_schemas import ListResponse, error_responses, request_body_from_model
-from app.core.context import ContextDep, render_template, ui_auth_required
+from app.core.context import ContextDep, render_template, require_system_admin, ui_auth_required
 from app.core.context_types import list_view_context
 from app.core.dependencies import ImageServiceDep, OrganizationServiceDep, ProfileServiceDep
 from app.core.htmx import handle_htmx_redirect, trigger_toast
+from app.core.security import clear_auth_cookies
 from app.core.services.images import ImagePreset, ImageProcessingError
 from app.core.types import ProfileVisibilityType, SlugPath, UsernamePath
 from app.db.models import Organization, User
@@ -92,7 +95,10 @@ async def edit_profile_page(ctx: ContextDep, user: User, service: ProfileService
     """Show profile edit page."""
     if user.role == "organization":
         org_repo = OrganizationRepository(ctx.db)
-        org = await org_repo.find_one(Organization.user_roles.any(user_id=user.id, role="admin"))
+        org = await org_repo.find_one(
+            Organization.user_roles.any(user_id=user.id, role="admin"),
+            Organization.is_active.is_(True),
+        )
 
         return await render_template(
             ctx.request,
@@ -125,6 +131,67 @@ async def privacy_settings_page(ctx: ContextDep, user: User, service: ProfileSer
         user=user,
         profile_user=user,
         profile=profile,
+    )
+
+
+@router.delete("/settings/account", responses=error_responses(auth=True), status_code=status.HTTP_204_NO_CONTENT)
+async def delete_account(ctx: ContextDep, service: ProfileServiceDep) -> Response:
+    """Deactivate the current user account (soft-delete)."""
+    user = ctx.require_authenticated()
+    await service.deactivate_user(user)
+    response = Response(status_code=204)
+    clear_auth_cookies(response)
+    return response
+
+
+@router.post("/settings/account/delete", include_in_schema=False)
+@ui_auth_required
+async def delete_account_post(ctx: ContextDep, user: User, service: ProfileServiceDep) -> Response:
+    """Deactivate the current user account via UI POST (soft-delete)."""
+    await service.deactivate_user(user)
+    response = await handle_htmx_redirect(ctx, "/auth/login")
+    clear_auth_cookies(response)
+    return response
+
+
+@router.post(
+    "/admin/retention/anonymize",
+    responses=error_responses(auth=True, forbidden=True),
+)
+async def run_retention_anonymization(
+    ctx: ContextDep,
+    service: ProfileServiceDep,
+    org_svc: OrganizationServiceDep,
+) -> Response:
+    """Run 90-day retention anonymization for soft-deleted entities (system_admin only)."""
+    user = ctx.require_authenticated()
+    require_system_admin(user)
+
+    cutoff = datetime.now(UTC) - timedelta(days=90)
+
+    user_result = await ctx.db.execute(select(User).where(User.is_active.is_(False), User.updated_at < cutoff))
+    users = list(user_result.scalars().all())
+    anonymized_users = 0
+    for u in users:
+        await service.anonymize_user(u)
+        anonymized_users += 1
+
+    org_result = await ctx.db.execute(
+        select(Organization).where(Organization.is_active.is_(False), Organization.updated_at < cutoff)
+    )
+    orgs = list(org_result.scalars().all())
+    anonymized_orgs = 0
+    for org in orgs:
+        await org_svc.anonymize_organization(org)
+        anonymized_orgs += 1
+
+    return JSONResponse(
+        status_code=200,
+        content={
+            "cutoff": cutoff.isoformat(),
+            "anonymized_users": anonymized_users,
+            "anonymized_organizations": anonymized_orgs,
+        },
     )
 
 

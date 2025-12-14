@@ -116,13 +116,13 @@ async def register_volunteer(data: VolunteerRegisterSchema, db: AsyncSession) ->
     org_repo = OrganizationRepository(db)
 
     # Check if email already exists (in users or orgs)
-    if await user_repo.get_by_email(data.email):
+    if await user_repo.find_one(User.email == data.email):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered")
 
     # Check if username already exists (in users or orgs)
-    if await user_repo.get_by_username(data.username):
+    if await user_repo.find_one(User.username == data.username):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Username already taken")
-    if await org_repo.get_by_username(data.username):
+    if await org_repo.find_one(Organization.username == data.username):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Username already taken")
 
     # Create new user (role defaults to volunteer)
@@ -175,9 +175,11 @@ async def register_organization(data: OrganizationRegisterSchema, db: AsyncSessi
     user_repo = UserRepository(db)
     org_repo = OrganizationRepository(db)
 
-    if await user_repo.get_by_email(data.email):
+    if await user_repo.find_one(User.email == data.email):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered")
-    if await user_repo.get_by_username(data.username):
+    if await user_repo.find_one(User.username == data.username):
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Username already taken")
+    if await org_repo.find_one(Organization.username == data.username):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Username already taken")
 
     backend_user = User(

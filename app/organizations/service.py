@@ -1,12 +1,14 @@
 """Organization business logic."""
 
+from datetime import UTC, datetime
 from uuid import UUID
 
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import forbid, require
 from app.core.service import BaseService
-from app.db.models import Organization
+from app.db.models import Application, Opportunity, Organization
 from app.db.repositories import OrganizationRepository, UserOrganizationRoleRepository
 from app.organizations.schemas import OrganizationMemberResponse
 
@@ -78,6 +80,55 @@ class OrganizationService(BaseService):
         organization = await self.get_by_id(organization_id)
         organization.logo = filename
         return await self._org_repo.update(organization)
+
+    async def soft_delete(self, organization_id: UUID) -> None:
+        """Soft-delete an organization and cascade soft-delete its opportunities."""
+        organization = require(
+            await self._org_repo.get_by_id(organization_id, include_inactive=True),
+            "Organization not found",
+        )
+
+        if not organization.is_active:
+            return
+
+        organization.is_active = False
+        await self._org_repo.update(organization)
+
+        now = datetime.now(UTC)
+        await self.db.execute(
+            update(Opportunity)
+            .where(
+                Opportunity.organization_id == organization_id,
+                Opportunity.deleted_at.is_(None),
+            )
+            .values(deleted_at=now, is_open=False)
+        )
+
+        opp_ids = select(Opportunity.id).where(Opportunity.organization_id == organization_id)
+        await self.db.execute(
+            update(Application)
+            .where(
+                Application.opportunity_id.in_(opp_ids),
+                Application.status == "pending",
+            )
+            .values(status="withdrawn")
+        )
+
+        await self.db.flush()
+
+    async def anonymize_organization(self, organization: Organization) -> None:
+        """Anonymize organization fields for erasure while preserving row and FK integrity."""
+        if organization.username.startswith("deleted-org-"):
+            return
+
+        suffix = organization.id.hex
+        organization.username = f"deleted-org-{suffix}"
+        organization.name = "Deleted Organization"
+        organization.description = None
+        organization.banner = None
+        organization.logo = None
+
+        await self._org_repo.update(organization)
 
     async def get_members(self, organization_id: UUID) -> list[OrganizationMemberResponse]:
         """Get organization members with user details."""

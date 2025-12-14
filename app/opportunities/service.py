@@ -1,8 +1,10 @@
 """Opportunity and application business logic."""
 
+from datetime import UTC, datetime
 from uuid import UUID
 
 from fastapi import HTTPException, status
+from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import conflict, forbid, require
@@ -38,6 +40,11 @@ class OpportunityService(BaseService):
         opp = await self._opp_repo.get_by_id_with_organization(opportunity_id)
         return require(opp, "Opportunity not found")
 
+    async def get_by_id_including_deleted(self, opportunity_id: UUID) -> Opportunity:
+        """Get opportunity by ID including soft-deleted opportunities."""
+        opp = await self._opp_repo.get_by_id(opportunity_id, include_deleted=True)
+        return require(opp, "Opportunity not found")
+
     async def create(
         self,
         *,
@@ -63,6 +70,25 @@ class OpportunityService(BaseService):
             location=location,
         )
         return await self._opp_repo.create(opportunity)
+
+    async def soft_delete(self, opportunity_id: UUID) -> None:
+        """Soft-delete an opportunity and withdraw pending applications."""
+        opportunity = await self.get_by_id_including_deleted(opportunity_id)
+
+        if opportunity.deleted_at is None:
+            opportunity.deleted_at = datetime.now(UTC)
+        opportunity.is_open = False
+        await self._opp_repo.update(opportunity)
+
+        await self.db.execute(
+            update(Application)
+            .where(
+                Application.opportunity_id == opportunity_id,
+                Application.status == "pending",
+            )
+            .values(status="withdrawn")
+        )
+        await self.db.flush()
 
     async def get_user_organizations(self, user_id: UUID) -> list[Organization]:
         """Get organizations where user is a member."""
