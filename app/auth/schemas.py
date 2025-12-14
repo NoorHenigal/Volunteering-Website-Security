@@ -1,10 +1,11 @@
 """Authentication schemas."""
 
-from typing import Literal
+from typing import Any, Literal
 
-from pydantic import EmailStr, Field
+from pydantic import EmailStr, Field, model_validator
 
 from app.core.base_schemas import BaseCreate, BaseOut, StrictModel, UserFieldsMixin
+from app.core.services.encryption import decrypt_field
 
 __all__ = [
     "LoginSchema",
@@ -57,10 +58,21 @@ class TokenResponse(StrictModel):
 class UserResponse(UserFieldsMixin, BaseOut):
     """User details."""
 
-    email: EmailStr
+    email: str
     role: UserRoleType
     bio: str | None = None
     description: str | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def decrypt_email(cls, data: Any) -> Any:  # noqa: ANN401
+        """Decrypt email_ciphertext to email field for response."""
+        if hasattr(data, "email_ciphertext"):
+            data = dict(data.__dict__)
+            data["email"] = decrypt_field(data.get("email_ciphertext", ""))
+        elif isinstance(data, dict) and "email_ciphertext" in data:
+            data["email"] = decrypt_field(data.get("email_ciphertext", ""))
+        return data
 
 
 class OrganizationResponse(BaseOut):

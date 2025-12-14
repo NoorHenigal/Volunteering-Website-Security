@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import conflict, forbid, require
 from app.core.service import BaseService
+from app.core.services.encryption import encrypt_field
 from app.db.models import Application, Opportunity, Organization, User
 from app.db.repositories import (
     ApplicationRepository,
@@ -147,7 +148,7 @@ class ApplicationService(BaseService):
         application = Application(
             opportunity_id=opportunity_id,
             volunteer_id=volunteer_id,
-            message=message,
+            message_ciphertext=encrypt_field(message),
         )
         return await self._app_repo.create(application)
 

@@ -17,6 +17,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.schemas import VolunteerRegisterSchema
+from app.core.services.encryption import encrypt_field, hash_email
 from app.db.models import Application, Opportunity, Organization, User, UserOrganizationRole
 from app.opportunities.schemas import ApplicationCreate, OpportunityCreate
 from app.organizations.schemas import OrganizationCreate
@@ -168,8 +169,8 @@ async def register_and_login(
 
 
 async def get_user_from_db(db: AsyncSession, email: str) -> User:
-    """Get a user from the database by email."""
-    result = await db.execute(select(User).where(User.email == email))
+    """Get a user from the database by email hash."""
+    result = await db.execute(select(User).where(User.email_hash == hash_email(email)))
     user = result.scalar_one_or_none()
     assert user is not None, f"User with email {email} not found"
     return user
@@ -283,7 +284,7 @@ async def create_application_db(
     app_obj = Application(
         opportunity_id=opportunity_id,
         volunteer_id=volunteer_id,
-        message=message or data.message,
+        message_ciphertext=encrypt_field(message or data.message),
         status=app_status,
     )
     db.add(app_obj)

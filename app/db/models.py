@@ -8,6 +8,7 @@ from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Index, St
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, declarative_mixin, mapped_column, relationship
 
+from app.core.services.encryption import decrypt_field
 from app.core.types import ProfileVisibilityType
 
 RoleType = Literal["volunteer", "organization", "system_admin"]
@@ -80,11 +81,12 @@ class User(Base, FullModelMixin):
     """User account (volunteer or organization admin)."""
 
     __tablename__ = "users"
-    email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
+    email_ciphertext: Mapped[str] = mapped_column(String(512), nullable=False)
+    email_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="1")
     role: Mapped[str] = mapped_column(String(50), nullable=False, default="volunteer", server_default="volunteer")
-    ip_address: Mapped[str | None] = mapped_column(String(45), nullable=True)
+    ip_address_ciphertext: Mapped[str | None] = mapped_column(String(512), nullable=True)
     first_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
     last_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
     username: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
@@ -140,6 +142,16 @@ class User(Base, FullModelMixin):
     )
 
     @property
+    def email(self) -> str:
+        """Decrypt and return email for display purposes."""
+        return decrypt_field(self.email_ciphertext) or ""
+
+    @property
+    def ip_address(self) -> str | None:
+        """Decrypt and return IP address for display purposes."""
+        return decrypt_field(self.ip_address_ciphertext)
+
+    @property
     def display_name(self) -> str:
         """Full display name, falling back to first/last name or username."""
         if self.custom_display_name:
@@ -181,11 +193,16 @@ class RefreshToken(Base, FullModelMixin):
         DateTime(timezone=True),
         nullable=False,
     )
-    device_info: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    device_info_ciphertext: Mapped[str | None] = mapped_column(String(512), nullable=True)
 
     __table_args__ = (Index("ix_refresh_tokens_user_expires", "user_id", "expires_at"),)
 
     user: Mapped[User] = relationship("User", back_populates="refresh_tokens")
+
+    @property
+    def device_info(self) -> str | None:
+        """Decrypt and return device info for display purposes."""
+        return decrypt_field(self.device_info_ciphertext)
 
 
 class Organization(Base, FullModelMixin):
@@ -284,7 +301,7 @@ class Application(Base, FullModelMixin):
         default="pending",
         server_default="pending",
     )
-    message: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    message_ciphertext: Mapped[str | None] = mapped_column(String(2048), nullable=True)
 
     __table_args__ = (
         UniqueConstraint("volunteer_id", "opportunity_id", name="uq_volunteer_opportunity"),
@@ -298,6 +315,11 @@ class Application(Base, FullModelMixin):
 
     opportunity: Mapped[Opportunity] = relationship("Opportunity", foreign_keys=[opportunity_id])
     volunteer: Mapped[User] = relationship("User", foreign_keys=[volunteer_id])
+
+    @property
+    def message(self) -> str | None:
+        """Decrypt and return message for display purposes."""
+        return decrypt_field(self.message_ciphertext)
 
 
 class Follow(Base):

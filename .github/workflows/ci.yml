@@ -12,7 +12,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  PYTHON_VERSION: '3.14.1'
+  PYTHON_VERSION: '3.14.2'
 
 jobs:
   lint:
@@ -71,8 +71,9 @@ jobs:
       POSTGRES_DB: volunteeringapp
       POSTGRES_HOST: localhost
       POSTGRES_PORT: 5432
-      SECRET_KEY: ${{ secrets.APP_TEST_KEY }}
+      JWT_SECRET_KEY: ${{ secrets.JWT_TEST_SECRET_KEY }}
       JWT_ALGORITHM: HS256
+      ENCRYPTION_KEY: ${{ secrets.TEST_ENCRYPTION_KEY }}
       ENVIRONMENT: test
 
     steps:
@@ -95,9 +96,6 @@ jobs:
   contract-tests:
     name: Contract Tests (Schemathesis)
     runs-on: ubuntu-latest
-    needs:
-      - lint
-      - unit-tests
 
     services:
       postgres:
@@ -120,8 +118,9 @@ jobs:
       POSTGRES_DB: volunteeringapp
       POSTGRES_HOST: localhost
       POSTGRES_PORT: 5432
-      SECRET_KEY: ${{ secrets.APP_TEST_KEY }}
+      JWT_SECRET_KEY: ${{ secrets.JWT_TEST_SECRET_KEY }}
       JWT_ALGORITHM: HS256
+      ENCRYPTION_KEY: ${{ secrets.TEST_ENCRYPTION_KEY }}
       ENVIRONMENT: test
 
     steps:

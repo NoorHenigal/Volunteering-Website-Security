@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     postgres_port: int = Field(default=..., alias="POSTGRES_PORT")
 
     # JWT settings
-    secret_key: SecretStr = Field(default=..., alias="SECRET_KEY")
+    jwt_secret_key: SecretStr = Field(default=..., alias="JWT_SECRET_KEY")
     jwt_algorithm: str = Field(default="HS256", alias="JWT_ALGORITHM")
     access_token_expire_minutes: int = Field(default=15, alias="ACCESS_TOKEN_EXPIRE_MINUTES")
     refresh_token_expire_days: int = Field(default=30, alias="REFRESH_TOKEN_EXPIRE_DAYS")
@@ -60,6 +60,9 @@ class Settings(BaseSettings):
 
     # Uploads (optional override)
     upload_dir: Path | None = Field(default=None, alias="UPLOAD_DIR")
+
+    # Encryption key for sensitive fields (64 hex chars = 32 bytes)
+    encryption_key: SecretStr = Field(default=..., alias="ENCRYPTION_KEY")
 
     @property
     def database_url(self) -> str:
