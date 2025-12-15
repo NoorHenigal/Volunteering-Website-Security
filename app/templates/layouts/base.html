@@ -100,9 +100,51 @@
     <body class="{% block body_class %}bg-slate-50 text-slate-800 font-sans min-h-screen flex flex-col antialiased selection:bg-brand-200 selection:text-brand-900{% endblock %}">
         {% block body_content %}
             {% set hide_chrome = hide_chrome|default(false) %}
+            {% from "components/icons.html" import icon %}
+            {% if settings.demo_data and user and not hide_chrome %}
+                <div x-data="{ open: false }" @keydown.escape.window="open = false">
+                    <div class="fixed left-4 top-20 z-50">
+                        <button type="button"
+                                @click="open = true"
+                                class="group relative inline-flex items-center justify-center rounded-full bg-orange-500 text-white w-10 h-10 shadow-lg hover:bg-orange-600 transition-colors">
+                            {{ icon('cog', 'sm', 'text-white') }}
+                            <span class="sr-only">Demo Settings</span>
+                            <span class="pointer-events-none absolute left-full ml-3 top-1/2 -translate-y-1/2 whitespace-nowrap rounded-md bg-slate-900 text-white text-xs font-semibold px-2 py-1 opacity-0 group-hover:opacity-100 transition-opacity shadow-lg">
+                                Demo Settings
+                            </span>
+                        </button>
+                    </div>
+                    <div x-cloak
+                         x-show="open"
+                         x-transition.opacity
+                         class="fixed inset-0 z-50 flex items-center justify-center p-4">
+                        <div class="absolute inset-0 bg-black/50 backdrop-blur-[1px]"
+                             @click="open = false"></div>
+                        <div class="relative w-full max-w-xl bg-white rounded-3xl shadow-premium border border-slate-100 overflow-hidden">
+                            <div class="flex items-center justify-between px-6 py-5 border-b border-slate-100">
+                                <div>
+                                    <h2 class="text-lg font-extrabold text-slate-900">Demo mode</h2>
+                                    <p class="text-sm text-slate-500 mt-0.5">Seed or remove demo data for this environment.</p>
+                                </div>
+                                <button type="button"
+                                        @click="open = false"
+                                        class="p-2 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors">
+                                    <span class="sr-only">Close</span>
+                                    {{ icon('x', 'lg') }}
+                                </button>
+                            </div>
+                            <div class="p-6 max-h-[80vh] overflow-auto"
+                                 hx-get="/demo/settings"
+                                 hx-trigger="load"
+                                 hx-swap="innerHTML">
+                                <div class="text-sm text-slate-500">Loading…</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
             {% if not hide_chrome %}
                 {% from "components/navigation.html" import user_dropdown %}
-                {% from "components/icons.html" import icon %}
                 <nav class="fixed w-full top-0 z-40 glass-nav transition-all duration-300"
                      x-data="{ mobileMenuOpen: false, scrolled: false }"
                      @scroll.window="scrolled = (window.pageYOffset > 20)">
@@ -274,7 +316,7 @@
                  x-data="{ toasts: [] }"
                  @show-toast.window="toasts.push({id: Date.now(), ...$event.detail}); setTimeout(() => { toasts.shift() }, 5000)">
                 <template x-for="toast in toasts" :key="toast.id">
-                    <div class="pointer-events-auto w-full max-w-sm overflow-hidden bg-white rounded-lg shadow-premium ring-1 ring-black ring-opacity-5 transition-all transform ease-out duration-300"
+                    <div class="pointer-events-auto w-80 sm:w-96 max-w-[calc(100vw-3rem)] overflow-hidden bg-white rounded-lg shadow-premium ring-1 ring-black ring-opacity-5 transition-all transform ease-out duration-300"
                          x-transition:enter="translate-y-2 opacity-0 sm:translate-y-0 sm:translate-x-2"
                          x-transition:enter-end="translate-y-0 opacity-100 sm:translate-x-0"
                          x-transition:leave="opacity-0"
@@ -289,8 +331,9 @@
                                         <span class="text-red-400">{{ icon('x-circle', 'lg') }}</span>
                                     </template>
                                 </div>
-                                <div class="ml-3 w-0 flex-1 pt-0.5">
-                                    <p class="text-sm font-medium text-slate-900" x-text="toast.message"></p>
+                                <div class="ml-3 min-w-0 flex-1 pt-0.5">
+                                    <p class="text-sm font-medium text-slate-900 whitespace-normal break-words"
+                                       x-text="toast.message"></p>
                                 </div>
                                 <div class="ml-4 flex-shrink-0 flex">
                                     <button @click="toasts = toasts.filter(t => t.id !== toast.id)"

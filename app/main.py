@@ -23,6 +23,7 @@ from app.core.config import settings
 from app.core.context import ContextDep, render_template
 from app.core.exceptions import http_exception_handler, validation_exception_handler
 from app.core.lifecycle import StartupCheckError, cleanup_shutdown_task, manage_test_shutdown, run_preflight_checks
+from app.demo.router import router as demo_router
 from app.opportunities.router import router as opp_router
 from app.organizations.router import router as org_router
 from app.profiles.router import router as profiles_router
@@ -156,6 +157,7 @@ async def home(ctx: ContextDep) -> Response:
 
 
 app.include_router(auth_router)
+app.include_router(demo_router)
 app.include_router(opp_router)
 app.include_router(org_router)
 app.include_router(profiles_router)
