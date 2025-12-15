@@ -10,6 +10,7 @@ from argon2.exceptions import VerifyMismatchError
 from argon2.profiles import RFC_9106_HIGH_MEMORY, RFC_9106_LOW_MEMORY
 from fastapi import HTTPException, status
 from jose import jwt
+from pydantic import SecretStr
 
 from app.auth.schemas import (
     AccountType,
@@ -46,6 +47,13 @@ def verify_password(password: str, hashed: str) -> bool:
         return False
     else:
         return True
+
+
+def _secret_to_str(value: SecretStr | str) -> str:
+    """Normalize SecretStr or raw string to a plain string value."""
+    if isinstance(value, SecretStr):
+        return value.get_secret_value()
+    return value
 
 
 def create_jwt_token(entity_id: UUID, role_or_type: str, account_type: AccountType = "volunteer") -> str:
@@ -131,7 +139,7 @@ async def register_volunteer(data: VolunteerRegisterSchema, db: AsyncSession) ->
     new_user = User(
         email_ciphertext=encrypt_field(data.email),
         email_hash=email_hashed,
-        password_hash=hash_password(data.password),
+        password_hash=hash_password(data.password.get_secret_value()),
         first_name=data.first_name,
         last_name=data.last_name,
         username=data.username,
@@ -140,11 +148,12 @@ async def register_volunteer(data: VolunteerRegisterSchema, db: AsyncSession) ->
     return UserResponse.model_validate(new_user)
 
 
-async def authenticate_user(email: str, password: str, db: AsyncSession) -> User:
+async def authenticate_user(email: str, password: SecretStr | str, db: AsyncSession) -> User:
     """Authenticate user by email/password or raise 401."""
     user_repo = UserRepository(db)
+    password_value = _secret_to_str(password)
     user = await user_repo.get_by_email_hash(hash_email(email))
-    if not user or not verify_password(password, user.password_hash):
+    if not user or not verify_password(password_value, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",
@@ -189,7 +198,7 @@ async def register_organization(data: OrganizationRegisterSchema, db: AsyncSessi
     backend_user = User(
         email_ciphertext=encrypt_field(data.email),
         email_hash=email_hashed,
-        password_hash=hash_password(data.password),
+        password_hash=hash_password(data.password.get_secret_value()),
         username=data.username,
         role="organization",
         first_name=data.name,
@@ -214,7 +223,7 @@ async def register_organization(data: OrganizationRegisterSchema, db: AsyncSessi
     return OrganizationResponse.model_validate(new_org)
 
 
-async def authenticate_organization(email: str, password: str, db: AsyncSession) -> User:
+async def authenticate_organization(email: str, password: SecretStr | str, db: AsyncSession) -> User:
     """Authenticate organization by email/password or raise 401."""
     user = await authenticate_user(email, password, db)
     if user.role != "organization":
@@ -234,7 +243,7 @@ async def issue_org_tokens(user: User) -> TokenResponse:
 async def login_entity(
     db: AsyncSession,
     email: str,
-    password: str,
+    password: SecretStr | str,
     account_type: AccountType,
     user_agent: str | None,
 ) -> TokenResponse:

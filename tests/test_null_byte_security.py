@@ -4,7 +4,7 @@ from typing import ClassVar
 
 import pytest
 from fastapi import status
-from pydantic import ValidationError
+from pydantic import SecretStr, ValidationError
 
 from app.auth.schemas import VolunteerRegisterSchema
 from app.opportunities.schemas import OpportunityCreate
@@ -202,7 +202,7 @@ class TestNullByteRejection:
         with pytest.raises(ValidationError):
             VolunteerRegisterSchema(
                 email="test\x00@example.com",
-                password="TestPass123!",  # noqa: S106
+                password=SecretStr(TEST_PWD),
                 first_name="Test",
                 last_name="User",
                 username="testuser",

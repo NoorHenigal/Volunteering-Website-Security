@@ -22,7 +22,7 @@ class Settings(BaseSettings):
 
     # Database settings
     postgres_user: str = Field(default=..., alias="POSTGRES_USER")
-    postgres_password: str = Field(default=..., alias="POSTGRES_PASSWORD")
+    postgres_password: SecretStr = Field(default=..., alias="POSTGRES_PASSWORD")
     postgres_db: str = Field(default=..., alias="POSTGRES_DB")
     postgres_host: str = Field(default=..., alias="POSTGRES_HOST")
     postgres_port: int = Field(default=..., alias="POSTGRES_PORT")
@@ -68,7 +68,7 @@ class Settings(BaseSettings):
     def database_url(self) -> str:
         """PostgreSQL connection URL."""
         return (
-            f"postgresql+psycopg://{self.postgres_user}:{self.postgres_password}"
+            f"postgresql+psycopg://{self.postgres_user}:{self.postgres_password.get_secret_value()}"
             f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
         )
 

@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, SecretBytes, SecretStr, model_validator
 
 from app.core.types import MUTABLE_CONFIG, NULL_BYTE_ERROR, ORM_CONFIG, STRICT_CONFIG
 
@@ -51,10 +51,16 @@ class _NullByteValidator(BaseModel):
 
     @model_validator(mode="before")
     @classmethod
-    def reject_null_bytes(cls, data: Any) -> Any:  # noqa: ANN401
+    def reject_null_bytes(cls, data: object) -> object:
         if isinstance(data, dict):
             for key, value in data.items():
                 if isinstance(value, str) and "\x00" in value:
+                    msg = f"{key}: {NULL_BYTE_ERROR}"
+                    raise ValueError(msg)
+                if isinstance(value, SecretStr) and "\x00" in value.get_secret_value():
+                    msg = f"{key}: {NULL_BYTE_ERROR}"
+                    raise ValueError(msg)
+                if isinstance(value, SecretBytes) and b"\x00" in value.get_secret_value():
                     msg = f"{key}: {NULL_BYTE_ERROR}"
                     raise ValueError(msg)
         return data

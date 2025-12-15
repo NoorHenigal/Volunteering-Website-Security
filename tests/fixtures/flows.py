@@ -34,7 +34,7 @@ class FlowHelper:
             "/auth/register/volunteer",
             json={
                 "email": data.email,
-                "password": data.password,
+                "password": data.password.get_secret_value(),
                 "first_name": data.first_name,
                 "last_name": data.last_name,
                 "username": data.username,
@@ -44,7 +44,7 @@ class FlowHelper:
 
         tokens_resp = await self.api.client.post(
             "/auth/login",
-            json={"email": data.email, "password": data.password, "account_type": "volunteer"},
+            json={"email": data.email, "password": data.password.get_secret_value(), "account_type": "volunteer"},
         )
         assert tokens_resp.status_code == 200, f"Login failed: {tokens_resp.text}"
         tokens: dict[str, str] = tokens_resp.json()
@@ -56,7 +56,7 @@ class FlowHelper:
             first_name=data.first_name,
             last_name=data.last_name,
             email=data.email,
-            password=data.password,
+            password=data.password.get_secret_value(),
             username=data.username,
             tokens=tokens,
             role=role,

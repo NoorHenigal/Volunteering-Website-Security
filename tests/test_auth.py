@@ -47,7 +47,11 @@ class TestAuthRoundtrip:
     async def test_login_nonexistent_user_fails(self, api: APIHelper) -> None:
         """Test login with non-existent user fails."""
         data = RegisterSchemaFactory.build()
-        await api.unauthorized("POST", "/auth/login", json={"email": data.email, "password": data.password})
+        await api.unauthorized(
+            "POST",
+            "/auth/login",
+            json={"email": data.email, "password": data.password.get_secret_value()},
+        )
 
     @pytest.mark.anyio
     async def test_status_unauthenticated_fails(self, api: APIHelper) -> None:

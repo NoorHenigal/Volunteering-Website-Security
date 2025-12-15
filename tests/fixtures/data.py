@@ -118,7 +118,7 @@ async def register_user(
     """Register a new volunteer user."""
     data = VolunteerRegisterSchemaFactory.build()
     email = email or data.email
-    password = password or data.password
+    password = password or data.password.get_secret_value()
     first_name = first_name or data.first_name
     last_name = last_name or data.last_name
     username = username or data.username
