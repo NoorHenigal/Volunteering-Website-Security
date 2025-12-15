@@ -1,7 +1,6 @@
 """Generate secure random keys for the application."""
 
-import base64
-import os
+import secrets
 from collections.abc import Callable
 from dataclasses import dataclass
 
@@ -14,12 +13,12 @@ console = Console()
 
 def hex_key(bytes_len: int) -> str:
     """Return a cryptographically secure random hex string of length 2 * bytes_len."""
-    return os.urandom(bytes_len).hex()
+    return secrets.token_hex(bytes_len)
 
 
 def urlsafe_b64_key(bytes_len: int) -> str:
     """Return a URL-safe base64 key generated from random bytes (without padding)."""
-    return base64.urlsafe_b64encode(os.urandom(bytes_len)).rstrip(b"=").decode("ascii")
+    return secrets.token_urlsafe(bytes_len)
 
 
 @dataclass(frozen=True)
@@ -35,7 +34,7 @@ SECRETS: list[Secret] = [
     Secret(
         name="POSTGRES_PASSWORD",
         generator=lambda: hex_key(32),
-        notes="Must match DB_PASSWORD",
+        notes="64 hex chars (32 bytes)",
     ),
     Secret(
         name="JWT_SECRET_KEY",

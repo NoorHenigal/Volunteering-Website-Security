@@ -2,68 +2,110 @@
 
 ## Dev Setup Guide
 
-1. Install Python 3.14.
-2. Install [*uv*](https://docs.astral.sh/uv/getting-started/installation/).
-3. Install Docker (if you're working on databases and/or want to test the web app).
-4. Clone this repository: `git clone https://github.com/M-AlNoaimi/KV6014-Volunteering-Project.git`.
-    > You might need to set your Git up with GitHub (use YouTube).
-5. Enter the repository via your terminal `cd KV6014-Volunteering-Project`.
-6. Run `uv sync --dev`.
-7. Create a new file in the `Docker/` folder called `.env`.
-8. Paste the contents of `Docker/.env.example` into `Docker/.env`.
-9. Create a new file in the root directory called `.env`.
-10. Paste the contents of `.env.example` into `.env`.
-11. Run `uv run generate_keys.py`.
-12. Use the generated keys (copy cleanly) to replace the placeholder keys set in `Docker/.env` and `.env`.
-13. You're good to go!
+This project now uses **a single `.env` file** for both the application and Docker.
+The old `Docker/.env` flow has been removed.
+
+### Prerequisites
+
+1. Install **Python 3.14**
+2. Install [**uv**](https://docs.astral.sh/uv/getting-started/installation/)
+3. Install **Docker** (required for databases)
+4. Make sure Git is set up with GitHub
+
+---
+
+### Initial Setup
+
+1. Clone the repository:
+
+   ```bash
+   git clone https://github.com/M-AlNoaimi/KV6014-Volunteering-Project.git
+   ```
+
+2. Enter the project directory:
+
+   ```bash
+   cd KV6014-Volunteering-Project
+   ```
+
+3. Install dependencies:
+
+   ```bash
+   uv sync --extra dev
+   ```
+
+4. Create your environment file:
+
+   ```bash
+   cp .env.example .env
+   ```
+
+5. Generate required secrets:
+
+   ```bash
+   uv run generate_keys.py
+   ```
+
+6. Copy the generated values into `.env`, replacing all placeholder keys.
+
+---
 
 ## Database Setup Guide
 
-1. Have Docker Installed (use YouTube or Google).
-2. Open up your Terminal and Navigate to the repository
+Docker is required for all database workflows.
 
-### To run the *volatile* database
+### Volatile (In-Memory) Database
 
-> This database type is *in-memory* only! But it should be the main one you're using during development, and/or when exporting schema's.
+> Recommended for development and schema work.
+> Data does **not** persist between restarts.
 
-Run this from the root directory:
-
-```bash
-docker-compose --env-file Docker/.env -f Docker/docker-compose.yml up db-volatile
-```
-
-or simply:
+From the project root:
 
 ```bash
 make pg-volatile
 ```
 
-### To run the *persistent* database
+---
 
-> This database type stores data on disk, so it will persist between container restarts.
+### Persistent Database
 
-Run this from the root directory:
+> Data is stored on disk and survives container restarts.
 
-```bash
-docker-compose --env-file Docker/.env -f Docker/docker-compose.yml up db-persistent
-```
-
-or simply:
+From the project root:
 
 ```bash
 make pg-persistent
 ```
 
-## Database Migration Guide
+---
 
-After you have started the database as shown above, run the following commands to apply the migrations:
+## Database Migrations
+
+Once a database container is running:
 
 ```bash
 make migrate
 ```
 
-## Run the Web App
+This applies all Alembic migrations to the active database.
+
+---
+
+## Running the Web App
 
 ```bash
 make run
 ```
+
+The app will start using the active database and environment configuration.
+
+---
+
+## Demo Data (Optional)
+
+If `DEMO_DATA=true` is set in `.env`, demo data can be managed via the UI:
+
+* Seed demo data from the demo settings modal
+* Unseed safely without touching real data
+* Requires authentication
+* No auto-seeding on startup
