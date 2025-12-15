@@ -1,13 +1,8 @@
 # KV6014-Volunteering-Project
 
-## Dev Setup Guide
+## Prerequisites
 
-This project now uses **a single `.env` file** for both the application and Docker.
-The old `Docker/.env` flow has been removed.
-
-### Prerequisites
-
-1. Install **Python 3.14**
+1. Install **Python 3.14.2**
 2. Install [**uv**](https://docs.astral.sh/uv/getting-started/installation/)
 3. Install **Docker** (required for databases)
 4. Make sure Git is set up with GitHub
