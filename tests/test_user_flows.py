@@ -165,7 +165,7 @@ class TestAuthorizationBoundaries:
                 "name": "Volunteer Created Org",
                 "username": "volunteer-org",
                 "email": "volunteer-org@example.com",
-                "password": "TestPass123!",
+                "password": "TestPass123!TestPwd",
                 "description": "Created by volunteer",
             },
         )

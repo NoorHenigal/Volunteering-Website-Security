@@ -93,7 +93,11 @@
                                     </div>
                                     <div>
                                         {{ form_label('Password', 'password', true) }}
-                                        {{ form_input('password', 'password', 'Min 8 characters', true, '', id='password', autocomplete='new-password') }}
+                                        {{ form_input('password', 'password', 'Create a strong password', true, '', id='password', autocomplete='new-password') }}
+                                        <p id="password-help" class="mt-1 text-xs text-slate-500 ml-1">
+                                            Choose a password between 16 and 64 characters.
+                                        </p>
+                                        <p id="password-error" class="mt-1 text-xs text-red-600 ml-1 hidden"></p>
                                     </div>
                                     <div>
                                         {{ form_label('Username', 'username', true) }}
@@ -121,7 +125,11 @@
                                     </div>
                                     <div>
                                         {{ form_label('Password', 'password', true) }}
-                                        {{ form_input('password', 'password', 'Min 8 characters', true, '', id='org_password', autocomplete='new-password') }}
+                                        {{ form_input('password', 'password', '16–64 ASCII characters', true, '', id='org_password', autocomplete='new-password') }}
+                                        <p id="org-password-help" class="mt-1 text-xs text-slate-500 ml-1">
+                                            16–64 characters. ASCII only. Spaces allowed, but not at the start or end.
+                                        </p>
+                                        <p id="org-password-error" class="mt-1 text-xs text-red-600 ml-1 hidden"></p>
                                     </div>
                                     <div>
                                         {{ form_label('Username', 'username', true) }}
@@ -203,4 +211,91 @@
             </div>
         </div>
     </div>
+    <script>
+        (function () {
+            const MIN_LEN = 16;
+            const MAX_LEN = 64;
+
+            function isPrintableAscii(str) {
+                for (let i = 0; i < str.length; i++) {
+                    const code = str.charCodeAt(i);
+                    if (code < 0x20 || code > 0x7E) return false;
+                }
+                return true;
+            }
+
+            function validatePasswordValue(password) {
+                if (password.length < MIN_LEN || password.length > MAX_LEN) {
+                    return `Password must be between ${MIN_LEN} and ${MAX_LEN} characters.`;
+                }
+                if (!isPrintableAscii(password)) {
+                    return "Password must contain only ASCII characters.";
+                }
+                if (password !== password.trimEnd() || password !== password.trimStart()) {
+                    if (password !== password.replace(/^ +| +$/g, "")) {
+                        return "Password cannot start or end with a space.";
+                    }
+                }
+                if (password.replace(/ /g, "") === "") {
+                    return "Password cannot be empty or whitespace-only.";
+                }
+                return null;
+            }
+
+            function wirePasswordValidation(form, inputId, errorId) {
+                const input = form.querySelector(`#${inputId}`);
+                const error = form.querySelector(`#${errorId}`);
+                if (!input || !error) return;
+
+                if (input.dataset.passwordValidationWired === "true") return;
+                input.dataset.passwordValidationWired = "true";
+
+                function update() {
+                    const message = validatePasswordValue(input.value);
+                    if (message) {
+                        error.textContent = message;
+                        error.classList.remove("hidden");
+                        input.setCustomValidity(message);
+                        return false;
+                    }
+                    error.textContent = "";
+                    error.classList.add("hidden");
+                    input.setCustomValidity("");
+                    return true;
+                }
+
+                input.addEventListener("input", update);
+                input.addEventListener("blur", update);
+                form.addEventListener(
+                    "submit",
+                    (e) => {
+                        if (!update()) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            input.focus();
+                        }
+                    },
+                    true,
+                );
+
+                update();
+            }
+
+            function wireAll() {
+                document.querySelectorAll("form").forEach((form) => {
+                    // Volunteer registration
+                    if (form.querySelector("#password") && form.querySelector("#password-error")) {
+                        wirePasswordValidation(form, "password", "password-error");
+                    }
+                    // Organization registration
+                    if (form.querySelector("#org_password") && form.querySelector("#org-password-error")) {
+                        wirePasswordValidation(form, "org_password", "org-password-error");
+                    }
+                });
+            }
+
+            document.addEventListener("DOMContentLoaded", wireAll);
+            document.addEventListener("htmx:afterSwap", wireAll);
+        })();
+    </script>
 {% endblock content %}

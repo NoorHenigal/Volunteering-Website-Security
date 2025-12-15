@@ -35,7 +35,7 @@ class TestAuthRoundtrip:
             "/auth/register",
             json={
                 "email": volunteer.email,
-                "password": "password123",
+                "password": "password123password123",
                 "role": "volunteer",
                 "first_name": "Duplicate",
                 "last_name": "User",
@@ -109,7 +109,7 @@ class TestAuthRoundtrip:
             json={"email": user.email, "password": user.password, "account_type": "volunteer"},
         )
 
-        new_password = "newpassword123"
+        new_password = "newpassword123newpassword123"
         reg_data = RegisterSchemaFactory.build(email=user.email, username=user.username)
         reg_resp = await api.client.post(
             "/auth/register/volunteer",

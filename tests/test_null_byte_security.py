@@ -13,7 +13,7 @@ from app.profiles.schemas import ProfileUpdateSchema
 from tests.fixtures.api import APIHelper
 from tests.fixtures.flows import FlowHelper
 
-TEST_PWD = "TestPass123!"
+TEST_PWD = "TestPass123!TestPwd"
 
 
 class TestNullByteRejection:
@@ -36,7 +36,7 @@ class TestNullByteRejection:
                 "/auth/register/volunteer",
                 json={
                     "email": f"test{null_string}@example.com",
-                    "password": "TestPass123!",
+                    "password": "TestPass123!TestPwd",
                     "first_name": "Test",
                     "last_name": "User",
                     "username": "testuser123",
@@ -76,7 +76,7 @@ class TestNullByteRejection:
                 "/auth/register/volunteer",
                 json={
                     "email": "test@example.com",
-                    "password": "TestPass123!",
+                    "password": "TestPass123!TestPwd",
                     "first_name": f"Test{null_string}",
                     "last_name": "User",
                     "username": "testuser123",
@@ -92,7 +92,7 @@ class TestNullByteRejection:
                 "/auth/register/volunteer",
                 json={
                     "email": "test@example.com",
-                    "password": "TestPass123!",
+                    "password": "TestPass123!TestPwd",
                     "first_name": "Test",
                     "last_name": f"User{null_string}",
                     "username": "testuser123",
@@ -111,7 +111,7 @@ class TestNullByteRejection:
                 "/auth/register/volunteer",
                 json={
                     "email": "test@example.com",
-                    "password": "TestPass123!",
+                    "password": "TestPass123!TestPwd",
                     "first_name": "Test",
                     "last_name": "User",
                     "username": f"testuser{null_string}",

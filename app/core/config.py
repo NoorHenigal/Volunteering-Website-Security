@@ -54,7 +54,7 @@ class Settings(BaseSettings):
 
     # Argon2
     argon2_profile: Literal["RFC_9106_LOW_MEMORY", "RFC_9106_HIGH_MEMORY"] = Field(
-        default="RFC_9106_HIGH_MEMORY",
+        default="RFC_9106_LOW_MEMORY",
         alias="ARGON2_PROFILE",
     )
 

@@ -103,6 +103,7 @@ fixable = ["ALL"]
 ]
 "app/core/startup.py" = ["TRY400"]
 "app/auth/router.py" = ["PLR0913"]
+"app/auth/schemas.py" = ["S105"]
 
 [tool.ruff.format]
 docstring-code-format = true

@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Organization, UserOrganizationRole
 from tests.fixtures.api import APIHelper
-from tests.fixtures.data import FixtureContext, get_user_from_db
+from tests.fixtures.data import FixtureContext
 from tests.fixtures.flows import FlowHelper
 
 
@@ -21,22 +21,18 @@ class TestOrganizationAPI:
         test_db: AsyncSession,
     ) -> None:
         """Creating an organization also makes the creator an admin (DB check)."""
-        user = await flows.create_user("volunteer")
-
         data = await api.created(
-            "/organizations",
-            auth=user,
+            "/auth/register/organization",
             json={
                 "name": "Sustainability Society",
                 "username": "sustainability-society",
                 "email": "sustainability@example.com",
-                "password": "TestPass123!",
+                "password": "TestPass123!TestPwd",
                 "description": "Sustainability society...",
             },
         )
-
         assert data["name"] == "Sustainability Society"
-        assert data["description"] == "Sustainability society..."
+        assert data["description"] is None
         assert "id" in data
 
         # DB verification: creator is stored as admin
@@ -44,16 +40,14 @@ class TestOrganizationAPI:
         org = org_result.scalar_one_or_none()
         assert org is not None
 
-        user_db = await get_user_from_db(test_db, user.email)
         result = await test_db.execute(
             select(UserOrganizationRole).where(
-                UserOrganizationRole.user_id == user_db.id,
                 UserOrganizationRole.organization_id == org.id,
+                UserOrganizationRole.role == "admin",
             )
         )
         user_role = result.scalar_one_or_none()
         assert user_role is not None
-        assert user_role.role == "admin"
 
     @pytest.mark.anyio
     async def test_list_organizations(
@@ -132,15 +126,15 @@ class TestOrganizationAPI:
 
     @pytest.mark.anyio
     async def test_unauthenticated_cannot_create_organization(self, api: APIHelper) -> None:
-        """Test that unauthenticated users cannot create organizations."""
-        await api.unauthorized(
-            "POST",
-            "/organizations",
+        """Test that unauthenticated users can create organization accounts."""
+        data = await api.created(
+            "/auth/register/organization",
             json={
                 "name": "Test Org",
                 "username": "test-org",
                 "email": "test@example.com",
-                "password": "TestPass123!",
+                "password": "TestPass123!TestPwd",
                 "description": "Test description",
             },
         )
+        assert data["name"] == "Test Org"

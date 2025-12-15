@@ -43,6 +43,20 @@ class VolunteerRegisterSchemaFactory(ModelFactory[VolunteerRegisterSchema]):
     def username(cls) -> str:
         return cls.__faker__.user_name()
 
+    @classmethod
+    def password(cls) -> str:
+        base = f"{cls.__faker__.password(length=24, special_chars=True, digits=True, upper_case=True, lower_case=True)}"
+        base = "".join(ch for ch in base if 0x20 <= ord(ch) <= 0x7E)
+        base = base.replace("\t", "").replace("\n", "").replace("\r", "")
+        base = base.strip(" ")
+        if len(base) < 16:
+            base = (base + "A1!aA1!aA1!aA1!a")[:16]
+        if len(base) > 64:
+            base = base[:64]
+        if base.strip(" ") == "":
+            base = "A1!aA1!aA1!aA1!a"
+        return base
+
 
 # Backwards compatibility alias
 RegisterSchemaFactory = VolunteerRegisterSchemaFactory

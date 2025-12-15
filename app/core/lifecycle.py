@@ -21,7 +21,7 @@ log = logging.getLogger(__name__)
 
 ARGON2_PROFILE_INCOMPATIBLE_MSG = (
     "Host machine does not meet requirements for configured Argon2 profile "
-    "(ARGON2_PROFILE=RFC_9106_HIGH_MEMORY). See Argon2-Info.md."
+    "(ARGON2_PROFILE=RFC_9106_HIGH_MEMORY). Choose RFC_9106_LOW_MEMORY or see Argon2-Info.md."
 )
 
 
