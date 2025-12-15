@@ -94,9 +94,6 @@
                                     <div>
                                         {{ form_label('Password', 'password', true) }}
                                         {{ form_input('password', 'password', 'Create a strong password', true, '', id='password', autocomplete='new-password') }}
-                                        <p id="password-help" class="mt-1 text-xs text-slate-500 ml-1">
-                                            Choose a password between 16 and 64 characters.
-                                        </p>
                                         <p id="password-error" class="mt-1 text-xs text-red-600 ml-1 hidden"></p>
                                     </div>
                                     <div>
@@ -212,7 +209,7 @@
         </div>
     </div>
     <script>
-        (function () {
+        (function() {
             const MIN_LEN = 16;
             const MAX_LEN = 64;
 
@@ -250,7 +247,29 @@
                 if (input.dataset.passwordValidationWired === "true") return;
                 input.dataset.passwordValidationWired = "true";
 
-                function update() {
+                let hasTyped = false;
+
+                function update({
+                    force
+                } = {
+                    force: false
+                }) {
+                    if (!hasTyped && input.value.length > 0) hasTyped = true;
+
+                    if (!force && !hasTyped) {
+                        error.textContent = "";
+                        error.classList.add("hidden");
+                        input.setCustomValidity("");
+                        return true;
+                    }
+
+                    if (!force && input.value.length === 0) {
+                        error.textContent = "";
+                        error.classList.add("hidden");
+                        input.setCustomValidity("");
+                        return true;
+                    }
+
                     const message = validatePasswordValue(input.value);
                     if (message) {
                         error.textContent = message;
@@ -264,12 +283,17 @@
                     return true;
                 }
 
-                input.addEventListener("input", update);
+                input.addEventListener("input", () => {
+                    hasTyped = true;
+                    update();
+                });
                 input.addEventListener("blur", update);
                 form.addEventListener(
                     "submit",
                     (e) => {
-                        if (!update()) {
+                        if (!update({
+                                force: true
+                            })) {
                             e.preventDefault();
                             e.stopPropagation();
                             input.focus();

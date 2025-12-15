@@ -1,0 +1,64 @@
+{% from "components/icons.html" import icon %}
+{% macro action_button(text, variant, enabled, hx_post=None) %}
+    {% set base = "w-full sm:flex-1 inline-flex items-center justify-center gap-2 rounded-full font-bold py-3.5 px-6 transition-all shadow-sm" %}
+    {% if not enabled %}
+        <button type="button"
+                disabled
+                class="{{ base }} bg-slate-100 text-slate-500 border border-slate-200 cursor-not-allowed">
+            {{ text }}
+        </button>
+    {% else %}
+        {% if variant == 'primary' %}
+            {% set klass = base ~ " bg-gradient-to-r from-brand-600 to-brand-700 hover:from-brand-700 hover:to-brand-800 text-white shadow-lg hover:shadow-brand-500/30 transform hover:-translate-y-0.5" %}
+        {% elif variant == 'danger' %}
+            {% set klass = base ~ " bg-red-600 hover:bg-red-700 text-white shadow-lg hover:shadow-red-500/30 transform hover:-translate-y-0.5" %}
+        {% else %}
+            {% set klass = base ~ " bg-slate-900 hover:bg-slate-800 text-white shadow-lg hover:shadow-slate-900/20 transform hover:-translate-y-0.5" %}
+        {% endif %}
+        <button type="button"
+                hx-post="{{ hx_post }}"
+                hx-target="#demo-settings-content"
+                hx-swap="outerHTML"
+                class="{{ klass }}">
+            {{ text }}
+            <span class="htmx-indicator">{{ icon('spinner', 'sm', 'animate-spin text-white') }}</span>
+        </button>
+    {% endif %}
+{% endmacro %}
+<div id="demo-settings-content" class="space-y-6">
+    <div class="flex items-start justify-between gap-6">
+        <div>
+            <h3 class="text-xl font-extrabold text-slate-900">Demo data</h3>
+            {% if seeded %}
+                <p class="text-sm text-slate-600 mt-1">
+                    Current status: <span class="font-semibold text-green-700">Seeded</span>
+                </p>
+            {% else %}
+                <p class="text-sm text-slate-600 mt-1">
+                    Current status: <span class="font-semibold text-slate-800">Not seeded</span>
+                </p>
+            {% endif %}
+        </div>
+        {% if seeded %}
+            <span class="inline-flex items-center px-3 py-1 rounded-full bg-green-100 text-green-800 text-xs font-bold border border-green-200">Active</span>
+        {% else %}
+            <span class="inline-flex items-center px-3 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-bold border border-slate-200">Inactive</span>
+        {% endif %}
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {{ action_button('Seed demo data', 'primary', can_manage and (not seeded) , '/demo/seed') }}
+        {{ action_button('Unseed demo data', 'danger', can_manage and seeded, '/demo/unseed') }}
+    </div>
+    {% if not can_manage %}
+        <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+            Log in to seed or remove demo data.
+        </div>
+    {% endif %}
+    <p class="text-xs text-slate-500">
+        {% if seeded %}
+            Unseeding removes only rows created by the active demo seed run.
+        {% else %}
+            Seeding uses a unique namespace to avoid collisions with real users.
+        {% endif %}
+    </p>
+</div>

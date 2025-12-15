@@ -1,52 +1,110 @@
 """Database seeding utilities for demo data generation."""
 
 import logging
+import re
+import secrets
 
 from faker import Faker
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.service import hash_password
 from app.core.services.encryption import encrypt_field, hash_email
-from app.db.models import Application, Follow, Opportunity, Organization, User, UserOrganizationRole
-from app.db.session import AsyncSessionLocal
+from app.db.models import (
+    Application,
+    DemoSeedRun,
+    Follow,
+    Opportunity,
+    Organization,
+    RefreshToken,
+    User,
+    UserOrganizationRole,
+)
 
 log = logging.getLogger(__name__)
 
 FAKER_SEED = 42
+MIN_IDENTIFIER_LENGTH = 3
 
 
-async def seed_demo_data() -> None:
-    """Seed the database with demo data if it doesn't already exist."""
-    async with AsyncSessionLocal() as session:
-        result = await session.execute(select(Organization).limit(1))
-        if result.scalar_one_or_none():
-            log.info("✓ Demo data already exists, skipping seeding")
-            return
-
-        log.info("Seeding demo data...")
-
-        try:
-            fake = Faker()
-            Faker.seed(FAKER_SEED)
-            users = await _create_users(session, fake)
-
-            orgs, used_user_count = await _create_organizations_with_sequence(session, fake, users)
-            opportunities = await _create_opportunities(session, fake, orgs)
-            volunteers = users[used_user_count:]
-
-            await _create_applications(session, fake, volunteers, opportunities)
-            await _create_follows(session, fake, users)
-            await session.commit()
-            log.info("✓ Demo data seeded successfully")
-
-        except Exception:
-            await session.rollback()
-            log.exception("Failed to seed demo data")
-            raise
+def _generate_namespace() -> str:
+    return f"demo_{secrets.token_hex(4)}"
 
 
-async def _create_users(session: AsyncSession, fake: Faker) -> list[User]:
+def _safe_identifier(value: str, *, max_length: int) -> str:
+    cleaned = re.sub(r"[^a-zA-Z0-9_-]", "", value)
+    if len(cleaned) < MIN_IDENTIFIER_LENGTH:
+        cleaned = cleaned + secrets.token_hex(2)
+    return cleaned[:max_length]
+
+
+async def get_active_demo_seed_run(session: AsyncSession) -> DemoSeedRun | None:
+    """Return the active demo seed run if one exists."""
+    result = await session.execute(select(DemoSeedRun).where(DemoSeedRun.is_active.is_(True)).limit(1))
+    return result.scalar_one_or_none()
+
+
+async def is_demo_seeded(session: AsyncSession) -> bool:
+    """Return True if a demo seed run is currently active."""
+    return await get_active_demo_seed_run(session) is not None
+
+
+async def seed_demo_data(session: AsyncSession) -> DemoSeedRun:
+    """Seed the database with demo data."""
+    existing = await get_active_demo_seed_run(session)
+    if existing:
+        return existing
+
+    log.info("Seeding demo data...")
+
+    namespace = _generate_namespace()
+    run = DemoSeedRun(namespace=namespace, is_active=True)
+    session.add(run)
+    await session.flush()
+
+    try:
+        fake = Faker()
+        Faker.seed(FAKER_SEED)
+        users = await _create_users(session, fake, run)
+
+        orgs, used_user_count = await _create_organizations_with_sequence(session, fake, users, run)
+        opportunities = await _create_opportunities(session, fake, orgs, run)
+        volunteers = users[used_user_count:]
+
+        await _create_applications(session, fake, volunteers, opportunities, run)
+        await _create_follows(session, fake, users, run)
+        await session.flush()
+    except Exception:
+        log.exception("Failed to seed demo data")
+        raise
+    else:
+        log.info("✓ Demo data seeded successfully")
+        return run
+
+
+async def unseed_demo_data(session: AsyncSession) -> bool:
+    """Remove all demo data created by the active demo seed run."""
+    run = await get_active_demo_seed_run(session)
+    if not run:
+        return False
+
+    run_id = run.id
+    demo_user_ids = select(User.id).where(User.demo_seed_run_id == run_id)
+
+    await session.execute(delete(RefreshToken).where(RefreshToken.user_id.in_(demo_user_ids)))
+    await session.execute(delete(Follow).where(Follow.demo_seed_run_id == run_id))
+    await session.execute(delete(Application).where(Application.demo_seed_run_id == run_id))
+    await session.execute(delete(Opportunity).where(Opportunity.demo_seed_run_id == run_id))
+    await session.execute(delete(UserOrganizationRole).where(UserOrganizationRole.demo_seed_run_id == run_id))
+    await session.execute(delete(Organization).where(Organization.demo_seed_run_id == run_id))
+    await session.execute(delete(User).where(User.demo_seed_run_id == run_id))
+
+    run.is_active = False
+    await session.flush()
+    return True
+
+
+async def _create_users(session: AsyncSession, fake: Faker, run: DemoSeedRun) -> list[User]:
     """Create 56 demo users (28 Male, 28 Female)."""
     default_password = hash_password("demo123")
     users = []
@@ -59,10 +117,11 @@ async def _create_users(session: AsyncSession, fake: Faker) -> list[User]:
         avatar_num = (i % 7) + 1
         first_name = fake.first_name_male()
         last_name = fake.last_name()
-        username = f"{first_name}{last_name}{i + 1}"
+        username = _safe_identifier(f"{run.namespace}_{first_name}{last_name}{i + 1}", max_length=50)
 
-        email = f"male_{i + 1}@example.com"
+        email = f"{run.namespace}_male_{i + 1}@example.com"
         user = User(
+            demo_seed_run_id=run.id,
             email_ciphertext=encrypt_field(email) or "",
             email_hash=hash_email(email),
             password_hash=default_password,
@@ -84,10 +143,11 @@ async def _create_users(session: AsyncSession, fake: Faker) -> list[User]:
         avatar_num = (i % 7) + 1
         first_name = fake.first_name_female()
         last_name = fake.last_name()
-        username = f"{first_name}{last_name}{i + 1}"
+        username = _safe_identifier(f"{run.namespace}_{first_name}{last_name}{i + 1}", max_length=50)
 
-        email = f"female_{i + 1}@example.com"
+        email = f"{run.namespace}_female_{i + 1}@example.com"
         user = User(
+            demo_seed_run_id=run.id,
             email_ciphertext=encrypt_field(email) or "",
             email_hash=hash_email(email),
             password_hash=default_password,
@@ -115,7 +175,7 @@ async def _create_users(session: AsyncSession, fake: Faker) -> list[User]:
 
 
 async def _create_organizations_with_sequence(
-    session: AsyncSession, fake: Faker, users: list[User]
+    session: AsyncSession, fake: Faker, users: list[User], run: DemoSeedRun
 ) -> tuple[list[Organization], int]:
     """Create 18 organizations with 1-2-0 admin visibility sequence.
 
@@ -145,7 +205,7 @@ async def _create_organizations_with_sequence(
         org_name = last_name + " Foundation" if i % 2 == 0 else "The " + last_name + " Initiative"
 
         slug_base = org_name.lower().replace("the ", "", 1).strip().replace(" ", "_").replace(".", "")
-        org_username = slug_base
+        org_username = _safe_identifier(f"{run.namespace}_{slug_base}", max_length=50)
 
         for admin in current_org_admins:
             if is_ghost_org:
@@ -161,6 +221,7 @@ async def _create_organizations_with_sequence(
         org_banner = f"demo-{banner_num}.webp"
 
         org = Organization(
+            demo_seed_run_id=run.id,
             name=org_name,
             description=fake.catch_phrase() + ". " + fake.bs().capitalize() + ".",
             username=org_username,
@@ -172,6 +233,7 @@ async def _create_organizations_with_sequence(
 
         for admin in current_org_admins:
             role = UserOrganizationRole(
+                demo_seed_run_id=run.id,
                 user_id=admin.id,
                 organization_id=org.id,
                 role="admin",
@@ -188,6 +250,7 @@ async def _create_opportunities(
     session: AsyncSession,
     fake: Faker,
     orgs: list[Organization],
+    run: DemoSeedRun,
 ) -> list[Opportunity]:
     """Create 18 opportunities (1 per org)."""
     opportunities = []
@@ -206,6 +269,7 @@ async def _create_opportunities(
         opp_banner = f"demo-{banner_num}.webp"
 
         opp = Opportunity(
+            demo_seed_run_id=run.id,
             title=fake.job(),
             description=fake.paragraph(nb_sentences=3),
             location=fake.city(),
@@ -226,6 +290,7 @@ async def _create_applications(
     fake: Faker,
     volunteers: list[User],
     opportunities: list[Opportunity],
+    run: DemoSeedRun,
 ) -> None:
     """Create applications."""
     applications = []
@@ -236,6 +301,7 @@ async def _create_applications(
         for k in range(2):
             opp = opportunities[(start_idx + k) % len(opportunities)]
             app = Application(
+                demo_seed_run_id=run.id,
                 opportunity_id=opp.id,
                 volunteer_id=vol.id,
                 status=fake.random_element(statuses),
@@ -247,7 +313,7 @@ async def _create_applications(
     await session.flush()
 
 
-async def _create_follows(session: AsyncSession, fake: Faker, users: list[User]) -> None:
+async def _create_follows(session: AsyncSession, fake: Faker, users: list[User], run: DemoSeedRun) -> None:
     """Create follows."""
     follows = []
     created_pairs = set()
@@ -261,11 +327,11 @@ async def _create_follows(session: AsyncSession, fake: Faker, users: list[User])
             pair = (str(user.id), str(target.id))
             if pair not in created_pairs:
                 created_pairs.add(pair)
-                follow = Follow(follower_id=user.id, followed_id=target.id)
+                follow = Follow(demo_seed_run_id=run.id, follower_id=user.id, followed_id=target.id)
                 follows.append(follow)
 
     session.add_all(follows)
     await session.flush()
 
 
-__all__ = ["seed_demo_data"]
+__all__ = ["get_active_demo_seed_run", "is_demo_seeded", "seed_demo_data", "unseed_demo_data"]

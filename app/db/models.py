@@ -42,6 +42,16 @@ def _org_fk() -> Mapped[UUID]:
     )
 
 
+def _demo_seed_fk(*, index: bool = True) -> Mapped[UUID | None]:
+    """Optional DemoSeedRun foreign key used to tag demo-created rows."""
+    return mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("demo_seed_runs.id", ondelete="SET NULL"),
+        nullable=True,
+        index=index,
+    )
+
+
 class Base(DeclarativeBase):
     """SQLAlchemy declarative base."""
 
@@ -77,10 +87,29 @@ class FullModelMixin(IDMixin, TimestampModelMixin):
     """UUID primary key with timestamps."""
 
 
+class DemoSeedRun(Base, FullModelMixin):
+    """Tracks an active demo seed run so demo data can be managed safely."""
+
+    __tablename__ = "demo_seed_runs"
+
+    namespace: Mapped[str] = mapped_column(String(32), nullable=False, unique=True, index=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="1")
+
+    __table_args__ = (
+        Index(
+            "ux_demo_seed_runs_one_active",
+            "is_active",
+            unique=True,
+            postgresql_where=text("is_active = true"),
+        ).ddl_if(dialect="postgresql"),
+    )
+
+
 class User(Base, FullModelMixin):
     """User account (volunteer or organization admin)."""
 
     __tablename__ = "users"
+    demo_seed_run_id: Mapped[UUID | None] = _demo_seed_fk()
     email_ciphertext: Mapped[str] = mapped_column(String(512), nullable=False)
     email_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -209,6 +238,7 @@ class Organization(Base, FullModelMixin):
     """Organization that posts volunteer opportunities."""
 
     __tablename__ = "organizations"
+    demo_seed_run_id: Mapped[UUID | None] = _demo_seed_fk()
     username: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     description: Mapped[str | None] = mapped_column(String(1000), nullable=True)
@@ -239,6 +269,7 @@ class UserOrganizationRole(Base, FullModelMixin):
     """Links users to organizations with role (admin or member)."""
 
     __tablename__ = "user_organization_roles"
+    demo_seed_run_id: Mapped[UUID | None] = _demo_seed_fk()
     user_id: Mapped[UUID] = _user_fk()
     organization_id: Mapped[UUID] = _org_fk()
     role: Mapped[str] = mapped_column(String(50), nullable=False)  # e.g., "admin", "member"
@@ -257,6 +288,7 @@ class Opportunity(Base, FullModelMixin):
     """Volunteer opportunity posted by an organization."""
 
     __tablename__ = "opportunities"
+    demo_seed_run_id: Mapped[UUID | None] = _demo_seed_fk()
     title: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     description: Mapped[str] = mapped_column(String(5000), nullable=False)
     location: Mapped[str | None] = mapped_column(String(255), nullable=True)
@@ -288,6 +320,7 @@ class Application(Base, FullModelMixin):
     """Volunteer application to an opportunity."""
 
     __tablename__ = "applications"
+    demo_seed_run_id: Mapped[UUID | None] = _demo_seed_fk()
     opportunity_id: Mapped[UUID] = mapped_column(
         PG_UUID(as_uuid=True),
         ForeignKey("opportunities.id", ondelete="CASCADE"),
@@ -327,6 +360,8 @@ class Follow(Base):
 
     __tablename__ = "follows"
 
+    demo_seed_run_id: Mapped[UUID | None] = _demo_seed_fk(index=False)
+
     follower_id: Mapped[UUID] = mapped_column(
         PG_UUID(as_uuid=True),
         ForeignKey("users.id", ondelete="CASCADE"),
@@ -357,6 +392,7 @@ __all__ = [
     "Application",
     "ApplicationStatusType",
     "Base",
+    "DemoSeedRun",
     "Follow",
     "FullModelMixin",
     "IDMixin",
