@@ -2,6 +2,7 @@
 
 import pytest
 from fastapi import status
+from httpx import AsyncClient
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -131,23 +132,22 @@ class TestAuthRoundtrip:
 
     @pytest.mark.anyio
     async def test_api_keys_loaded_correctly(self) -> None:
-        """Critical: Verify API keys loaded correctly"""
+        """Critical: Verify API keys loaded correctly."""
         from app.core.config import settings
-        
+
         assert settings.jwt_secret_key is not None
         jwt_value = settings.jwt_secret_key.get_secret_value()
         assert len(jwt_value) > 20, "JWT key should be at least 20 characters"
-        
+
         assert settings.encryption_key is not None
         encryption_value = settings.encryption_key.get_secret_value()
         assert len(encryption_value) == 64, "Encryption key must be exactly 64 hex characters"
 
     @pytest.mark.anyio
     async def test_auth_library_initialized(self, client: AsyncClient) -> None:
-        """Critical: Verify library initialized correctly"""
-
+        """Critical: Verify library initialized correctly."""
         response = await client.get("/auth/me")
-        
+
         assert response.status_code in (401, 303), f"Auth system may not be initialized properly, got {response.status_code}"
 
     @pytest.mark.anyio
@@ -157,33 +157,34 @@ class TestAuthRoundtrip:
         test_db: AsyncSession,
         flows: FlowHelper,
     ) -> None:
-        """Critical: Account type (role) is saved correctly in database"""
-        from app.db.models import User
-        from app.core.services.encryption import hash_email
+        """Critical: Account type (role) is saved correctly in database."""
         from sqlalchemy import select
-        
+
+        from app.core.services.encryption import hash_email
+        from app.db.models import User
+
         # Test 1: Volunteer role is saved
         volunteer = await flows.create_user("volunteer")
-        
+
         result = await test_db.execute(
             select(User).where(User.email_hash == hash_email(volunteer.email))
         )
         db_user = result.scalar_one()
-        
+
         # Verify the role field is correctly saved in database
         assert db_user.role is not None, "User role should not be None"
         assert db_user.role == "volunteer", f"Expected role 'volunteer', got '{db_user.role}'"
-        
+
         # Test 2: Multiple users can have the same role
         volunteer2 = await flows.create_user("volunteer")
-        
+
         result2 = await test_db.execute(
             select(User).where(User.email_hash == hash_email(volunteer2.email))
         )
         db_user2 = result2.scalar_one()
-        
+
         assert db_user2.role == "volunteer", "Second volunteer should also have 'volunteer' role"
-        
+
         # Test 3: Verify roles are stored as strings, not other types
         assert isinstance(db_user.role, str), f"Role should be string, got {type(db_user.role)}"
 
@@ -194,11 +195,12 @@ class TestAuthRoundtrip:
         test_db: AsyncSession,
         flows: FlowHelper,
     ) -> None:
-        """Critical: User roles are assigned correctly"""
-        from app.db.models import User
-        from app.core.services.encryption import hash_email
+        """Critical: User roles are assigned correctly."""
         from sqlalchemy import select
-        
+
+        from app.core.services.encryption import hash_email
+        from app.db.models import User
+
         # Test 1: Volunteer role is assigned on registration
         volunteer = await flows.create_user("volunteer")
         result = await test_db.execute(
@@ -206,7 +208,7 @@ class TestAuthRoundtrip:
         )
         db_user = result.scalar_one()
         assert db_user.role == "volunteer", "Volunteer role not assigned correctly"
-        
+
         # Test 2: Multiple users get correct roles independently
         volunteer2 = await flows.create_user("volunteer")
         result2 = await test_db.execute(
@@ -214,7 +216,7 @@ class TestAuthRoundtrip:
         )
         db_user2 = result2.scalar_one()
         assert db_user2.role == "volunteer", "Second volunteer role not assigned correctly"
-        
+
         # Test 3: Verify roles are distinct between users
         assert db_user.id != db_user2.id, "Users should have unique IDs"
         assert db_user.role == db_user2.role, "Both volunteers should have same role type"
