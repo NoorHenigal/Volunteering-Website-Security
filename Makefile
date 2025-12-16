@@ -22,20 +22,20 @@ export-schema:
 	@echo "Schema exported to schema.sql"
 
 migrate:
-	uv run alembic upgrade head
+	uv run --python 3.14 alembic upgrade head
 
 check:
 	uv sync --extra dev
-	uv run ruff check
-	uv run ruff format
-	uv run pytest -xvs
-	uv run mypy --strict .
+	uv run --python 3.14 ruff check
+	uv run --python 3.14 ruff format
+	uv run --python 3.14 pytest -xvs
+	uv run --python 3.14 mypy --strict .
 
 test:
-	uv run pytest -xvs
+	uv run --python 3.14 pytest -xvs
 
 run-hold:
-	TEST_RUN_DURATION=5 uv run python run.py
+	TEST_RUN_DURATION=5 uv run --python 3.14 python run.py
 
 run:
-	uv run python run.py
+	uv run --python 3.14 python run.py
