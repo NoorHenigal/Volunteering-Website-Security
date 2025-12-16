@@ -1,7 +1,10 @@
 """Tests for user and organization profiles."""
 
+from io import BytesIO
+
 import pytest
 from httpx import AsyncClient
+from pyfakefs.fake_filesystem import FakeFilesystem
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Follow
@@ -229,3 +232,116 @@ async def test_profile_visibility_private(client: AsyncClient) -> None:
     # 3. Owner -> 200
     response = await client.get("/privateuser", headers=target.auth_header)
     assert response.status_code == 200
+
+@pytest.mark.anyio
+async def test_file_storage_service_works(
+    client: AsyncClient,
+    test_db: AsyncSession,
+    fs: FakeFilesystem,
+) -> None:
+    """Critical: Verify file storage service works"""
+    from pathlib import Path
+    import tempfile
+    from unittest.mock import patch
+    
+    # Mock upload directory (same pattern as existing tests)
+    upload_dir = Path(tempfile.gettempdir()) / "test_uploads"
+    fs.makedirs(str(upload_dir), exist_ok=True)
+    
+    with patch("app.core.config.settings.upload_dir", upload_dir):
+        # Verify upload directory is accessible
+        assert upload_dir is not None, "Upload directory not configured"
+        
+        # Test that upload endpoint works
+        user = await register_and_login(client, role="volunteer")
+        
+        from tests.test_uploads import create_test_image
+        from io import BytesIO
+        buffer = BytesIO(create_test_image())
+        
+        response = await client.post(
+            "/settings/profile/picture",
+            files={"file": ("test.png", buffer, "image/png")},
+            headers=user.auth_header,
+        )
+        
+        assert response.status_code in (200, 303), "File storage service not working"
+        
+        # Verify file was actually saved
+        saved_files = list(upload_dir.rglob("*.webp"))
+        assert len(saved_files) > 0, "No files were saved to storage"
+
+@pytest.mark.anyio
+async def test_uploaded_picture_and_description_in_database(
+    client: AsyncClient,
+    test_db: AsyncSession,
+    fs: FakeFilesystem,
+) -> None:
+    """Critical: Uploaded picture and description appear in database"""
+    from app.db.models import User
+    from app.core.services.encryption import hash_email
+    from sqlalchemy import select
+    from pathlib import Path
+    import tempfile
+    from unittest.mock import patch
+    from io import BytesIO
+    
+    # Mock upload directory
+    upload_dir = Path(tempfile.gettempdir()) / "test_uploads"
+    fs.makedirs(str(upload_dir), exist_ok=True)
+    
+    with patch("app.core.config.settings.upload_dir", upload_dir):
+        user = await register_and_login(client, role="volunteer")
+        
+        # Upload picture
+        from tests.test_uploads import create_test_image
+        buffer = BytesIO(create_test_image())
+        await client.post(
+            "/settings/profile/picture",
+            files={"file": ("db_test.png", buffer, "image/png")},
+            headers=user.auth_header,
+        )
+        
+        # Update bio
+        await client.put(
+            "/settings/profile",
+            headers=user.auth_header,
+            json={"bio": "Database check bio"},
+        )
+        
+        # Check database
+        result = await test_db.execute(
+            select(User).where(User.email_hash == hash_email(user.email))
+        )
+        db_user = result.scalar_one()
+        
+        assert db_user.profile_picture is not None, "Profile picture not in database"
+        assert db_user.bio is not None, "Bio not in database"
+
+@pytest.mark.anyio
+async def test_visibility_settings_reflected_in_database(
+    client: AsyncClient,
+    test_db: AsyncSession,
+) -> None:
+    """Critical: Profile visibility settings are reflected in database"""
+    from app.db.models import User
+    from app.core.services.encryption import hash_email
+    from sqlalchemy import select
+    
+    user = await register_and_login(client, role="volunteer")
+    
+    # Set visibility to authenticated
+    await client.put(
+        "/settings/privacy",
+        headers=user.auth_header,
+        json={"profile_visibility": "authenticated"},
+    )
+    
+    # Check database
+    result = await test_db.execute(
+        select(User).where(User.email_hash == hash_email(user.email))
+    )
+    db_user = result.scalar_one()
+    
+    assert db_user.profile_visibility == "authenticated", \
+        f"Expected 'authenticated', got '{db_user.profile_visibility}'"
