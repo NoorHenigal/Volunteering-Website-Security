@@ -16,7 +16,7 @@ from app.auth.schemas import (
     VolunteerRegisterSchema,
 )
 from app.core.base_schemas import ErrorResponse, request_body_from_model
-from app.core.context import RequestContext, get_context, validation_error_response
+from app.core.context import RequestContext, get_context, render_template, validation_error_response
 from app.core.htmx import htmx_redirect
 from app.core.security import clear_auth_cookies, set_auth_cookies
 
@@ -339,3 +339,21 @@ async def get_current_user(ctx: Annotated[RequestContext, Depends(get_context)])
     """Get current user details."""
     user = ctx.require_authenticated()
     return await ctx.success_response(data=UserResponse.model_validate(user))
+
+
+@router.get("/event-statistics", include_in_schema=False)
+async def event_statistics_page(ctx: Annotated[RequestContext, Depends(get_context)]) -> Response:
+    """Show event statistics page (UI only)."""
+    return await render_template(ctx.request, "event_statistics.html", user=ctx.user)
+
+
+@router.get("/user-statistics", include_in_schema=False)
+async def user_statistics_page(ctx: Annotated[RequestContext, Depends(get_context)]) -> Response:
+    """Show user statistics page (UI only)."""
+    return await render_template(ctx.request, "user_statistics.html", user=ctx.user)
+
+
+@router.get("/admin-statistics", include_in_schema=False)
+async def admin_statistics_page(ctx: Annotated[RequestContext, Depends(get_context)]) -> Response:
+    """Show admin statistics page (UI only)."""
+    return await render_template(ctx.request, "admin_statistics.html", user=ctx.user)

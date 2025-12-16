@@ -1,0 +1,98 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}User Statistics{% endblock %}
+
+{% block content %}
+<section class="max-w-6xl mx-auto space-y-10">
+    <header class="space-y-2">
+        <h1 class="text-4xl font-bold text-gray-900">Volunteer Statistics</h1>
+    </header>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <article class="bg-white rounded-2xl shadow p-6 border border-gray-100">
+            <p class="text-sm font-semibold text-gray-500 uppercase tracking-wide">Total Events Completed</p>
+            <p class="text-4xl font-bold text-blue-600 mt-3">27</p>
+        </article>
+        <article class="bg-white rounded-2xl shadow p-6 border border-gray-100">
+            <p class="text-sm font-semibold text-gray-500 uppercase tracking-wide">Hours Volunteered Per Month</p>
+            <p class="text-4xl font-bold text-green-600 mt-3">10h</p>
+        </article>
+        <article class="bg-white rounded-2xl shadow p-6 border border-gray-100">
+            <p class="text-sm font-semibold text-gray-500 uppercase tracking-wide">Hours Spent Volunteering</p>
+            <p class="text-4xl font-bold text-purple-600 mt-3">55h</p>
+        </article>
+    </div>
+
+    <div class="bg-white rounded-2xl shadow-lg p-8">
+        <div class="flex items-center justify-between mb-6">
+            <div>
+                <h2 class="text-2xl font-semibold text-gray-900">Hours Volunteered Per Month</h2>
+            </div>
+        </div>
+        <div class="h-[26rem]">
+            <canvas id="monthly-hours-chart" class="w-full h-full"></canvas>
+        </div>
+    </div>
+</section>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    document.addEventListener("DOMContentLoaded", () => {
+        const canvas = document.getElementById("monthly-hours-chart");
+        if (!canvas) {
+            return;
+        }
+
+        const monthlyHours = [6, 5, 4, 5, 4, 6, 5, 4, 5, 5, 3, 3];
+
+        new Chart(canvas, {
+            type: "line",
+            data: {
+                labels: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
+                datasets: [
+                    {
+                        label: "Hours volunteered",
+                        data: monthlyHours,
+                        borderColor: "#2563eb",
+                        backgroundColor: "rgba(37, 99, 235, 0.12)",
+                        fill: true,
+                        borderWidth: 3,
+                        tension: 0.35,
+                        pointRadius: 4,
+                        pointBackgroundColor: "#1d4ed8",
+                    },
+                ],
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            stepSize: 5,
+                        },
+                    },
+                    x: {
+                        ticks: {
+                            maxRotation: 0,
+                            minRotation: 0,
+                            autoSkip: true,
+                        },
+                    },
+                },
+                plugins: {
+                    legend: {
+                        display: false,
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: (ctx) => `${ctx.parsed.y} hours`,
+                        },
+                    },
+                },
+            },
+        });
+    });
+</script>
+{% endblock %}
