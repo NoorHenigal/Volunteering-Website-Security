@@ -1,0 +1,193 @@
+{# Message Components #}
+{% from "components/icons.html" import icon %}
+{% from "components/user.html" import entity_avatar %}
+{% macro conversation_card(conv, acting_as, acting_id) %}
+    {% set other = conv.other_party %}
+    {% if other %}
+        <div class="flex items-center gap-3">
+            {{ entity_avatar(other, size='xl', online_dot=True) }}
+            <div class="flex-1 min-w-0">
+                <div class="flex items-center justify-between gap-2 mb-0.5">
+                    <h3 class="font-semibold text-slate-900 truncate text-sm group-hover:text-brand-600 transition-colors">
+                        {{ other.name }}
+                    </h3>
+                    <span class="text-xs text-slate-400 flex-shrink-0 tabular-nums">
+                        {% if conv.last_message_at %}{{ _relative_time(conv.last_message_at) }}{% endif %}
+                    </span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <p class="text-sm text-slate-500 truncate flex-1 {% if conv.has_unread %}font-medium text-slate-700{% endif %}">
+                        {{ conv.last_message_preview or "Start a conversation..." }}
+                    </p>
+                    {% if conv.has_unread %}
+                        <span class="unread-dot flex-shrink-0 w-2.5 h-2.5 bg-brand-500 rounded-full animate-pulse"></span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    {% endif %}
+{% endmacro %}
+{% macro _relative_time(dt) %}
+    {{ dt.strftime("%b %d") }}
+{% endmacro %}
+{% macro conversation_header(other_party, acting_as, acting_id, organization=None) %}
+    <div class="bg-white/80 backdrop-blur-xl border-b border-slate-100/50 px-4 py-3 flex items-center gap-3 sticky top-0 z-10">
+        <a href="{% if acting_as == 'organization' %}/org/{{ acting_id }}/messages{% else %}/messages{% endif %}"
+           class="lg:hidden text-slate-400 hover:text-slate-600 transition-colors p-2 -ml-2 rounded-xl hover:bg-slate-100">
+            {{ icon('arrow-left', 'md') }}
+        </a>
+        {% if other_party %}
+            {{ entity_avatar(other_party, size='lg', online_dot=True) }}
+            <div class="flex-1 min-w-0">
+                <a href="/{{ other_party.username }}"
+                   class="font-semibold text-slate-900 hover:text-brand-600 transition-colors block truncate">{{ other_party.name }}</a>
+                <p class="text-xs text-slate-500 flex items-center gap-1">
+                    <span class="w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>
+                    Online
+                </p>
+            </div>
+        {% endif %}
+        {% if acting_as == 'organization' and organization %}
+            <div class="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-purple-50 rounded-full border border-purple-100">
+                <div class="w-5 h-5 rounded-full bg-purple-500 flex items-center justify-center text-white text-xs font-bold">
+                    {{ organization.name[:1] }}
+                </div>
+                <span class="text-xs font-medium text-purple-700">{{ organization.name }}</span>
+            </div>
+        {% endif %}
+    </div>
+{% endmacro %}
+{% macro message_bubble(message, is_own=False, user=None) %}
+    <div class="flex {% if is_own %}justify-end{% endif %} animate-enter">
+        <div class="max-w-[75%] {% if is_own %}bg-gradient-to-br from-brand-500 to-brand-600 text-white shadow-lg shadow-brand-500/20{% else %}bg-white border border-slate-100 text-slate-800 shadow-sm{% endif %} px-4 py-2.5 rounded-2xl {% if is_own %}rounded-br-md{% else %}rounded-bl-md{% endif %}">
+            <p class="text-sm leading-relaxed whitespace-pre-wrap break-words">{{ message.content }}</p>
+            <div class="flex items-center {% if is_own %}justify-end{% endif %} gap-1.5 mt-1">
+                <span class="text-xs {% if is_own %}text-brand-200{% else %}text-slate-400{% endif %} tabular-nums">
+                    {{ message.created_at.strftime("%I:%M %p") }}
+                </span>
+                {% if is_own %}
+                    <svg class="w-4 h-4 text-brand-200"
+                         fill="none"
+                         viewBox="0 0 24 24"
+                         stroke="currentColor"
+                         stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+{% endmacro %}
+{% macro typing_indicator(sender_name=None) %}
+    <div class="flex items-end gap-2 animate-enter">
+        <div class="bg-white border border-slate-100 px-4 py-3 rounded-2xl rounded-bl-md shadow-sm">
+            <div class="flex items-center gap-1">
+                <span class="w-2 h-2 bg-slate-400 rounded-full animate-bounce"
+                      style="animation-delay: 0ms;
+                             animation-duration: 1s"></span>
+                <span class="w-2 h-2 bg-slate-400 rounded-full animate-bounce"
+                      style="animation-delay: 150ms;
+                             animation-duration: 1s"></span>
+                <span class="w-2 h-2 bg-slate-400 rounded-full animate-bounce"
+                      style="animation-delay: 300ms;
+                             animation-duration: 1s"></span>
+            </div>
+        </div>
+    </div>
+{% endmacro %}
+{% macro empty_inbox() %}
+    <div class="p-12 text-center">
+        <div class="w-20 h-20 bg-slate-100 rounded-full mx-auto mb-6 flex items-center justify-center">
+            {{ icon('chat-bubble-left-right', '2xl', 'text-slate-300') }}
+        </div>
+        <h3 class="text-lg font-bold text-slate-900 mb-2">No messages yet</h3>
+        <p class="text-slate-500 max-w-sm mx-auto">
+            Start a conversation by visiting someone's profile and clicking the Message button.
+        </p>
+    </div>
+{% endmacro %}
+{% macro compose_form(conversation_id, acting_as, acting_id) %}
+    <div class="border-t border-slate-100/50 bg-white/80 backdrop-blur-xl p-4">
+        <form hx-post="{% if acting_as == 'organization' %}/org/{{ acting_id }}/messages/{{ conversation_id }}/send{% else %}/messages/{{ conversation_id }}/send{% endif %}"
+              hx-target="#message-container"
+              hx-swap="beforeend"
+              hx-on::after-request="this.reset(); setTimeout(() => { document.getElementById('message-list').scrollTop = document.getElementById('message-list').scrollHeight; }, 50)"
+              class="flex items-end gap-3"
+              x-data="{ message: '' }">
+            <div class="flex-1 relative">
+                <textarea name="content"
+                          x-model="message"
+                          placeholder="Type a message..."
+                          required
+                          autocomplete="off"
+                          rows="1"
+                          @keydown.enter.prevent="if (!$event.shiftKey && message.trim()) { $el.form.requestSubmit(); }"
+                          @input="$el.style.height = 'auto'; $el.style.height = Math.min($el.scrollHeight, 120) + 'px'"
+                          class="w-full px-4 py-3 border-0 bg-slate-100 rounded-2xl text-sm placeholder:text-slate-400 focus:bg-slate-50 focus:ring-2 focus:ring-brand-500/20 transition-all outline-none resize-none min-h-[48px] max-h-[120px]"></textarea>
+            </div>
+            <button type="submit"
+                    :disabled="!message.trim()"
+                    class="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-brand-500 to-brand-600 text-white rounded-2xl hover:from-brand-600 hover:to-brand-700 transition-all shadow-lg shadow-brand-500/25 hover:shadow-xl hover:shadow-brand-500/30 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none flex items-center justify-center">
+                {{ icon('paper-airplane', 'md') }}
+            </button>
+        </form>
+    </div>
+{% endmacro %}
+{% macro inbox_switcher_item(href, name, subtitle, is_selected, is_org, unread_count=0, logo=None) %}
+    <a href="{{ href }}"
+       class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-slate-50 transition-colors {% if is_selected %}{{ 'bg-purple-50 ring-1 ring-purple-200' if is_org else 'bg-brand-50 ring-1 ring-brand-200' }}{% endif %}">
+        <div class="w-8 h-8 rounded-lg bg-gradient-to-br {{ 'from-purple-500 to-purple-600' if is_org else 'from-brand-500 to-brand-600' }} flex items-center justify-center text-white text-xs font-bold shadow-md overflow-hidden flex-shrink-0">
+            {% if logo %}
+                <img src="/static/uploads/logos/{{ logo }}"
+                     alt="{{ name }}"
+                     class="w-full h-full object-cover">
+            {% elif is_org %}
+                {{ name[:1] }}
+            {% else %}
+                {{ icon('user', 'sm', 'text-white') }}
+            {% endif %}
+        </div>
+        <div class="flex-1 min-w-0">
+            <p class="text-sm font-medium text-slate-900 truncate">{{ name }}</p>
+            <p class="text-xs text-slate-500 truncate">{{ subtitle }}</p>
+        </div>
+        {% if is_selected %}
+            <div class="flex-shrink-0 {{ 'text-purple-500' if is_org else 'text-brand-500' }}">{{ icon('check', 'sm') }}</div>
+        {% elif unread_count > 0 %}
+            <span class="flex-shrink-0 min-w-5 h-5 px-1.5 {{ 'bg-purple-500' if is_org else 'bg-brand-500' }} text-white text-xs font-bold rounded-full flex items-center justify-center">
+                {{ unread_count if unread_count < 100 else '99+' }}
+            </span>
+        {% endif %}
+    </a>
+{% endmacro %}
+{% macro inbox_header_avatar(organization, acting_as) %}
+    {% if acting_as == 'organization' and organization %}
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center text-white font-bold shadow-lg shadow-purple-500/25 overflow-hidden flex-shrink-0">
+            {% if organization.logo %}
+                <img src="/static/uploads/logos/{{ organization.logo }}"
+                     alt="{{ organization.name }}"
+                     class="w-full h-full object-cover">
+            {% else %}
+                {{ organization.name[:1] }}
+            {% endif %}
+        </div>
+    {% else %}
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-500 to-brand-600 flex items-center justify-center shadow-lg shadow-brand-500/25 flex-shrink-0">
+            {{ icon('chat-bubble-left-right', 'md', 'text-white') }}
+        </div>
+    {% endif %}
+{% endmacro %}
+{% macro start_conversation_button(recipient_type, recipient_id, acting_as='user', acting_id=None, size='md') %}
+    {% set size_classes = {"sm": "px-3 py-1.5 text-xs", "md": "px-4 py-2 text-sm", "lg": "px-6 py-2.5 text-base"} %}
+    <form action="{% if acting_as == 'organization' %}/org/{{ acting_id }}/messages/start{% else %}/messages/start{% endif %}"
+          method="POST"
+          class="inline">
+        <input type="hidden" name="recipient_type" value="{{ recipient_type }}">
+        <input type="hidden" name="recipient_id" value="{{ recipient_id }}">
+        <button type="submit"
+                class="{{ size_classes.get(size, size_classes['md']) }} rounded-full font-bold bg-brand-600 hover:bg-brand-700 text-white transition-all shadow-md hover:shadow-lg transform hover:-translate-y-0.5 flex items-center gap-2">
+            {{ icon('chat-alt', 'sm') }}
+            Message
+        </button>
+    </form>
+{% endmacro %}

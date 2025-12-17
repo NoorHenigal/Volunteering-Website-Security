@@ -1,13 +1,26 @@
 """Database repositories."""
 
+from datetime import UTC, datetime
 from uuid import UUID
 
-from sqlalchemy import ColumnElement, func, select
+from sqlalchemy import ColumnElement, and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import DeclarativeBase, selectinload
 from sqlalchemy.orm.strategy_options import _AbstractLoad
 
-from app.db.models import Application, Follow, Opportunity, Organization, RefreshToken, User, UserOrganizationRole
+from app.db.models import (
+    Application,
+    Conversation,
+    ConversationParticipant,
+    Follow,
+    Message,
+    Opportunity,
+    Organization,
+    ParticipantType,
+    RefreshToken,
+    User,
+    UserOrganizationRole,
+)
 
 
 class BaseRepository[T: DeclarativeBase]:
@@ -406,9 +419,187 @@ class FollowRepository:
         return {uid: (follower_counts.get(uid, 0), following_counts.get(uid, 0)) for uid in user_ids}
 
 
+class ConversationRepository(BaseRepository[Conversation]):
+    """Repository for Conversation model database operations."""
+
+    model = Conversation
+
+    @staticmethod
+    def build_dm_key(
+        type1: ParticipantType,
+        id1: UUID,
+        type2: ParticipantType,
+        id2: UUID,
+    ) -> str:
+        """Build canonical dm_key for a DM conversation.
+
+        Sorts participants alphabetically to ensure consistent key regardless of order.
+        Format: "organization:<uuid>|user:<uuid>" or "user:<uuid>|user:<uuid>"
+        """
+        p1 = f"{type1}:{id1}"
+        p2 = f"{type2}:{id2}"
+        return "|".join(sorted([p1, p2]))
+
+    async def find_by_dm_key(self, dm_key: str) -> Conversation | None:
+        """Find conversation by dm_key."""
+        return await self.find_one(Conversation.dm_key == dm_key)
+
+    async def get_inbox(
+        self,
+        entity_type: ParticipantType,
+        entity_id: UUID,
+        limit: int = 50,
+        before_cursor: tuple[datetime, UUID] | None = None,
+    ) -> list[Conversation]:
+        """Get inbox conversations ordered by last_message_at DESC NULLS LAST.
+
+        Returns conversations with participants eagerly loaded.
+        Uses (last_message_at, id) tuple cursor for stable pagination.
+        """
+        # Build subquery to find conversations where entity is a participant
+        if entity_type == "user":
+            participant_filter = ConversationParticipant.user_id == entity_id
+        else:
+            participant_filter = ConversationParticipant.organization_id == entity_id
+
+        query = (
+            select(Conversation)
+            .join(ConversationParticipant, Conversation.id == ConversationParticipant.conversation_id)
+            .where(participant_filter)
+            .where(Conversation.last_message_at.isnot(None))  # Only show conversations with messages
+            .options(selectinload(Conversation.participants))
+        )
+
+        # Apply cursor pagination
+        if before_cursor:
+            cursor_ts, cursor_id = before_cursor
+            query = query.where(
+                or_(
+                    Conversation.last_message_at < cursor_ts,
+                    and_(
+                        Conversation.last_message_at == cursor_ts,
+                        Conversation.id < cursor_id,
+                    ),
+                )
+            )
+
+        # Order by last_message_at DESC NULLS LAST, then by id for tie-breaking
+        query = query.order_by(
+            Conversation.last_message_at.desc().nulls_last(),
+            Conversation.id.desc(),
+        ).limit(limit)
+
+        result = await self.session.execute(query)
+        return list(result.scalars().unique().all())
+
+    async def get_with_participants(self, conv_id: UUID) -> Conversation | None:
+        """Get conversation with participants and their user/org details loaded."""
+        return await self.find_one(
+            Conversation.id == conv_id,
+            options=[
+                selectinload(Conversation.participants).selectinload(ConversationParticipant.user),
+                selectinload(Conversation.participants).selectinload(ConversationParticipant.organization),
+            ],
+        )
+
+    async def update_last_message(self, conv_id: UUID, message_at: datetime) -> None:
+        """Update conversation's last_message_at timestamp."""
+        conv = await self.get_by_id(conv_id)
+        if conv:
+            conv.last_message_at = message_at
+            await self.update(conv)
+
+
+class ConversationParticipantRepository(BaseRepository[ConversationParticipant]):
+    """Repository for ConversationParticipant model database operations."""
+
+    model = ConversationParticipant
+
+    async def get_participant(
+        self,
+        conversation_id: UUID,
+        entity_type: ParticipantType,
+        entity_id: UUID,
+    ) -> ConversationParticipant | None:
+        """Get participant by conversation and entity."""
+        if entity_type == "user":
+            return await self.find_one(
+                ConversationParticipant.conversation_id == conversation_id,
+                ConversationParticipant.user_id == entity_id,
+            )
+        return await self.find_one(
+            ConversationParticipant.conversation_id == conversation_id,
+            ConversationParticipant.organization_id == entity_id,
+        )
+
+    async def mark_read(self, participant: ConversationParticipant) -> ConversationParticipant:
+        """Update last_read_at to now."""
+        participant.last_read_at = datetime.now(UTC)
+        return await self.update(participant)
+
+
+class MessageRepository(BaseRepository[Message]):
+    """Repository for Message model database operations."""
+
+    model = Message
+
+    async def get_messages(
+        self,
+        conversation_id: UUID,
+        limit: int = 50,
+        before_cursor: tuple[datetime, UUID] | None = None,
+    ) -> list[Message]:
+        """Get messages with (created_at, id) cursor pagination.
+
+        Returns messages newest first for the query, caller should reverse for display.
+        """
+        query = (
+            select(Message)
+            .where(Message.conversation_id == conversation_id)
+            .options(
+                selectinload(Message.sender_user),
+                selectinload(Message.sender_organization),
+            )
+        )
+
+        if before_cursor:
+            cursor_ts, cursor_id = before_cursor
+            query = query.where(
+                or_(
+                    Message.created_at < cursor_ts,
+                    and_(
+                        Message.created_at == cursor_ts,
+                        Message.id < cursor_id,
+                    ),
+                )
+            )
+
+        query = query.order_by(
+            Message.created_at.desc(),
+            Message.id.desc(),
+        ).limit(limit)
+
+        result = await self.session.execute(query)
+        return list(result.scalars().all())
+
+    async def get_latest(self, conversation_id: UUID) -> Message | None:
+        """Get most recent message for a conversation."""
+        query = (
+            select(Message)
+            .where(Message.conversation_id == conversation_id)
+            .order_by(Message.created_at.desc(), Message.id.desc())
+            .limit(1)
+        )
+        result = await self.session.execute(query)
+        return result.scalar_one_or_none()
+
+
 __all__ = [
     "ApplicationRepository",
+    "ConversationParticipantRepository",
+    "ConversationRepository",
     "FollowRepository",
+    "MessageRepository",
     "OpportunityRepository",
     "OrganizationRepository",
     "RefreshTokenRepository",

@@ -6,6 +6,7 @@
 {% from "components/cards.html" import page_card, opportunity_list_item %}
 {% from "components/user.html" import user_avatar, avatar_initials %}
 {% from "components/image_upload.html" import image_upload_modal %}
+{% from "components/messages.html" import start_conversation_button %}
 {% block title %}{{ organization.name }}{% endblock %}
 {% block content %}
     <div class="animate-enter">
@@ -83,6 +84,13 @@
                         <p class="text-slate-400 italic">No description provided yet.</p>
                     {% endif %}
                 </div>
+                {% if user and not is_admin %}
+                    <div class="bg-white rounded-3xl p-8 border border-slate-100 shadow-sm">
+                        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Contact</h3>
+                        <p class="text-slate-600 text-sm mb-4">Have a question? Send a message to this organization.</p>
+                        {{ start_conversation_button('organization', organization.id, size='md') }}
+                    </div>
+                {% endif %}
                 {% set visible_members = members|selectattr('is_visible')|list %}
                 {% if not is_public_view and visible_members %}
                     <div class="bg-white rounded-3xl p-8 border border-slate-100 shadow-sm">

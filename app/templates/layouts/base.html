@@ -12,17 +12,25 @@
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
               rel="stylesheet">
         <link rel="stylesheet" href="/static/css/output.css">
-        <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.8/dist/htmx.min.js"
-                integrity="sha384-/TgkGk7p307TH7EXJDuUlgG3Ce1UVolAOFopFekQkkXihi5u/6OCvVKyz1W+idaz"
+        <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.7/dist/htmx.min.js"
+                integrity="sha384-ZBXiYtYQ6hJ2Y0ZNoYuI+Nq5MqWBr+chMrS/RkXpNzQCApHEhOt2aY8EJgqwHLkJ"
                 crossorigin="anonymous"></script>
         <script src="https://cdn.jsdelivr.net/npm/htmx-ext-response-targets@2.0.4"
                 integrity="sha384-T41oglUPvXLGBVyRdZsVRxNWnOOqCynaPubjUVjxhsjFTKrFJGEMm3/0KGmNQ+Pg"
                 crossorigin="anonymous"></script>
         <script defer
-                src="https://cdn.jsdelivr.net/npm/alpinejs@3.15.2/dist/cdn.min.js"
-                integrity="sha384-vAaZH8GvWxVAeUkrId2leZTzMdEd6aSfjar0FL2rZh2Ocf5Z81QTnKJMHMpMSFb1"
+                src="https://cdn.jsdelivr.net/npm/alpinejs@3.15.3/dist/cdn.min.js"
+                integrity="sha384-4E5IZutrbnm0GBnBqEA2tgLsTg6ublElJlpE9qQQNL0WrY9g4GPahFyJYwnDet2+"
                 crossorigin="anonymous"></script>
+        <script src="/static/js/messaging.js"></script>
         <script>
+            // Re-initialize Alpine components after HTMX swaps
+            document.addEventListener("htmx:afterSwap", (event) => {
+                if (window.Alpine) {
+                    Alpine.initTree(event.detail.target);
+                }
+            });
+
             document.addEventListener("htmx:configRequest", (event) => {
                 const match = document.cookie.match(/(?:^|; )csrf_token=([^;]+)/);
                 if (!match) return;

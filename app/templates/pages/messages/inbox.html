@@ -1,0 +1,145 @@
+{% extends "layouts/base.html" %}
+{% from "components/icons.html" import icon %}
+{% from "components/messages.html" import conversation_card, empty_inbox, inbox_switcher_item, inbox_header_avatar %}
+{% block title %}
+    Messages
+    {% if organization %}- {{ organization.name }}{% endif %}
+{% endblock %}
+{% block main_padding %}pt-16 md:pt-20{% endblock %}
+{% block container_class %}max-w-7xl mx-auto w-full{% endblock %}
+{% block content %}
+    <div class="h-[calc(100vh-6rem)] flex"
+         x-data="{ searchQuery: '', selectedId: '{{ selected_conversation.id if selected_conversation else '' }}', showConversation: {{ 'true' if selected_conversation else 'false' }}, ...inboxSocket() }"
+         x-init="init('{{ acting_as }}', '{{ acting_id }}', '{{ ws_token }}')"
+         @close-conversation.window="showConversation = false; selectedId = ''"
+         @keydown.escape.window="if(showConversation && window.innerWidth < 1024) { showConversation = false; selectedId = ''; }"
+         @beforeunload.window="disconnect()">
+        <div class="w-full lg:w-[380px] flex flex-col bg-white rounded-l-2xl lg:rounded-l-2xl lg:rounded-r-none shadow-xl shadow-slate-200/50 border border-slate-100 overflow-hidden"
+             :class="{ 'hidden lg:flex': showConversation }">
+            <div class="p-4 border-b border-slate-100 bg-gradient-to-r from-white to-slate-50/50">
+                <div class="flex items-center gap-3 mb-4">
+                    {% if user_organizations and user_organizations|length > 0 %}
+                        <div class="relative flex-1" x-data="{ contextOpen: false }">
+                            <button @click="contextOpen = !contextOpen"
+                                    @click.outside="contextOpen = false"
+                                    class="w-full flex items-center gap-3 p-2 -m-2 rounded-xl hover:bg-slate-50 transition-colors">
+                                {% if acting_as == 'organization' %}
+                                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center text-white font-bold shadow-lg shadow-purple-500/25 overflow-hidden flex-shrink-0">
+                                        {% if organization.logo %}
+                                            <img src="/static/uploads/logos/{{ organization.logo }}"
+                                                 alt="{{ organization.name }}"
+                                                 class="w-full h-full object-cover">
+                                        {% else %}
+                                            {{ organization.name[:1] }}
+                                        {% endif %}
+                                    </div>
+                                    <div class="flex-1 min-w-0 text-left">
+                                        <h1 class="text-lg font-bold text-slate-900 truncate">{{ organization.name }}</h1>
+                                        <p class="text-xs text-slate-500">Organization Messages</p>
+                                    </div>
+                                {% else %}
+                                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-500 to-brand-600 flex items-center justify-center shadow-lg shadow-brand-500/25 flex-shrink-0">
+                                        {{ icon('chat-bubble-left-right', 'md', 'text-white') }}
+                                    </div>
+                                    <div class="flex-1 min-w-0 text-left">
+                                        <h1 class="text-lg font-bold text-slate-900">Personal Messages</h1>
+                                        <p class="text-xs text-slate-500">
+                                            {{ conversations|length }} conversation
+                                            {% if conversations|length != 1 %}s{% endif %}
+                                        </p>
+                                    </div>
+                                {% endif %}
+                                <div class="flex-shrink-0 text-slate-400">{{ icon('chevron-down', 'sm') }}</div>
+                            </button>
+                            <div x-show="contextOpen"
+                                 x-transition:enter="transition ease-out duration-100"
+                                 x-transition:enter-start="opacity-0 scale-95"
+                                 x-transition:enter-end="opacity-100 scale-100"
+                                 x-transition:leave="transition ease-in duration-75"
+                                 x-transition:leave-start="opacity-100 scale-100"
+                                 x-transition:leave-end="opacity-0 scale-95"
+                                 class="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-xl border border-slate-100 overflow-hidden z-50">
+                                <div class="p-2">
+                                    <p class="px-3 py-1.5 text-xs font-medium text-slate-400 uppercase tracking-wider">Switch Inbox</p>
+                                    {% if user.role != 'organization' %}
+                                        {{ inbox_switcher_item('/messages', 'Personal', user.display_name, acting_as == 'user', false, personal_unread_count) }}
+                                    {% endif %}
+                                    {% for org in user_organizations %}
+                                        {% set org_unread = org_unread_counts.get(org.id|string, 0) %}
+                                        {{ inbox_switcher_item('/org/' ~ org.id ~ '/messages', org.name, 'Organization', acting_as == 'organization' and acting_id|string == org.id|string, true, org_unread, org.logo) }}
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                    {% else %}
+                        {{ inbox_header_avatar(organization, acting_as) }}
+                        <div class="flex-1 min-w-0">
+                            <h1 class="text-lg font-bold text-slate-900 truncate">
+                                {{ organization.name if acting_as == 'organization' else 'Messages' }}
+                            </h1>
+                            <p class="text-xs text-slate-500">
+                                {% if acting_as == 'organization' %}
+                                    Organization Messages
+                                {% else %}
+                                    {{ conversations|length }} conversation
+                                    {% if conversations|length != 1 %}s{% endif %}
+                                {% endif %}
+                            </p>
+                        </div>
+                    {% endif %}
+                </div>
+                <div class="relative">
+                    <input type="text"
+                           x-model="searchQuery"
+                           placeholder="Search conversations..."
+                           class="w-full pl-10 pr-4 py-2.5 bg-slate-100 border-0 rounded-xl text-sm placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-brand-500/20 transition-all">
+                    <div class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">{{ icon('search', 'sm') }}</div>
+                </div>
+            </div>
+            <div class="flex-1 overflow-y-auto">
+                {% if conversations %}
+                    <div class="divide-y divide-slate-50">
+                        {% for conv in conversations %}
+                            {% set other = conv.other_party %}
+                            {% if other %}
+                                <a href="{% if acting_as == 'organization' %}/org/{{ acting_id }}/messages/{{ conv.id }}{% else %}/messages/{{ conv.id }}{% endif %}"
+                                   class="block p-3 hover:bg-gradient-to-r hover:from-brand-50/50 hover:to-transparent transition-all duration-200 group cursor-pointer"
+                                   :class="{ 'bg-brand-50 border-l-2 border-l-brand-500': selectedId === '{{ conv.id }}' }"
+                                   @click.prevent="selectedId = '{{ conv.id }}'; showConversation = true; $el.querySelector('.unread-dot')?.remove(); $el.querySelector('.font-medium')?.classList.remove('font-medium', 'text-slate-700')"
+                                   x-show="!searchQuery || '{{ other.name|lower }}'.includes(searchQuery.toLowerCase())"
+                                   hx-get="{% if acting_as == 'organization' %}/org/{{ acting_id }}/messages/{{ conv.id }}{% else %}/messages/{{ conv.id }}{% endif %}?partial=true"
+                                   hx-target="#conversation-panel"
+                                   hx-swap="innerHTML"
+                                   hx-push-url="{% if acting_as == 'organization' %}/org/{{ acting_id }}/messages/{{ conv.id }}{% else %}/messages/{{ conv.id }}{% endif %}"
+                                   data-conversation-id="{{ conv.id }}">
+                                    {{ conversation_card(conv, acting_as, acting_id) }}
+                                </a>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    {{ empty_inbox() }}
+                {% endif %}
+            </div>
+        </div>
+        <div id="conversation-panel"
+             class="flex-1 flex flex-col bg-white lg:rounded-r-2xl lg:border-l-0 shadow-xl shadow-slate-200/50 border border-slate-100 lg:border-l-0 overflow-hidden"
+             :class="{ 'hidden lg:flex': !showConversation, 'flex': showConversation }">
+            {% if selected_conversation %}
+                {% include "pages/messages/conversation_content.html" %}
+            {% else %}
+                <div class="flex-1 flex items-center justify-center">
+                    <div class="text-center p-8">
+                        <div class="w-24 h-24 bg-gradient-to-br from-slate-100 to-slate-50 rounded-3xl mx-auto mb-6 flex items-center justify-center shadow-inner">
+                            {{ icon('chat-bubble-left-right', '2xl', 'text-slate-300') }}
+                        </div>
+                        <h3 class="text-xl font-bold text-slate-800 mb-2">Select a conversation</h3>
+                        <p class="text-slate-500 text-sm max-w-sm mx-auto leading-relaxed">
+                            Choose a conversation from the list to start messaging, or visit someone's profile to start a new chat.
+                        </p>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+{% endblock %}

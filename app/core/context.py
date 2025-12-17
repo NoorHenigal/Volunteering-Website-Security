@@ -274,12 +274,21 @@ class RequestContext:
                 return schema(**body)
 
             if "application/x-www-form-urlencoded" in content_type or "multipart/form-data" in content_type:
-                form = await self.request.form()
-                form_data = {}
+                # Use cached form data if available from CSRF middleware
+                form = getattr(self.request.state, "_cached_form", None)
+                if form is None:
+                    form = await self.request.form()
+                form_data: dict[str, object] = {}
                 for field, form_name in form_fields.items():
                     value = form.get(form_name)
                     if value is not None:
-                        form_data[field] = str(value)
+                        str_value = str(value)
+                        # Coerce UUID fields for strict models
+                        field_info = schema.model_fields.get(field)
+                        if field_info and field_info.annotation is UUID:
+                            form_data[field] = UUID(str_value)
+                        else:
+                            form_data[field] = str_value
                 return schema(**form_data)
         except ValidationError as e:
             raise RequestValidationError(e.errors()) from e
