@@ -2,6 +2,7 @@
 
 import pytest
 from httpx import AsyncClient
+from pyfakefs.fake_filesystem import FakeFilesystem
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Follow
@@ -229,3 +230,41 @@ async def test_profile_visibility_private(client: AsyncClient) -> None:
     # 3. Owner -> 200
     response = await client.get("/privateuser", headers=target.auth_header)
     assert response.status_code == 200
+
+@pytest.mark.anyio
+async def test_file_storage_service_works(
+    client: AsyncClient,
+    fs: FakeFilesystem,
+) -> None:
+    """Critical: Verify file storage service works."""
+    import tempfile
+    from pathlib import Path
+    from unittest.mock import patch
+
+    # Mock upload directory (same pattern as existing tests)
+    upload_dir = Path(tempfile.gettempdir()) / "test_uploads"
+    fs.makedirs(str(upload_dir), exist_ok=True)
+
+    with patch("app.core.config.settings.upload_dir", upload_dir):
+        # Verify upload directory is accessible
+        assert upload_dir is not None, "Upload directory not configured"
+
+        # Test that upload endpoint works
+        user = await register_and_login(client, role="volunteer")
+
+        from io import BytesIO
+
+        from tests.test_uploads import create_test_image
+        buffer = BytesIO(create_test_image())
+
+        response = await client.post(
+            "/settings/profile/picture",
+            files={"file": ("test.png", buffer, "image/png")},
+            headers=user.auth_header,
+        )
+
+        assert response.status_code in (200, 303), "File storage service not working"
+
+        # Verify file was actually saved
+        saved_files = list(upload_dir.rglob("*.webp"))
+        assert len(saved_files) > 0, "No files were saved to storage"
