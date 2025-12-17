@@ -347,12 +347,6 @@ async def event_statistics_page(ctx: Annotated[RequestContext, Depends(get_conte
     return await render_template(ctx.request, "event_statistics.html", user=ctx.user)
 
 
-@router.get("/user-statistics", include_in_schema=False)
-async def user_statistics_page(ctx: Annotated[RequestContext, Depends(get_context)]) -> Response:
-    """Show user statistics page (UI only)."""
-    return await render_template(ctx.request, "user_statistics.html", user=ctx.user)
-
-
 @router.get("/admin-statistics", include_in_schema=False)
 async def admin_statistics_page(ctx: Annotated[RequestContext, Depends(get_context)]) -> Response:
     """Show admin statistics page (UI only)."""
