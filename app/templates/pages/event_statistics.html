@@ -10,16 +10,6 @@
 
     {% call page_card('5xl') %}
     <div class="space-y-10">
-        <form class="flex flex-col md:flex-row gap-3" method="GET" action="/auth/event-statistics">
-            <label for="event-search" class="sr-only">Search events</label>
-            <input id="event-search" name="q" type="search" placeholder="Search events..."
-                class="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-            <button type="submit"
-                class="px-6 py-3 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-colors">
-                Search
-            </button>
-        </form>
-
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
             <article class="bg-gray-50 rounded-xl p-6 border border-gray-100">
                 <p class="text-sm font-semibold text-gray-500 uppercase tracking-wide">Volunteers Signed Up</p>
