@@ -10,6 +10,7 @@ Usage:
 import argparse
 import asyncio
 import os
+import selectors
 import sys
 
 from granian import Granian, loops
@@ -56,7 +57,14 @@ def main() -> None:
     args = parser.parse_args()
 
     try:
-        asyncio.run(run_preflight_checks())
+        if sys.platform == "win32":
+            # Windows requires SelectorEventLoop for psycopg3 compatibility
+            asyncio.run(
+                run_preflight_checks(),
+                loop_factory=lambda: asyncio.SelectorEventLoop(selectors.SelectSelector()),
+            )
+        else:
+            asyncio.run(run_preflight_checks())
     except StartupCheckError as e:
         app_log.error("%s", e)
         sys.exit(1)
