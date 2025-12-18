@@ -8,277 +8,323 @@
 {% from "components/buttons.html" import back_link, action_buttons %}
 {% from "components/layout.html" import settings_section_header, profile_hero %}
 {% from "components/image_upload.html" import image_upload_modal %}
+{% from "components/report.html" import report_button_with_text %}
 {% block title %}{{ profile_user.display_name }}{% endblock %}
 {% block content %}
-    <div {% if user and user.id==profile_user.id %}x-data="profileManager()"{% endif %}>
-        <div class="animate-enter">
-            {{ profile_hero() }}
-            <div class="relative max-w-6xl mx-auto px-4 sm:px-6 -mt-24 md:-mt-28">
-                <div class="flex flex-col md:flex-row gap-6 items-start">
-                    <div class="w-full md:w-80 flex-shrink-0">
-                        <div class="bg-white rounded-3xl shadow-premium p-8 border border-slate-100 text-center relative overflow-hidden group">
-                            <div class="relative inline-block mx-auto mb-6 group/avatar">
-                                {% if user and user.id == profile_user.id %}
-                                    {% call image_upload_modal('avatar-upload', 'Update Profile Picture', '/settings/profile/picture', aspect_ratio=1) %}
-                                        <div class="w-40 h-40 rounded-full p-1 bg-white ring-2 ring-brand-100 shadow-lg">
-                                            <div class="relative w-full h-full group">
-                                                <div class="w-full h-full rounded-full overflow-hidden bg-white shadow-xl">
-                                                    {% if profile_user.profile_picture %}
-                                                        <img src="/static/uploads/avatars/{{ profile_user.profile_picture }}"
-                                                             alt="{{ profile_user.username }}"
-                                                             class="w-full h-full object-cover">
-                                                    {% else %}
-                                                        <div class="w-full h-full rounded-full bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center text-4xl font-bold text-white">
-                                                            {{ profile_user.first_name[0] if profile_user.first_name else
-                                                            profile_user.username[0] | upper }}
-                                                        </div>
-                                                    {% endif %}
-                                                </div>
-                                                <button type="button"
-                                                        @click="triggerSelect()"
-                                                        class="absolute -bottom-2 -right-2 flex items-center justify-center">
-                                                    <div class="h-10 w-10 rounded-full bg-slate-900 text-white flex items-center justify-center shadow-lg ring-4 ring-white hover:bg-slate-800 transition-colors cursor-pointer">
-                                                        {{ icon('pencil', 'sm') }}
-                                                    </div>
-                                                </button>
-                                            </div>
-                                        </div>
-                                    {% endcall %}
-                                {% else %}
-                                    <div class="w-40 h-40 rounded-full p-1 bg-white ring-2 ring-brand-100 shadow-lg">
-                                        <div class="w-full h-full rounded-full overflow-hidden shadow-xl">
-                                            {% if profile_user.profile_picture %}
-                                                <img src="/static/uploads/avatars/{{ profile_user.profile_picture }}"
-                                                     alt="{{ profile_user.display_name }}"
-                                                     class="w-full h-full object-cover">
-                                            {% else %}
-                                                <div class="w-full h-full rounded-full bg-gradient-to-br from-slate-200 to-slate-300 flex items-center justify-center text-slate-500 font-bold text-4xl">
-                                                    {{ profile_user.first_name[0] }}{{ profile_user.last_name[0] }}
-                                                </div>
-                                            {% endif %}
-                                        </div>
-                                    </div>
-                                {% endif %}
-                            </div>
-                            <h1 class="text-3xl font-extrabold text-slate-900 tracking-tight leading-tight mb-2">
-                                {{
-                                profile_user.display_name }}
-                            </h1>
-                            <p class="text-brand-600 font-semibold text-base mb-4">@{{ profile_user.username }}</p>
-                            <div class="flex flex-col items-center gap-2 mb-8 text-sm text-slate-500">
-                                {{ role_badge(profile_user.role) }}
-                                <div class="flex items-center gap-1.5 mt-2">
-                                    <span class="text-slate-400">{{ icon('calendar', 'sm') }}</span>
-                                    <span>Joined {{ profile_user.created_at.strftime("%b %Y") }}</span>
-                                </div>
-                                {% if (profile and profile.email and user.show_email) or (user and user.id ==
-                                    profile_user.id) %}
-                                    {% if profile and profile.email %}
-                                        <div class="flex items-center gap-1.5 truncate max-w-full px-2"
-                                             title="{{ profile.email }}">
-                                            <span class="text-slate-400 flex-shrink-0">{{ icon('mail', 'sm') }}</span>
-                                            <span class="truncate">{{ profile.email }}</span>
-                                        </div>
-                                    {% endif %}
-                                {% endif %}
-                            </div>
-                            {% if profile %}
-                                <div class="flex items-center justify-center gap-6 border-t border-slate-100 pt-6 mb-6 text-sm">
-                                    <a href="/{{ profile_user.username }}/followers"
-                                       class="hover:text-brand-600 transition-colors group/stat">
-                                        <span class="block font-bold text-xl text-slate-900 group-hover/stat:text-brand-600 transition-colors">{{
-                                        profile.follower_count }}</span>
-                                        <span class="text-slate-500">Followers</span>
-                                    </a>
-                                    <span class="text-slate-200 text-2xl font-light">|</span>
-                                    <a href="/{{ profile_user.username }}/following"
-                                       class="hover:text-brand-600 transition-colors group/stat">
-                                        <span class="block font-bold text-xl text-slate-900 group-hover/stat:text-brand-600 transition-colors">{{
-                                        profile.following_count }}</span>
-                                        <span class="text-slate-500">Following</span>
-                                    </a>
-                                </div>
-                            {% endif %}
+    <div x-data="{% if user and user.id==profile_user.id %}profileManager(){% else %}{}
+    {% endif %}
+    ">
+    <div class="animate-enter">
+        {{ profile_hero() }}
+        <div class="relative max-w-6xl mx-auto px-4 sm:px-6 -mt-24 md:-mt-28">
+            <div class="flex flex-col md:flex-row gap-6 items-start">
+                <div class="w-full md:w-80 flex-shrink-0">
+                    <div class="bg-white rounded-3xl shadow-premium p-8 border border-slate-100 text-center relative overflow-hidden group">
+                        <div class="relative inline-block mx-auto mb-6 group/avatar">
                             {% if user and user.id == profile_user.id %}
-                                <div class="flex flex-col gap-3">
-                                    <button type="button"
-                                            @click="editProfileOpen = true"
-                                            class="w-full py-3 px-4 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 transition-all shadow-md hover:shadow-lg text-sm flex items-center justify-center gap-2">
-                                        {{ icon('pencil', 'sm') }}
-                                        Edit Profile
-                                    </button>
-                                    <button type="button"
-                                            @click="privacyOpen = true"
-                                            class="w-full py-3 px-4 bg-white border border-slate-200 text-slate-700 font-bold rounded-xl hover:bg-slate-50 transition-colors text-sm flex items-center justify-center gap-2">
-                                        <span class="text-slate-400">{{ icon('lock', 'sm') }}</span>
-                                        Privacy
-                                    </button>
-                                </div>
-                            {% elif user and profile and profile.is_following is not none %}
-                                <div class="flex flex-col gap-3">
-                                    <div id="follow-button-container">
-                                        {% block follow_button scoped %}{{ follow_button(profile_user.username, profile.is_following, 'lg') }}{% endblock %}
+                                {% call image_upload_modal('avatar-upload', 'Update Profile Picture', '/settings/profile/picture', aspect_ratio=1) %}
+                                    <div class="w-40 h-40 rounded-full p-1 bg-white ring-2 ring-brand-100 shadow-lg">
+                                        <div class="relative w-full h-full group">
+                                            <div class="w-full h-full rounded-full overflow-hidden bg-white shadow-xl">
+                                                {% if profile_user.profile_picture %}
+                                                    <img src="/static/uploads/avatars/{{ profile_user.profile_picture }}"
+                                                         alt="{{ profile_user.username }}"
+                                                         class="w-full h-full object-cover">
+                                                {% else %}
+                                                    <div class="w-full h-full rounded-full bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center text-4xl font-bold text-white">
+                                                        {{ profile_user.first_name[0] if profile_user.first_name else
+                                                        profile_user.username[0] | upper }}
+                                                    </div>
+                                                {% endif %}
+                                            </div>
+                                            <button type="button"
+                                                    @click="triggerSelect()"
+                                                    class="absolute -bottom-2 -right-2 flex items-center justify-center">
+                                                <div class="h-10 w-10 rounded-full bg-slate-900 text-white flex items-center justify-center shadow-lg ring-4 ring-white hover:bg-slate-800 transition-colors cursor-pointer">
+                                                    {{ icon('pencil', 'sm') }}
+                                                </div>
+                                            </button>
+                                        </div>
                                     </div>
-                                    {{ start_conversation_button('user', profile_user.id, size='lg') }}
+                                {% endcall %}
+                            {% else %}
+                                <div class="w-40 h-40 rounded-full p-1 bg-white ring-2 ring-brand-100 shadow-lg">
+                                    <div class="w-full h-full rounded-full overflow-hidden shadow-xl">
+                                        {% if profile_user.profile_picture %}
+                                            <img src="/static/uploads/avatars/{{ profile_user.profile_picture }}"
+                                                 alt="{{ profile_user.display_name }}"
+                                                 class="w-full h-full object-cover">
+                                        {% else %}
+                                            <div class="w-full h-full rounded-full bg-gradient-to-br from-slate-200 to-slate-300 flex items-center justify-center text-slate-500 font-bold text-4xl">
+                                                {{ profile_user.first_name[0] }}{{ profile_user.last_name[0] }}
+                                            </div>
+                                        {% endif %}
+                                    </div>
                                 </div>
                             {% endif %}
                         </div>
-                    </div>
-                    <div class="flex-1 min-w-0 space-y-8 md:mt-12">
-                        {% if profile and (profile.bio or profile.description) %}
-                            <div class="bg-white rounded-3xl shadow-sm border border-slate-100 p-8 md:p-10">
-                                {% if profile.bio %}
-                                    <h2 class="text-2xl font-bold text-slate-900 mb-4 leading-tight">"{{ profile.bio }}"</h2>
-                                {% endif %}
-                                {% if profile.description %}
-                                    <div class="prose prose-slate prose-lg max-w-none text-slate-600 leading-relaxed whitespace-pre-wrap">
-                                        {{
-                                        profile.description }}
+                        <h1 class="text-3xl font-extrabold text-slate-900 tracking-tight leading-tight mb-2">
+                            {{
+                            profile_user.display_name }}
+                        </h1>
+                        <p class="text-brand-600 font-semibold text-base mb-4">@{{ profile_user.username }}</p>
+                        <div class="flex flex-col items-center gap-2 mb-8 text-sm text-slate-500">
+                            {{ role_badge(profile_user.role) }}
+                            <div class="flex items-center gap-1.5 mt-2">
+                                <span class="text-slate-400">{{ icon('calendar', 'sm') }}</span>
+                                <span>Joined {{ profile_user.created_at.strftime("%b %Y") }}</span>
+                            </div>
+                            {% if (profile and profile.email and user.show_email) or (user and user.id ==
+                                profile_user.id) %}
+                                {% if profile and profile.email %}
+                                    <div class="flex items-center gap-1.5 truncate max-w-full px-2"
+                                         title="{{ profile.email }}">
+                                        <span class="text-slate-400 flex-shrink-0">{{ icon('mail', 'sm') }}</span>
+                                        <span class="truncate">{{ profile.email }}</span>
                                     </div>
                                 {% endif %}
-                            </div>
-                        {% elif user and user.id == profile_user.id %}
-                            <div class="bg-slate-50 border border-dashed border-slate-200 rounded-3xl p-12 text-center cursor-pointer hover:bg-slate-100 transition-colors"
-                                 @click="editProfileOpen = true">
-                                <p class="text-slate-500 font-medium mb-3 text-lg">
-                                    Your profile is looking a bit empty! Tell the
-                                    world
-                                    who you are.
-                                </p>
-                                <button type="button"
-                                        class="inline-flex items-center text-brand-600 font-bold hover:underline text-lg">
-                                    Write your bio <span class="ml-1">{{ icon('arrow-right', 'md') }}</span>
-                                </button>
+                            {% endif %}
+                        </div>
+                        {% if profile %}
+                            <div class="grid grid-cols-2 gap-4 border-t border-slate-100 pt-6 mb-6">
+                                <a href="/{{ profile_user.username }}/followers"
+                                   class="text-center hover:bg-slate-50 rounded-xl py-3 transition-colors group/stat">
+                                    <span class="block font-bold text-2xl text-slate-900 group-hover/stat:text-brand-600 transition-colors">{{ profile.follower_count }}</span>
+                                    <span class="text-xs font-medium text-slate-500 uppercase tracking-wide">Followers</span>
+                                </a>
+                                <a href="/{{ profile_user.username }}/following"
+                                   class="text-center hover:bg-slate-50 rounded-xl py-3 transition-colors group/stat">
+                                    <span class="block font-bold text-2xl text-slate-900 group-hover/stat:text-brand-600 transition-colors">{{ profile.following_count }}</span>
+                                    <span class="text-xs font-medium text-slate-500 uppercase tracking-wide">Following</span>
+                                </a>
                             </div>
                         {% endif %}
-                        <div class="grid grid-cols-2 lg:grid-cols-3 gap-6">
-                            <div class="bg-gradient-to-br from-orange-50 to-amber-50 rounded-3xl p-6 border border-orange-100 flex flex-col justify-between h-36">
-                                <span class="text-orange-900/40 font-bold text-xs uppercase tracking-wider">Impact</span>
+                        {% if user and user.id == profile_user.id %}
+                            <div class="flex flex-col gap-3">
+                                <button type="button"
+                                        @click="editProfileOpen = true"
+                                        class="w-full py-3 px-4 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 transition-all shadow-md hover:shadow-lg text-sm flex items-center justify-center gap-2">
+                                    {{ icon('pencil', 'sm') }}
+                                    Edit Profile
+                                </button>
+                                <button type="button"
+                                        @click="privacyOpen = true"
+                                        class="w-full py-3 px-4 bg-white border border-slate-200 text-slate-700 font-bold rounded-xl hover:bg-slate-50 transition-colors text-sm flex items-center justify-center gap-2">
+                                    <span class="text-slate-400">{{ icon('lock', 'sm') }}</span>
+                                    Privacy
+                                </button>
+                            </div>
+                        {% elif user and profile and profile.is_following is not none %}
+                            <div class="flex flex-col gap-3">
+                                <div id="follow-button-container" class="w-full">
+                                    {% block follow_button scoped %}
+                                        {% if profile.is_following %}
+                                            <form action="/{{ profile_user.username }}/unfollow"
+                                                  method="POST"
+                                                  class="w-full">
+                                                <button type="submit"
+                                                        class="w-full py-3 px-4 rounded-xl font-bold border border-slate-200 bg-white hover:bg-red-50 hover:text-red-600 hover:border-red-200 text-slate-600 transition-all shadow-sm text-sm">
+                                                    Unfollow
+                                                </button>
+                                            </form>
+                                        {% else %}
+                                            <form action="/{{ profile_user.username }}/follow"
+                                                  method="POST"
+                                                  class="w-full">
+                                                <button type="submit"
+                                                        class="w-full py-3 px-4 rounded-xl font-bold bg-brand-600 hover:bg-brand-700 text-white transition-all shadow-md hover:shadow-lg text-sm">
+                                                    Follow
+                                                </button>
+                                            </form>
+                                        {% endif %}
+                                    {% endblock %}
+                                </div>
+                                <form action="/messages/start" method="POST" class="w-full">
+                                    <input type="hidden" name="recipient_type" value="user">
+                                    <input type="hidden" name="recipient_id" value="{{ profile_user.id }}">
+                                    <button type="submit"
+                                            class="w-full py-3 px-4 rounded-xl font-bold bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 transition-all text-sm flex items-center justify-center gap-2">
+                                        {{ icon('chat-alt', 'sm') }}
+                                        Message
+                                    </button>
+                                </form>
+                            </div>
+                            <div class="mt-4 pt-4 border-t border-slate-100">
+                                {{ report_button_with_text('user', profile_user.id, 'Report Profile') }}
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="flex-1 min-w-0 space-y-8 md:mt-12">
+                    {% if profile and (profile.bio or profile.description) %}
+                        <div class="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+                            <div class="p-8 md:p-10">
+                                {% if profile.bio %}
+                                    <div class="mb-6 pb-6 border-b border-slate-100">
+                                        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Tagline</h3>
+                                        <p class="text-xl md:text-2xl font-semibold text-slate-800 italic leading-relaxed">"{{ profile.bio }}"</p>
+                                    </div>
+                                {% endif %}
+                                {% if profile.description %}
+                                    <div>
+                                        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">About</h3>
+                                        <div class="prose prose-slate prose-lg max-w-none text-slate-600 leading-relaxed whitespace-pre-wrap">
+                                            {{ profile.description }}
+                                        </div>
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    {% elif user and user.id == profile_user.id %}
+                        <div class="bg-gradient-to-br from-slate-50 to-slate-100/50 border border-dashed border-slate-200 rounded-3xl p-10 text-center cursor-pointer hover:from-brand-50/50 hover:to-purple-50/50 hover:border-brand-200 transition-all group"
+                             @click="editProfileOpen = true">
+                            <div class="w-16 h-16 bg-white rounded-2xl shadow-sm mx-auto mb-5 flex items-center justify-center text-slate-300 group-hover:text-brand-500 transition-colors">
+                                {{ icon('pencil', 'xl') }}
+                            </div>
+                            <p class="text-slate-600 font-medium mb-2 text-lg">Your profile is looking a bit empty!</p>
+                            <p class="text-slate-400 text-sm mb-4">Tell the world who you are and what drives you.</p>
+                            <span class="inline-flex items-center text-brand-600 font-bold group-hover:underline">
+                                Write your bio {{ icon('arrow-right', 'sm') }}
+                            </span>
+                        </div>
+                    {% endif %}
+                    {% if profile %}
+                        <div class="grid grid-cols-2 lg:grid-cols-3 gap-4">
+                            <div class="bg-gradient-to-br from-brand-50 to-purple-50 rounded-2xl p-5 border border-brand-100 flex flex-col justify-between h-32">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-brand-500">{{ icon('pencil', 'sm') }}</span>
+                                    <span class="text-brand-900/60 font-semibold text-xs uppercase tracking-wider">Applications</span>
+                                </div>
                                 <div class="flex items-baseline gap-1">
-                                    <span class="text-4xl font-extrabold text-orange-600">850</span>
-                                    <span class="text-sm font-bold text-orange-400">pts</span>
+                                    <span class="text-3xl font-extrabold text-brand-600">{{ profile.applications_count }}</span>
                                 </div>
                             </div>
-                            <div class="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-3xl p-6 border border-blue-100 flex flex-col justify-between h-36">
-                                <span class="text-blue-900/40 font-bold text-xs uppercase tracking-wider">Events</span>
+                            <div class="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-2xl p-5 border border-emerald-100 flex flex-col justify-between h-32">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-emerald-500">{{ icon('check-circle', 'sm') }}</span>
+                                    <span class="text-emerald-900/60 font-semibold text-xs uppercase tracking-wider">Accepted</span>
+                                </div>
                                 <div class="flex items-baseline gap-1">
-                                    <span class="text-4xl font-extrabold text-blue-600">12</span>
+                                    <span class="text-3xl font-extrabold text-emerald-600">{{ profile.accepted_applications_count }}</span>
                                 </div>
                             </div>
-                            <div class="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-3xl p-6 border border-emerald-100 flex flex-col justify-between h-36 col-span-2 lg:col-span-1">
-                                <span class="text-emerald-900/40 font-bold text-xs uppercase tracking-wider">Hours</span>
+                            <div class="bg-gradient-to-br from-slate-50 to-slate-100 rounded-2xl p-5 border border-slate-200 flex flex-col justify-between h-32 col-span-2 lg:col-span-1">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-slate-400">{{ icon('calendar', 'sm') }}</span>
+                                    <span class="text-slate-500 font-semibold text-xs uppercase tracking-wider">Member Since</span>
+                                </div>
                                 <div class="flex items-baseline gap-1">
-                                    <span class="text-4xl font-extrabold text-emerald-600">48</span>
-                                    <span class="text-sm font-bold text-emerald-400">hrs</span>
+                                    <span class="text-xl font-bold text-slate-700">{{ profile_user.created_at.strftime("%b %Y") }}</span>
                                 </div>
                             </div>
                         </div>
-                    </div>
+                    {% endif %}
                 </div>
             </div>
         </div>
-        {% if user and user.id == profile_user.id %}
-            {% call modal('editProfileOpen', 'Edit Profile', 'Update your personal information.', 'md') %}
-                <form hx-post="/settings/profile"
-                      hx-ext="response-targets"
-                      hx-target-error="#edit-profile-error"
-                      class="p-5 sm:p-6 space-y-4">
-                    <div id="edit-profile-error"></div>
-                    <div class="grid grid-cols-2 gap-4">
-                        {{ modal_field('First Name', 'first_name', 'text', profile_user.first_name or '') }}
-                        {{ modal_field('Last Name', 'last_name', 'text', profile_user.last_name or '') }}
-                    </div>
-                    {{ modal_field('Display Name', 'display_name', 'text', profile_user.custom_display_name or '', 'e.g. ' ~
-                                        profile_user.first_name ~ ' ' ~ profile_user.last_name) }}
-                    {{ modal_field('Bio tagline', 'bio', 'text', profile.bio or '', 'Impact maker, volunteer enthusiast...') }}
-                    {{ modal_field('About Me', 'description', 'textarea', profile.description or '', 'Share your story...', 5) }}
-                    {{ modal_actions('editProfileOpen', 'Save Changes') }}
-                </form>
-            {% endcall %}
-            {% call modal('privacyOpen', 'Privacy Settings', 'Control who can see your profile and information.', 'lg') %}
-                <form hx-post="/settings/privacy"
-                      hx-target="#main-content"
-                      hx-swap="none"
-                      hx-ext="response-targets"
-                      hx-target-error="#privacy-error"
-                      class="p-5 sm:p-6 space-y-5"
-                      @htmx:after-request="privacyOpen = false; window.location.reload()">
-                    <div id="privacy-error"></div>
-                    <div class="grid gap-6 md:grid-cols-2 items-start">
-                        <div>
-                            {{ settings_section_header('Profile Visibility', 'eye', 'blue') }}
-                            <div class="mt-2 grid grid-cols-1 gap-3">
-                                {{ radio_option('profile_visibility', 'public', '🌐', 'Public', 'Visible to everyone',
-                                                                user.profile_visibility == 'public') }}
-                                {{ radio_option('profile_visibility', 'authenticated', '👤', 'Auth Only', 'Platform members',
-                                                                user.profile_visibility == 'authenticated') }}
-                                {{ radio_option('profile_visibility', 'followers', '👥', 'Followers', 'Only followers',
-                                                                user.profile_visibility == 'followers') }}
-                                {{ radio_option('profile_visibility', 'private', '🔒', 'Private', 'Only you', user.profile_visibility ==
-                                                                'private') }}
-                            </div>
-                        </div>
-                        <div>
-                            {{ settings_section_header('Info Visibility', 'info-circle', 'purple') }}
-                            <div class="mt-2 space-y-2">
-                                {{ checkbox_toggle('show_email', 'Show Email', 'Display email on profile', user.show_email) }}
-                                {{ checkbox_toggle('show_organizations', 'Show Orgs', "Display memberships",
-                                                                user.show_organizations) }}
-                                {{ checkbox_toggle('searchable', 'Searchable', 'Appear in search', user.searchable) }}
-                                <button type="button"
-                                        @mouseenter="deleteAccountHover = true"
-                                        @mouseleave="deleteAccountHover = false"
-                                        @click="deleteAccountOpen = true"
-                                        class="w-full flex items-center justify-between p-4 border rounded-xl cursor-pointer transition-all duration-200 bg-red-50/40 border-red-200 hover:bg-red-50 hover:border-red-300">
-                                    <div class="text-left">
-                                        <span class="block font-semibold text-red-800 text-sm"
-                                              x-text="deleteAccountHover ? 'Delete Account?' : 'Delete Account'"></span>
-                                        <span class="block text-xs text-red-700/80 mt-0.5">Deactivate your account and sign out</span>
-                                    </div>
-                                    <div class="relative inline-flex items-center">
-                                        <span class="text-red-500">{{ icon('x', 'sm') }}</span>
-                                    </div>
-                                </button>
-                            </div>
+    </div>
+    {% if user and user.id == profile_user.id %}
+        {% call modal('editProfileOpen', 'Edit Profile', 'Update your personal information.', 'md') %}
+            <form hx-post="/settings/profile"
+                  hx-ext="response-targets"
+                  hx-target-error="#edit-profile-error"
+                  class="p-5 sm:p-6 space-y-4">
+                <div id="edit-profile-error"></div>
+                <div class="grid grid-cols-2 gap-4">
+                    {{ modal_field('First Name', 'first_name', 'text', profile_user.first_name or '') }}
+                    {{ modal_field('Last Name', 'last_name', 'text', profile_user.last_name or '') }}
+                </div>
+                {{ modal_field('Display Name', 'display_name', 'text', profile_user.custom_display_name or '', 'e.g. ' ~
+                                profile_user.first_name ~ ' ' ~ profile_user.last_name) }}
+                {{ modal_field('Bio tagline', 'bio', 'text', profile.bio or '', 'Impact maker, volunteer enthusiast...') }}
+                {{ modal_field('About Me', 'description', 'textarea', profile.description or '', 'Share your story...', 5) }}
+                {{ modal_actions('editProfileOpen', 'Save Changes') }}
+            </form>
+        {% endcall %}
+        {% call modal('privacyOpen', 'Privacy Settings', 'Control who can see your profile and information.', 'lg') %}
+            <form hx-post="/settings/privacy"
+                  hx-target="#main-content"
+                  hx-swap="none"
+                  hx-ext="response-targets"
+                  hx-target-error="#privacy-error"
+                  class="p-5 sm:p-6 space-y-5"
+                  @htmx:after-request="privacyOpen = false; window.location.reload()">
+                <div id="privacy-error"></div>
+                <div class="grid gap-6 md:grid-cols-2 items-start">
+                    <div>
+                        {{ settings_section_header('Profile Visibility', 'eye', 'blue') }}
+                        <div class="mt-2 grid grid-cols-1 gap-3">
+                            {{ radio_option('profile_visibility', 'public', '🌐', 'Public', 'Visible to everyone',
+                                                        user.profile_visibility == 'public') }}
+                            {{ radio_option('profile_visibility', 'authenticated', '👤', 'Auth Only', 'Platform members',
+                                                        user.profile_visibility == 'authenticated') }}
+                            {{ radio_option('profile_visibility', 'followers', '👥', 'Followers', 'Only followers',
+                                                        user.profile_visibility == 'followers') }}
+                            {{ radio_option('profile_visibility', 'private', '🔒', 'Private', 'Only you', user.profile_visibility ==
+                                                        'private') }}
                         </div>
                     </div>
-                    <div class="pt-4 border-t border-slate-100">{{ modal_actions('privacyOpen', 'Save Privacy Settings') }}</div>
-                </form>
-            {% endcall %}
-            {% call modal('deleteAccountOpen', 'Delete Account', 'This will deactivate your account and sign you out.', 'md') %}
-                <div class="p-5 sm:p-6 space-y-4">
-                    <div class="rounded-xl border border-red-200 bg-red-50/50 p-4">
-                        <h4 class="text-sm font-bold text-red-900 mb-1">What happens next</h4>
-                        <p class="text-sm text-red-800/80">
-                            Your account will be deactivated immediately. You will be signed out. Your profile and content will no longer be visible.
-                        </p>
-                    </div>
-                    <div class="flex justify-end gap-3">
-                        <button type="button"
-                                @click="deleteAccountOpen = false"
-                                class="inline-flex w-full justify-center rounded-xl bg-white px-3 py-2 text-sm font-semibold text-slate-900 shadow-sm ring-1 ring-inset ring-slate-300 hover:bg-slate-50 sm:mt-0 sm:w-auto">
-                            Back
-                        </button>
-                        <button type="button"
-                                hx-post="/settings/account/delete"
-                                hx-swap="none"
-                                class="inline-flex w-full justify-center rounded-xl bg-red-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-700 sm:mt-0 sm:w-auto">
-                            Yes, delete
-                        </button>
+                    <div>
+                        {{ settings_section_header('Info Visibility', 'info-circle', 'purple') }}
+                        <div class="mt-2 space-y-2">
+                            {{ checkbox_toggle('show_email', 'Show Email', 'Display email on profile', user.show_email) }}
+                            {{ checkbox_toggle('show_organizations', 'Show Orgs', "Display memberships",
+                                                        user.show_organizations) }}
+                            {{ checkbox_toggle('searchable', 'Searchable', 'Appear in search', user.searchable) }}
+                            <button type="button"
+                                    @mouseenter="deleteAccountHover = true"
+                                    @mouseleave="deleteAccountHover = false"
+                                    @click="deleteAccountOpen = true"
+                                    class="w-full flex items-center justify-between p-4 border rounded-xl cursor-pointer transition-all duration-200 bg-red-50/40 border-red-200 hover:bg-red-50 hover:border-red-300">
+                                <div class="text-left">
+                                    <span class="block font-semibold text-red-800 text-sm"
+                                          x-text="deleteAccountHover ? 'Delete Account?' : 'Delete Account'"></span>
+                                    <span class="block text-xs text-red-700/80 mt-0.5">Deactivate your account and sign out</span>
+                                </div>
+                                <div class="relative inline-flex items-center">
+                                    <span class="text-red-500">{{ icon('x', 'sm') }}</span>
+                                </div>
+                            </button>
+                        </div>
                     </div>
                 </div>
-            {% endcall %}
-        {% endif %}
-    </div>
-    <script>
-        document.addEventListener("alpine:init", () => {
-            if (!document.querySelector('[x-data="profileManager()"]')) return;
-            Alpine.data("profileManager", () => ({
-                editProfileOpen: false,
-                privacyOpen: false,
-                deleteAccountOpen: false,
-                deleteAccountHover: false,
-            }));
-        });
-    </script>
+                <div class="pt-4 border-t border-slate-100">{{ modal_actions('privacyOpen', 'Save Privacy Settings') }}</div>
+            </form>
+        {% endcall %}
+        {% call modal('deleteAccountOpen', 'Delete Account', 'This will deactivate your account and sign you out.', 'md') %}
+            <div class="p-5 sm:p-6 space-y-4">
+                <div class="rounded-xl border border-red-200 bg-red-50/50 p-4">
+                    <h4 class="text-sm font-bold text-red-900 mb-1">What happens next</h4>
+                    <p class="text-sm text-red-800/80">
+                        Your account will be deactivated immediately. You will be signed out. Your profile and content will no longer be visible.
+                    </p>
+                </div>
+                <div class="flex justify-end gap-3">
+                    <button type="button"
+                            @click="deleteAccountOpen = false"
+                            class="inline-flex w-full justify-center rounded-xl bg-white px-3 py-2 text-sm font-semibold text-slate-900 shadow-sm ring-1 ring-inset ring-slate-300 hover:bg-slate-50 sm:mt-0 sm:w-auto">
+                        Back
+                    </button>
+                    <button type="button"
+                            hx-post="/settings/account/delete"
+                            hx-swap="none"
+                            class="inline-flex w-full justify-center rounded-xl bg-red-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-700 sm:mt-0 sm:w-auto">
+                        Yes, delete
+                    </button>
+                </div>
+            </div>
+        {% endcall %}
+    {% endif %}
+</div>
+<script>
+    document.addEventListener("alpine:init", () => {
+        if (!document.querySelector('[x-data="profileManager()"]')) return;
+        Alpine.data("profileManager", () => ({
+            editProfileOpen: false,
+            privacyOpen: false,
+            deleteAccountOpen: false,
+            deleteAccountHover: false,
+        }));
+    });
+</script>
 {% endblock %}

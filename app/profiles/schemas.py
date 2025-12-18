@@ -77,6 +77,8 @@ class FullProfileSchema(PublicProfileSchema):
     profile_visibility: ProfileVisibilityType
     is_following: bool | None = None  # Only for authenticated non-owner viewers
     is_followed_by: bool | None = None  # Only for authenticated non-owner viewers
+    applications_count: int = 0  # Total applications submitted
+    accepted_applications_count: int = 0  # Accepted applications (completed volunteering)
 
 
 class FollowResponseSchema(StrictModel):

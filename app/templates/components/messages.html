@@ -1,6 +1,7 @@
 {# Message Components #}
 {% from "components/icons.html" import icon %}
 {% from "components/user.html" import entity_avatar %}
+{% from "components/report.html" import report_button %}
 {% macro conversation_card(conv, acting_as, acting_id) %}
     {% set other = conv.other_party %}
     {% if other %}
@@ -58,8 +59,8 @@
     </div>
 {% endmacro %}
 {% macro message_bubble(message, is_own=False, user=None) %}
-    <div class="flex {% if is_own %}justify-end{% endif %} animate-enter">
-        <div class="max-w-[75%] {% if is_own %}bg-gradient-to-br from-brand-500 to-brand-600 text-white shadow-lg shadow-brand-500/20{% else %}bg-white border border-slate-100 text-slate-800 shadow-sm{% endif %} px-4 py-2.5 rounded-2xl {% if is_own %}rounded-br-md{% else %}rounded-bl-md{% endif %}">
+    <div class="flex {% if is_own %}justify-end{% endif %} animate-enter group/msg">
+        <div class="max-w-[75%] {% if is_own %}bg-gradient-to-br from-brand-500 to-brand-600 text-white shadow-lg shadow-brand-500/20{% else %}bg-white border border-slate-100 text-slate-800 shadow-sm{% endif %} px-4 py-2.5 rounded-2xl {% if is_own %}rounded-br-md{% else %}rounded-bl-md{% endif %} relative">
             <p class="text-sm leading-relaxed whitespace-pre-wrap break-words">{{ message.content }}</p>
             <div class="flex items-center {% if is_own %}justify-end{% endif %} gap-1.5 mt-1">
                 <span class="text-xs {% if is_own %}text-brand-200{% else %}text-slate-400{% endif %} tabular-nums">
@@ -67,6 +68,11 @@
                 </span>
                 {% if is_own %}{{ icon('check', 'sm', 'text-brand-200') }}{% endif %}
             </div>
+            {% if not is_own %}
+                <div class="absolute -right-8 top-1/2 -translate-y-1/2 opacity-0 group-hover/msg:opacity-100 transition-opacity">
+                    {{ report_button('message', message.id, 'xs') }}
+                </div>
+            {% endif %}
         </div>
     </div>
 {% endmacro %}

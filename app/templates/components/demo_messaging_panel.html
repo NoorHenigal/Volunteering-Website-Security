@@ -1,0 +1,59 @@
+{% from "components/icons.html" import icon %}
+<div id="demo-messaging-panel"
+     class="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 rounded-2xl p-4 shadow-sm">
+    <div class="flex items-start gap-3">
+        <div class="flex-shrink-0 w-10 h-10 bg-orange-500 rounded-xl flex items-center justify-center shadow-lg shadow-orange-500/25">
+            {{ icon('beaker', 'md', 'text-white') }}
+        </div>
+        <div class="flex-1 min-w-0">
+            <h3 class="font-bold text-slate-900 text-sm">Demo Mode</h3>
+            {% if not seeded %}
+                <p class="text-xs text-slate-600 mt-1">Use the orange cog button to seed demo data first.</p>
+            {% elif has_active_bot %}
+                <p class="text-xs text-slate-600 mt-1">
+                    {% if bot_name %}
+                        {{ bot_name }}
+                    {% else %}
+                        A demo user
+                    {% endif %}
+                    is chatting with you.
+                    Reply to see live typing!
+                </p>
+                <div class="flex flex-wrap gap-2 mt-3">
+                    {% if conversation_id %}
+                        <a href="/messages/{{ conversation_id }}"
+                           hx-get="/messages/{{ conversation_id }}?partial=true"
+                           hx-target="#conversation-panel"
+                           hx-swap="innerHTML"
+                           hx-push-url="/messages/{{ conversation_id }}"
+                           @click="selectedId = '{{ conversation_id }}'; showConversation = true"
+                           class="inline-flex items-center gap-2 px-4 py-2 bg-brand-500 hover:bg-brand-600 text-white text-xs font-semibold rounded-full transition-colors shadow-sm">
+                            {{ icon('chat-bubble-left-right', 'sm') }}
+                            Open Chat
+                        </a>
+                    {% endif %}
+                    <button type="button"
+                            hx-post="/demo/bot/stop"
+                            hx-target="#demo-messaging-panel"
+                            hx-swap="outerHTML"
+                            class="inline-flex items-center gap-2 px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-semibold rounded-full transition-colors">
+                        {{ icon('x', 'sm') }}
+                        Stop Demo
+                        <span class="htmx-indicator">{{ icon('spinner', 'sm', 'animate-spin') }}</span>
+                    </button>
+                </div>
+            {% else %}
+                <p class="text-xs text-slate-600 mt-1">Test live messaging with a simulated user.</p>
+                <button type="button"
+                        hx-post="/demo/bot/start"
+                        hx-target="#demo-messaging-panel"
+                        hx-swap="outerHTML"
+                        class="mt-3 inline-flex items-center gap-2 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold rounded-full transition-colors shadow-sm">
+                    {{ icon('paper-airplane', 'sm') }}
+                    Receive a Demo Message
+                    <span class="htmx-indicator">{{ icon('spinner', 'sm', 'animate-spin') }}</span>
+                </button>
+            {% endif %}
+        </div>
+    </div>
+</div>

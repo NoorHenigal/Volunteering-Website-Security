@@ -1,0 +1,19 @@
+{# Admin Navigation Component #}
+{% from "components/icons.html" import icon %}
+{% macro admin_nav(active_tab, pending_reports_count=0) %}
+    <nav class="flex items-center gap-1 mb-8 p-1 bg-slate-100 rounded-xl w-fit">
+        <a href="/admin/dashboard"
+           class="flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 {{ 'bg-white text-slate-900 shadow-sm' if active_tab == 'overview' else 'text-slate-600 hover:text-slate-900 hover:bg-white/50' }}">
+            {{ icon('chart-bar', 'sm') }}
+            <span>Overview</span>
+        </a>
+        <a href="/admin/reports"
+           class="flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 {{ 'bg-white text-slate-900 shadow-sm' if active_tab == 'reports' else 'text-slate-600 hover:text-slate-900 hover:bg-white/50' }}">
+            {{ icon('flag', 'sm') }}
+            <span>Reports</span>
+            {% if pending_reports_count > 0 %}
+                <span class="ml-1 px-2 py-0.5 text-xs font-bold bg-red-500 text-white rounded-full">{{ pending_reports_count }}</span>
+            {% endif %}
+        </a>
+    </nav>
+{% endmacro %}

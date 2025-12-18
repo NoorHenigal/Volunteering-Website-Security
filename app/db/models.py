@@ -14,6 +14,8 @@ from app.core.types import ProfileVisibilityType
 RoleType = Literal["volunteer", "organization", "system_admin"]
 ApplicationStatusType = Literal["pending", "accepted", "rejected", "withdrawn"]
 ParticipantType = Literal["user", "organization"]
+ReportTargetType = Literal["user", "organization", "opportunity", "message"]
+ReportStatusType = Literal["pending", "resolved_deleted", "rejected"]
 
 
 def _pg_check(expression: str, name: str) -> CheckConstraint:
@@ -553,6 +555,100 @@ class Message(Base, FullModelMixin):
         return self.sender_user_id if self.sender_user_id else self.sender_organization_id  # type: ignore[return-value]
 
 
+class Report(Base, FullModelMixin):
+    """User-submitted report for content moderation."""
+
+    __tablename__ = "reports"
+    demo_seed_run_id: Mapped[UUID | None] = _demo_seed_fk()
+
+    reporter_id: Mapped[UUID] = _user_fk()
+
+    target_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    target_user_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    target_organization_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("organizations.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    target_opportunity_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("opportunities.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    target_message_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("messages.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+
+    reason: Mapped[str] = mapped_column(String(100), nullable=False)
+    description: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+
+    status: Mapped[str] = mapped_column(String(50), nullable=False, default="pending", server_default="pending")
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    resolved_by_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "target_type IN ('user', 'organization', 'opportunity', 'message')",
+            name="ck_report_target_type",
+        ),
+        CheckConstraint(
+            "status IN ('pending', 'resolved_deleted', 'rejected')",
+            name="ck_report_status",
+        ),
+        _pg_index("ix_reports_status_pending", "status", where="status = 'pending'"),
+        Index("ix_reports_target_type_status", "target_type", "status"),
+        Index("ix_reports_created_at", "created_at"),
+    )
+
+    reporter: Mapped[User] = relationship("User", foreign_keys=[reporter_id])
+    target_user: Mapped[User | None] = relationship("User", foreign_keys=[target_user_id])
+    target_organization: Mapped[Organization | None] = relationship(
+        "Organization", foreign_keys=[target_organization_id]
+    )
+    target_opportunity: Mapped[Opportunity | None] = relationship("Opportunity", foreign_keys=[target_opportunity_id])
+    target_message: Mapped[Message | None] = relationship("Message", foreign_keys=[target_message_id])
+    resolver: Mapped[User | None] = relationship("User", foreign_keys=[resolved_by_id])
+
+    @property
+    def target_id(self) -> UUID | None:
+        """Return the ID of the target entity based on target_type."""
+        target_map: dict[str, UUID | None] = {
+            "user": self.target_user_id,
+            "organization": self.target_organization_id,
+            "opportunity": self.target_opportunity_id,
+            "message": self.target_message_id,
+        }
+        return target_map.get(self.target_type)
+
+    @property
+    def target_display_name(self) -> str:
+        """Return a display name for the target."""
+        if self.target_type == "user" and self.target_user:
+            return self.target_user.display_name
+        if self.target_type == "organization" and self.target_organization:
+            return self.target_organization.name
+        if self.target_type == "opportunity" and self.target_opportunity:
+            return self.target_opportunity.title
+        if self.target_type == "message" and self.target_message:
+            return f"Message from {self.target_message.sender_user.display_name if self.target_message.sender_user else 'Organization'}"
+        return "[Deleted]"
+
+
 __all__ = [
     "Application",
     "ApplicationStatusType",
@@ -569,6 +665,9 @@ __all__ = [
     "ParticipantType",
     "ProfileVisibilityType",
     "RefreshToken",
+    "Report",
+    "ReportStatusType",
+    "ReportTargetType",
     "RoleType",
     "TimestampModelMixin",
     "User",

@@ -1,0 +1,163 @@
+{# Report Components - macros for report button and modal #}
+{% from "components/icons.html" import icon %}
+{% macro report_button(target_type, target_id, size='sm', class='') %}
+    {# Report button that triggers the global report modal #}
+    <button type="button"
+            @click="$dispatch('open-report-modal', { targetType: '{{ target_type }}', targetId: '{{ target_id }}' })"
+            class="inline-flex items-center justify-center text-slate-400 hover:text-red-500 transition-colors {{ class }}"
+            title="Report {{ target_type }}">
+        {{ icon('flag', size) }}
+        <span class="sr-only">Report</span>
+    </button>
+{% endmacro %}
+{% macro report_button_with_text(target_type, target_id, text='Report') %}
+    {# Report button with visible text #}
+    <button type="button"
+            @click="$dispatch('open-report-modal', { targetType: '{{ target_type }}', targetId: '{{ target_id }}' })"
+            class="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-red-600 transition-colors">
+        {{ icon('flag', 'sm') }}
+        <span>{{ text }}</span>
+    </button>
+{% endmacro %}
+{% macro report_modal() %}
+    {# Global report modal - include once in base layout #}
+    <div x-data="reportModal()"
+         x-show="open"
+         x-cloak
+         @open-report-modal.window="openModal($event.detail)"
+         @keydown.escape.window="open = false"
+         class="fixed inset-0 z-50 overflow-y-auto"
+         aria-labelledby="report-modal-title"
+         role="dialog"
+         aria-modal="true">
+        <div class="flex min-h-screen items-center justify-center p-4">
+            <div x-show="open"
+                 x-transition:enter="ease-out duration-300"
+                 x-transition:enter-start="opacity-0"
+                 x-transition:enter-end="opacity-100"
+                 x-transition:leave="ease-in duration-200"
+                 x-transition:leave-start="opacity-100"
+                 x-transition:leave-end="opacity-0"
+                 class="fixed inset-0 bg-black/50 backdrop-blur-sm"
+                 @click="open = false"></div>
+            <div x-show="open"
+                 x-transition:enter="ease-out duration-300"
+                 x-transition:enter-start="opacity-0 scale-95"
+                 x-transition:enter-end="opacity-100 scale-100"
+                 x-transition:leave="ease-in duration-200"
+                 x-transition:leave-start="opacity-100 scale-100"
+                 x-transition:leave-end="opacity-0 scale-95"
+                 class="relative w-full max-w-md bg-white rounded-2xl shadow-xl">
+                <div class="px-6 py-4 border-b border-slate-100">
+                    <div class="flex items-center justify-between">
+                        <h3 id="report-modal-title" class="text-lg font-semibold text-slate-900">
+                            Report <span x-text="targetType" class="capitalize"></span>
+                        </h3>
+                        <button type="button"
+                                @click="open = false"
+                                class="p-2 text-slate-400 hover:text-slate-600 rounded-lg transition-colors">
+                            {{ icon('x', 'md') }}
+                        </button>
+                    </div>
+                </div>
+                <form action="/reports"
+                      method="POST"
+                      hx-post="/reports"
+                      hx-target="#report-result"
+                      hx-swap="innerHTML"
+                      @htmx:after-request="if(event.detail.successful) { setTimeout(() => { open = false; resetForm(); }, 1500); }"
+                      class="p-6 space-y-4">
+                    <input type="hidden" name="target_type" :value="targetType">
+                    <input type="hidden" name="target_id" :value="targetId">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-2">Why are you reporting this?</label>
+                        <div class="space-y-2">
+                            <label class="flex items-center gap-3 p-3 rounded-lg border border-slate-200 hover:border-brand-300 hover:bg-brand-50/50 cursor-pointer transition-colors has-[:checked]:border-brand-500 has-[:checked]:bg-brand-50">
+                                <input type="radio"
+                                       name="reason"
+                                       value="spam"
+                                       required
+                                       class="w-4 h-4 text-brand-600 border-slate-300 focus:ring-brand-500">
+                                <span class="text-sm text-slate-700">Spam or misleading content</span>
+                            </label>
+                            <label class="flex items-center gap-3 p-3 rounded-lg border border-slate-200 hover:border-brand-300 hover:bg-brand-50/50 cursor-pointer transition-colors has-[:checked]:border-brand-500 has-[:checked]:bg-brand-50">
+                                <input type="radio"
+                                       name="reason"
+                                       value="harassment"
+                                       class="w-4 h-4 text-brand-600 border-slate-300 focus:ring-brand-500">
+                                <span class="text-sm text-slate-700">Harassment or bullying</span>
+                            </label>
+                            <label class="flex items-center gap-3 p-3 rounded-lg border border-slate-200 hover:border-brand-300 hover:bg-brand-50/50 cursor-pointer transition-colors has-[:checked]:border-brand-500 has-[:checked]:bg-brand-50">
+                                <input type="radio"
+                                       name="reason"
+                                       value="inappropriate"
+                                       class="w-4 h-4 text-brand-600 border-slate-300 focus:ring-brand-500">
+                                <span class="text-sm text-slate-700">Inappropriate content</span>
+                            </label>
+                            <label class="flex items-center gap-3 p-3 rounded-lg border border-slate-200 hover:border-brand-300 hover:bg-brand-50/50 cursor-pointer transition-colors has-[:checked]:border-brand-500 has-[:checked]:bg-brand-50">
+                                <input type="radio"
+                                       name="reason"
+                                       value="impersonation"
+                                       class="w-4 h-4 text-brand-600 border-slate-300 focus:ring-brand-500">
+                                <span class="text-sm text-slate-700">Impersonation</span>
+                            </label>
+                            <label class="flex items-center gap-3 p-3 rounded-lg border border-slate-200 hover:border-brand-300 hover:bg-brand-50/50 cursor-pointer transition-colors has-[:checked]:border-brand-500 has-[:checked]:bg-brand-50">
+                                <input type="radio"
+                                       name="reason"
+                                       value="other"
+                                       class="w-4 h-4 text-brand-600 border-slate-300 focus:ring-brand-500">
+                                <span class="text-sm text-slate-700">Other</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div>
+                        <label for="report-description"
+                               class="block text-sm font-medium text-slate-700 mb-2">
+                            Additional details <span class="text-slate-400 font-normal">(optional)</span>
+                        </label>
+                        <textarea id="report-description"
+                                  name="description"
+                                  rows="3"
+                                  maxlength="1000"
+                                  placeholder="Provide any additional context that might help us review this report..."
+                                  class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 resize-none"></textarea>
+                    </div>
+                    <div id="report-result"></div>
+                    <div class="flex items-center justify-end gap-3 pt-2">
+                        <button type="button"
+                                @click="open = false"
+                                class="px-4 py-2.5 text-sm font-medium text-slate-700 hover:text-slate-900 transition-colors">
+                            Cancel
+                        </button>
+                        <button type="submit"
+                                class="px-4 py-2.5 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-xl transition-colors">
+                            Submit Report
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <script>
+        function reportModal() {
+            return {
+                open: false,
+                targetType: '',
+                targetId: '',
+                openModal(detail) {
+                    this.targetType = detail.targetType;
+                    this.targetId = detail.targetId;
+                    this.open = true;
+                },
+                resetForm() {
+                    this.targetType = '';
+                    this.targetId = '';
+                    const form = this.$el.querySelector('form');
+                    if (form) form.reset();
+                    const result = document.getElementById('report-result');
+                    if (result) result.innerHTML = '';
+                }
+            }
+        }
+    </script>
+{% endmacro %}

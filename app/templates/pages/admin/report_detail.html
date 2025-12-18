@@ -1,0 +1,175 @@
+{% extends "layouts/base.html" %}
+{% from "components/admin_nav.html" import admin_nav %}
+{% from "components/icons.html" import icon %}
+{% from "components/user.html" import user_avatar %}
+{% block title %}Report Detail - Admin{% endblock %}
+{% block content %}
+    <div class="space-y-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <h1 class="text-3xl font-bold text-slate-900">Admin Dashboard</h1>
+                <p class="mt-1 text-sm text-slate-500">Content moderation and platform management</p>
+            </div>
+            <div class="flex items-center gap-2">
+                <span class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-full bg-purple-100 text-purple-700 border border-purple-200">
+                    {{ icon('fingerprint', 'sm') }}
+                    {{ user.role_display }}
+                </span>
+            </div>
+        </div>
+        {{ admin_nav(active_tab) }}
+        <div class="flex items-center gap-2 text-sm text-slate-500">
+            <a href="/admin/reports" class="hover:text-brand-600 transition-colors">Reports</a>
+            <span>{{ icon('chevron-right', 'sm') }}</span>
+            <span class="text-slate-900 font-medium">Report Detail</span>
+        </div>
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="lg:col-span-2 space-y-6">
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                    <div class="px-6 py-4 border-b border-slate-100">
+                        <div class="flex items-center gap-3">
+                            <span class="inline-flex items-center px-2.5 py-1 text-xs font-semibold rounded-full {% if report.target_type == 'user' %}bg-blue-100 text-blue-700 {% elif report.target_type == 'organization' %}bg-purple-100 text-purple-700 {% elif report.target_type == 'opportunity' %}bg-green-100 text-green-700 {% else %}bg-amber-100 text-amber-700{% endif %}">
+                                {{ report.target_type | capitalize }} Report
+                            </span>
+                            <span class="inline-flex items-center px-2.5 py-1 text-xs font-semibold rounded-full {% if report.status == 'pending' %}bg-amber-100 text-amber-700 {% elif report.status == 'resolved_deleted' %}bg-red-100 text-red-700 {% else %}bg-slate-100 text-slate-700{% endif %}">
+                                {{ report.status | replace('_', ' ') | title }}
+                            </span>
+                        </div>
+                    </div>
+                    <div class="p-6 space-y-6">
+                        <div>
+                            <h3 class="text-sm font-medium text-slate-500 mb-2">Reported Content</h3>
+                            <div class="p-4 bg-slate-50 rounded-xl border border-slate-200">
+                                {% if report.target_type == 'user' and report.target_user %}
+                                    <div class="flex items-center gap-3">
+                                        {{ user_avatar(report.target_user, 'md') }}
+                                        <div>
+                                            <p class="font-semibold text-slate-900">{{ report.target_user.display_name }}</p>
+                                            <p class="text-sm text-slate-500">@{{ report.target_user.username }}</p>
+                                        </div>
+                                        <a href="/{{ report.target_user.username }}"
+                                           class="ml-auto text-sm text-brand-600 hover:text-brand-700 font-medium"
+                                           target="_blank">View Profile {{ icon('external-link', 'sm') }}</a>
+                                    </div>
+                                {% elif report.target_type == 'organization' and report.target_organization %}
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center">
+                                            <span class="text-purple-600 font-bold">{{ report.target_organization.name[:2] | upper }}</span>
+                                        </div>
+                                        <div>
+                                            <p class="font-semibold text-slate-900">{{ report.target_organization.name }}</p>
+                                            <p class="text-sm text-slate-500">@{{ report.target_organization.username }}</p>
+                                        </div>
+                                        <a href="/{{ report.target_organization.username }}"
+                                           class="ml-auto text-sm text-brand-600 hover:text-brand-700 font-medium"
+                                           target="_blank">View Organization {{ icon('external-link', 'sm') }}</a>
+                                    </div>
+                                {% elif report.target_type == 'opportunity' and report.target_opportunity %}
+                                    <div>
+                                        <p class="font-semibold text-slate-900">{{ report.target_opportunity.title }}</p>
+                                        <p class="text-sm text-slate-500 mt-1">
+                                            by {{ report.target_opportunity.organization.name if report.target_opportunity.organization else 'Unknown' }}
+                                        </p>
+                                        <a href="/opportunities/{{ report.target_opportunity.id }}"
+                                           class="mt-2 inline-flex items-center gap-1 text-sm text-brand-600 hover:text-brand-700 font-medium"
+                                           target="_blank">View Opportunity {{ icon('external-link', 'sm') }}</a>
+                                    </div>
+                                {% elif report.target_type == 'message' and report.target_message %}
+                                    <div>
+                                        <p class="text-sm text-slate-500 mb-2">
+                                            From: {{ report.target_message.sender_user.display_name if report.target_message.sender_user else report.target_message.sender_organization.name if report.target_message.sender_organization else 'Unknown' }}
+                                        </p>
+                                        <p class="text-slate-900 bg-white p-3 rounded-lg border border-slate-200">{{ report.target_message.content }}</p>
+                                    </div>
+                                {% else %}
+                                    <p class="text-slate-500 italic">Content has been deleted or is no longer available.</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div>
+                            <h3 class="text-sm font-medium text-slate-500 mb-2">Report Reason</h3>
+                            <p class="text-slate-900 font-medium">
+                                {% for code, label in report_reasons %}
+                                    {% if code == report.reason %}{{ label }}{% endif %}
+                                {% endfor %}
+                            </p>
+                        </div>
+                        {% if report.description %}
+                            <div>
+                                <h3 class="text-sm font-medium text-slate-500 mb-2">Additional Details</h3>
+                                <p class="text-slate-700">{{ report.description }}</p>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            <div class="space-y-6">
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+                    <h3 class="text-sm font-semibold text-slate-900 mb-4">Report Information</h3>
+                    <dl class="space-y-4">
+                        <div>
+                            <dt class="text-xs font-medium text-slate-500 uppercase tracking-wider">Reported By</dt>
+                            <dd class="mt-1 flex items-center gap-2">
+                                {{ user_avatar(report.reporter, 'sm') }}
+                                <div>
+                                    <p class="text-sm font-medium text-slate-900">{{ report.reporter.display_name }}</p>
+                                    <p class="text-xs text-slate-500">@{{ report.reporter.username }}</p>
+                                </div>
+                            </dd>
+                        </div>
+                        <div>
+                            <dt class="text-xs font-medium text-slate-500 uppercase tracking-wider">Submitted</dt>
+                            <dd class="mt-1 text-sm text-slate-900">
+                                {{ report.created_at.strftime("%B %d, %Y at %H:%M") }}
+                            </dd>
+                        </div>
+                        {% if report.resolver %}
+                            <div>
+                                <dt class="text-xs font-medium text-slate-500 uppercase tracking-wider">Resolved By</dt>
+                                <dd class="mt-1 text-sm text-slate-900">
+                                    {{ report.resolver.display_name }}
+                                </dd>
+                            </div>
+                            <div>
+                                <dt class="text-xs font-medium text-slate-500 uppercase tracking-wider">Resolved At</dt>
+                                <dd class="mt-1 text-sm text-slate-900">
+                                    {{ report.resolved_at.strftime("%B %d, %Y at %H:%M") if report.resolved_at else '-' }}
+                                </dd>
+                            </div>
+                        {% endif %}
+                    </dl>
+                </div>
+                {% if report.status == 'pending' %}
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+                        <h3 class="text-sm font-semibold text-slate-900 mb-4">Actions</h3>
+                        <div class="space-y-3">
+                            <form action="/admin/reports/{{ report.id }}/resolve" method="POST">
+                                <input type="hidden" name="action" value="delete">
+                                <button type="submit"
+                                        class="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-xl transition-colors"
+                                        onclick="return confirm('Delete this content? This action cannot be undone.')">
+                                    {{ icon('trash', 'sm') }}
+                                    Delete Content
+                                </button>
+                            </form>
+                            <form action="/admin/reports/{{ report.id }}/resolve" method="POST">
+                                <input type="hidden" name="action" value="reject">
+                                <button type="submit"
+                                        class="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors"
+                                        onclick="return confirm('Reject this report? The content will remain visible.')">
+                                    {{ icon('x', 'sm') }}
+                                    Reject Report
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                {% endif %}
+                <a href="/admin/reports"
+                   class="flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors">
+                    {{ icon('arrow-left', 'sm') }}
+                    Back to Reports
+                </a>
+            </div>
+        </div>
+    </div>
+{% endblock %}

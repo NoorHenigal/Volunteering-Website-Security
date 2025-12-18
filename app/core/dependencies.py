@@ -10,6 +10,7 @@ from app.messaging.service import MessagingService
 from app.opportunities.service import ApplicationService, OpportunityService
 from app.organizations.service import OrganizationService
 from app.profiles.service import ProfileService
+from app.reports.service import ReportService
 
 
 def get_image_service() -> ImageService:
@@ -42,6 +43,11 @@ def get_messaging_service(ctx: Annotated[RequestContext, Depends(get_context)]) 
     return MessagingService(ctx.db)
 
 
+def get_report_service(ctx: Annotated[RequestContext, Depends(get_context)]) -> ReportService:
+    """Dependency factory for ReportService."""
+    return ReportService(ctx.db)
+
+
 # Type aliases for cleaner router signatures
 ImageServiceDep = Annotated[ImageService, Depends(get_image_service)]
 OpportunityServiceDep = Annotated[OpportunityService, Depends(get_opportunity_service)]
@@ -49,6 +55,7 @@ ApplicationServiceDep = Annotated[ApplicationService, Depends(get_application_se
 OrganizationServiceDep = Annotated[OrganizationService, Depends(get_organization_service)]
 ProfileServiceDep = Annotated[ProfileService, Depends(get_profile_service)]
 MessagingServiceDep = Annotated[MessagingService, Depends(get_messaging_service)]
+ReportServiceDep = Annotated[ReportService, Depends(get_report_service)]
 
 
 __all__ = [
@@ -58,10 +65,12 @@ __all__ = [
     "OpportunityServiceDep",
     "OrganizationServiceDep",
     "ProfileServiceDep",
+    "ReportServiceDep",
     "get_application_service",
     "get_image_service",
     "get_messaging_service",
     "get_opportunity_service",
     "get_organization_service",
     "get_profile_service",
+    "get_report_service",
 ]

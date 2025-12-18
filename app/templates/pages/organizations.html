@@ -9,6 +9,7 @@
 {% from "components/messages.html" import start_conversation_button %}
 {% from "components/feedback.html" import fullscreen_overlay, overlay_actions %}
 {% from "components/forms.html" import form_label, form_input, form_textarea %}
+{% from "components/report.html" import report_button_with_text %}
 {% block title %}{{ organization.name }}{% endblock %}
 {% block content %}
     <div class="animate-enter"
@@ -98,6 +99,9 @@
                         <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Contact</h3>
                         <p class="text-slate-600 text-sm mb-4">Have a question? Send a message to this organization.</p>
                         {{ start_conversation_button('organization', organization.id, size='md') }}
+                        <div class="mt-4 pt-4 border-t border-slate-100">
+                            {{ report_button_with_text('organization', organization.id, 'Report Organization') }}
+                        </div>
                     </div>
                 {% endif %}
                 {% set visible_members = members|selectattr('is_visible')|list %}

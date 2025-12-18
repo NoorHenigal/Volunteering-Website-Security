@@ -50,27 +50,30 @@
                 </div>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div class="bg-white p-6 rounded-2xl shadow-subtle border border-slate-100 hover:shadow-md transition-all">
-                    <div class="w-12 h-12 rounded-xl bg-orange-100 flex items-center justify-center text-orange-600 mb-4">
-                        {{ icon('clock', 'lg') }}
+                <a href="/messages"
+                   class="bg-white p-6 rounded-2xl shadow-subtle border border-slate-100 hover:shadow-md transition-all block group">
+                    <div class="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center text-blue-600 mb-4">
+                        {{ icon('chat-bubble-left-right', 'lg') }}
                     </div>
-                    <h3 class="text-lg font-bold text-slate-900 mb-1">Recent Activity</h3>
-                    <p class="text-slate-500 text-sm">Check what's happening in your network.</p>
-                </div>
-                <div class="bg-white p-6 rounded-2xl shadow-subtle border border-slate-100 hover:shadow-md transition-all">
+                    <h3 class="text-lg font-bold text-slate-900 mb-1 group-hover:text-brand-600">Messages</h3>
+                    <p class="text-slate-500 text-sm">Chat with organizations and volunteers.</p>
+                </a>
+                <a href="/opportunities"
+                   class="bg-white p-6 rounded-2xl shadow-subtle border border-slate-100 hover:shadow-md transition-all block group">
                     <div class="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center text-blue-600 mb-4">
                         {{ icon('archive', 'lg') }}
                     </div>
-                    <h3 class="text-lg font-bold text-slate-900 mb-1">Explore</h3>
+                    <h3 class="text-lg font-bold text-slate-900 mb-1 group-hover:text-brand-600">Explore</h3>
                     <p class="text-slate-500 text-sm">Discover new volunteering opportunities.</p>
-                </div>
-                <div class="bg-white p-6 rounded-2xl shadow-subtle border border-slate-100 hover:shadow-md transition-all">
+                </a>
+                <a href="/organizations"
+                   class="bg-white p-6 rounded-2xl shadow-subtle border border-slate-100 hover:shadow-md transition-all block group">
                     <div class="w-12 h-12 rounded-xl bg-green-100 flex items-center justify-center text-green-600 mb-4">
                         {{ icon('users', 'lg') }}
                     </div>
-                    <h3 class="text-lg font-bold text-slate-900 mb-1">Community</h3>
-                    <p class="text-slate-500 text-sm">Connect with others and grow together.</p>
-                </div>
+                    <h3 class="text-lg font-bold text-slate-900 mb-1 group-hover:text-brand-600">Community</h3>
+                    <p class="text-slate-500 text-sm">Connect with organizations and volunteers.</p>
+                </a>
             </div>
         {% else %}
             <div class="text-center max-w-4xl mx-auto py-12 md:py-20">

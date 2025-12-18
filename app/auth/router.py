@@ -15,6 +15,7 @@ from app.auth.schemas import (
     OrganizationRegisterSchema,
     VolunteerRegisterSchema,
 )
+from app.core.config import settings
 from app.core.context import RequestContext, get_context, render_template, require_system_admin
 from app.core.htmx import htmx_redirect
 from app.core.security import clear_auth_cookies, set_auth_cookies
@@ -405,6 +406,11 @@ async def admin_setup_submit(ctx: Annotated[RequestContext, Depends(get_context)
 @router.post("/logout")
 async def logout(ctx: Annotated[RequestContext, Depends(get_context)]) -> Response:
     """Logout user."""
+    if ctx.user and settings.demo_data:
+        from app.demo.bot import clear_demo_conversation  # noqa: PLC0415
+
+        await clear_demo_conversation(ctx.db, ctx.user.id)
+
     refresh_token = ctx.request.cookies.get("refresh_token")
     if refresh_token:
         await service.logout(refresh_token, ctx.db)
@@ -422,12 +428,6 @@ async def get_current_user(ctx: Annotated[RequestContext, Depends(get_context)])
     """Get current user details - redirects to profile page."""
     user = ctx.require_authenticated()
     return await ctx.success_response(redirect_url=f"/{user.username}")
-
-
-@router.get("/event-statistics", include_in_schema=False)
-async def event_statistics_page(ctx: Annotated[RequestContext, Depends(get_context)]) -> Response:
-    """Show event statistics page (UI only)."""
-    return await render_template(ctx.request, "pages/event_statistics.html", user=ctx.user)
 
 
 @router.get("/admin-statistics", include_in_schema=False)

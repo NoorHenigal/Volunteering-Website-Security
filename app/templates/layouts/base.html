@@ -187,11 +187,6 @@
                                         Organizations
                                         <span class="absolute -bottom-1 left-0 w-0 h-0.5 bg-brand-500 transition-all duration-300 group-hover:w-full"></span>
                                     </a>
-                                    <a href="/auth/event-statistics"
-                                       class="text-sm font-medium text-slate-600 hover:text-brand-600 transition-colors relative group">
-                                        Event Stats
-                                        <span class="absolute -bottom-1 left-0 w-0 h-0.5 bg-brand-500 transition-all duration-300 group-hover:w-full"></span>
-                                    </a>
                                     <div class="pl-4 border-l border-slate-200">{{ user_dropdown(user) }}</div>
                                 {% else %}
                                     <div class="flex items-center gap-4">
@@ -233,8 +228,6 @@
                                    class="block px-3 py-2 rounded-md text-base font-medium text-slate-700 hover:text-brand-600 hover:bg-brand-50 transition-colors">Opportunities</a>
                                 <a href="/organizations"
                                    class="block px-3 py-2 rounded-md text-base font-medium text-slate-700 hover:text-brand-600 hover:bg-brand-50 transition-colors">Organizations</a>
-                                <a href="/auth/event-statistics"
-                                   class="block px-3 py-2 rounded-md text-base font-medium text-slate-700 hover:text-brand-600 hover:bg-brand-50 transition-colors">Event Stats</a>
                                 <a href="/{{ user.username }}"
                                    class="block px-3 py-2 rounded-md text-base font-medium text-slate-700 hover:text-brand-600 hover:bg-brand-50 transition-colors">Profile</a>
                                 <a href="/"
@@ -367,5 +360,9 @@
                 </template>
             </div>
         {% endblock body_content %}
+        {% if user %}
+            {% from "components/report.html" import report_modal %}
+            {{ report_modal() }}
+        {% endif %}
     </body>
 </html>

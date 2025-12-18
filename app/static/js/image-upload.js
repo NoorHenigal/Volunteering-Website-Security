@@ -11,7 +11,7 @@ document.addEventListener('alpine:init', () => {
         uploadName: 'file',
         aspectRatio: 1,
         objectUrl: null, // Store object URL for cleanup
-        
+
         // Reactive properties
         uploading: false,
         file: null,
@@ -30,7 +30,7 @@ document.addEventListener('alpine:init', () => {
         startY: 0,
         initialImageX: 0,
         initialImageY: 0,
-        
+
         init(endpointUrl, aspectRatio) {
             this.endpointUrl = endpointUrl;
             this.aspectRatio = aspectRatio;

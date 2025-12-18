@@ -16,6 +16,7 @@ from app.core.security import decode_access_token
 from app.db.models import Organization, ParticipantType, User
 from app.db.repositories import OrganizationRepository, UserOrganizationRoleRepository, UserRepository
 from app.db.session import AsyncSessionLocal
+from app.demo.bot import get_active_bot_session
 from app.messaging.schemas import MessageCreate, StartConversationRequest
 from app.messaging.service import MessagingService
 from app.messaging.websocket import manager
@@ -94,7 +95,10 @@ async def _get_user_orgs_and_counts(
 
 
 @router.get("/messages", include_in_schema=False)
-async def inbox(ctx: ContextDep) -> Response:
+async def inbox(
+    ctx: ContextDep,
+    partial: Annotated[str | None, Query()] = None,
+) -> Response:
     """User's personal message inbox."""
     mctx = await _resolve_context(ctx)
     user_organizations, org_unread_counts, _ = await _get_user_orgs_and_counts(ctx.db, mctx.user, mctx.svc)
@@ -103,6 +107,15 @@ async def inbox(ctx: ContextDep) -> Response:
         return RedirectResponse(url=f"/org/{user_organizations[0].id}/messages", status_code=302)
 
     conversations = await mctx.svc.get_inbox(mctx.acting_as, mctx.acting_id)
+
+    if partial == "list":
+        return await render_template(
+            ctx.request,
+            "components/conversation_list.html",
+            conversations=conversations,
+            acting_as=mctx.acting_as,
+            acting_id=mctx.acting_id,
+        )
 
     return await render_template(
         ctx.request,
@@ -135,6 +148,9 @@ async def _render_conversation(
 
     other_party = await mctx.svc._get_other_party(conversation, mctx.acting_as, mctx.acting_id)
 
+    bot_session = get_active_bot_session(mctx.user.id)
+    is_demo_bot = bot_session is not None and bot_session.conversation_id == conversation_id
+
     if partial or ctx.is_htmx:
         return await render_template(
             ctx.request,
@@ -147,6 +163,7 @@ async def _render_conversation(
             acting_id=mctx.acting_id,
             ws_token=mctx.ws_token,
             organization=mctx.organization,
+            is_demo_bot=is_demo_bot,
         )
 
     conversations = await mctx.svc.get_inbox(mctx.acting_as, mctx.acting_id)
@@ -163,6 +180,7 @@ async def _render_conversation(
         organization=mctx.organization,
         conversations=conversations,
         selected_conversation=conversation,
+        is_demo_bot=is_demo_bot,
     )
 
 

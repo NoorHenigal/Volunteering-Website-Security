@@ -18,6 +18,8 @@ from app.db.models import (
     Organization,
     ParticipantType,
     RefreshToken,
+    Report,
+    ReportTargetType,
     User,
     UserOrganizationRole,
 )
@@ -594,6 +596,71 @@ class MessageRepository(BaseRepository[Message]):
         return result.scalar_one_or_none()
 
 
+class ReportRepository(BaseRepository[Report]):
+    """Repository for Report model database operations."""
+
+    model = Report
+
+    async def get_pending(self, skip: int = 0, limit: int = 50) -> list[Report]:
+        """Get pending reports with all relationships loaded."""
+        return await self.find_many(
+            Report.status == "pending",
+            options=[
+                selectinload(Report.reporter),
+                selectinload(Report.target_user),
+                selectinload(Report.target_organization),
+                selectinload(Report.target_opportunity).selectinload(Opportunity.organization),
+                selectinload(Report.target_message).selectinload(Message.sender_user),
+                selectinload(Report.target_message).selectinload(Message.sender_organization),
+            ],
+            skip=skip,
+            limit=limit,
+        )
+
+    async def count_pending(self) -> int:
+        """Count pending reports."""
+        return await self.count(Report.status == "pending")
+
+    async def get_by_id_with_details(self, report_id: UUID) -> Report | None:
+        """Get report by ID with all relationships loaded."""
+        return await self.find_one(
+            Report.id == report_id,
+            options=[
+                selectinload(Report.reporter),
+                selectinload(Report.target_user),
+                selectinload(Report.target_organization),
+                selectinload(Report.target_opportunity).selectinload(Opportunity.organization),
+                selectinload(Report.target_message).selectinload(Message.sender_user),
+                selectinload(Report.target_message).selectinload(Message.sender_organization),
+                selectinload(Report.resolver),
+            ],
+        )
+
+    async def exists_for_target(
+        self,
+        reporter_id: UUID,
+        target_type: ReportTargetType,
+        target_id: UUID,
+    ) -> bool:
+        """Check if reporter already has a pending report for this target."""
+        target_field_map: dict[ReportTargetType, str] = {
+            "user": "target_user_id",
+            "organization": "target_organization_id",
+            "opportunity": "target_opportunity_id",
+            "message": "target_message_id",
+        }
+        field_name = target_field_map[target_type]
+        return (
+            await self.count(
+                Report.reporter_id == reporter_id,
+                Report.target_type == target_type,
+                getattr(Report, field_name) == target_id,
+                Report.status == "pending",
+            )
+            > 0
+        )
+
+
 __all__ = [
     "ApplicationRepository",
     "ConversationParticipantRepository",
@@ -603,6 +670,7 @@ __all__ = [
     "OpportunityRepository",
     "OrganizationRepository",
     "RefreshTokenRepository",
+    "ReportRepository",
     "UserOrganizationRoleRepository",
     "UserRepository",
 ]

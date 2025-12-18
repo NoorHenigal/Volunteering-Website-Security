@@ -103,6 +103,18 @@ async def _ensure_admin_account() -> None:
             log.info("✓ Admin account exists")
 
 
+def _init_faker() -> None:
+    """Pre-initialize Faker to avoid slow first request in demo mode."""
+    from app.core.config import settings  # noqa: PLC0415
+
+    if settings.demo_data:
+        log.info("  Initializing Faker for demo mode (this may take a few seconds)...")
+        from app.demo.bot import init_faker  # noqa: PLC0415
+
+        init_faker()
+        log.info("✓ Faker initialized for demo mode")
+
+
 async def run_preflight_checks() -> None:
     """Run all pre-flight checks before starting the application."""
     if os.getenv("SKIP_PREFLIGHT_CHECKS") == "1":
@@ -114,6 +126,7 @@ async def run_preflight_checks() -> None:
     _check_database_connection()
     _check_migrations()
     await _ensure_admin_account()
+    _init_faker()
 
     log.info("All startup checks passed\n")
 

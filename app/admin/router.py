@@ -7,6 +7,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 
 from app.admin.service import AdminService
 from app.core.context import ContextDep, render_template, require_system_admin
+from app.core.dependencies import ReportServiceDep
 from app.core.types import UI_RESPONSES
 from app.db.models import User
 
@@ -34,7 +35,7 @@ def _require_admin(ctx: ContextDep) -> User:
 
 
 @router.get("/dashboard", include_in_schema=False)
-async def admin_dashboard(ctx: ContextDep, admin_svc: AdminServiceDep) -> Response:
+async def admin_dashboard(ctx: ContextDep, admin_svc: AdminServiceDep, report_svc: ReportServiceDep) -> Response:
     """Show admin dashboard with platform statistics."""
     user = _require_admin(ctx)
 
@@ -42,12 +43,15 @@ async def admin_dashboard(ctx: ContextDep, admin_svc: AdminServiceDep) -> Respon
         return RedirectResponse(url="/auth/login", status_code=303)
 
     stats = await admin_svc.get_platform_stats()
+    pending_reports_count = await report_svc.count_pending()
 
     return await render_template(
         ctx.request,
         "pages/admin/dashboard.html",
         user=user,
         stats=stats,
+        pending_reports_count=pending_reports_count,
+        active_tab="overview",
     )
 
 
