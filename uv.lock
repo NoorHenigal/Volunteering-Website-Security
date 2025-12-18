@@ -355,19 +355,19 @@ wheels = [
 
 [[package]]
 name = "faker"
-version = "38.2.0"
+version = "39.0.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "tzdata" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/64/27/022d4dbd4c20567b4c294f79a133cc2f05240ea61e0d515ead18c995c249/faker-38.2.0.tar.gz", hash = "sha256:20672803db9c7cb97f9b56c18c54b915b6f1d8991f63d1d673642dc43f5ce7ab", size = 1941469, upload-time = "2025-11-19T16:37:31.892Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/30/b9/0897fb5888ddda099dc0f314a8a9afb5faa7e52eaf6865c00686dfb394db/faker-39.0.0.tar.gz", hash = "sha256:ddae46d3b27e01cea7894651d687b33bcbe19a45ef044042c721ceac6d3da0ff", size = 1941757, upload-time = "2025-12-17T19:19:04.762Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/17/93/00c94d45f55c336434a15f98d906387e87ce28f9918e4444829a8fda432d/faker-38.2.0-py3-none-any.whl", hash = "sha256:35fe4a0a79dee0dc4103a6083ee9224941e7d3594811a50e3969e547b0d2ee65", size = 1980505, upload-time = "2025-11-19T16:37:30.208Z" },
+    { url = "https://files.pythonhosted.org/packages/eb/5a/26cdb1b10a55ac6eb11a738cea14865fa753606c4897d7be0f5dc230df00/faker-39.0.0-py3-none-any.whl", hash = "sha256:c72f1fca8f1a24b8da10fcaa45739135a19772218ddd61b86b7ea1b8c790dce7", size = 1980775, upload-time = "2025-12-17T19:19:02.926Z" },
 ]
 
 [[package]]
 name = "fastapi"
-version = "0.124.4"
+version = "0.125.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "annotated-doc" },
@@ -375,9 +375,9 @@ dependencies = [
     { name = "starlette" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/cd/21/ade3ff6745a82ea8ad88552b4139d27941549e4f19125879f848ac8f3c3d/fastapi-0.124.4.tar.gz", hash = "sha256:0e9422e8d6b797515f33f500309f6e1c98ee4e85563ba0f2debb282df6343763", size = 378460, upload-time = "2025-12-12T15:00:43.891Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/17/71/2df15009fb4bdd522a069d2fbca6007c6c5487fce5cb965be00fc335f1d1/fastapi-0.125.0.tar.gz", hash = "sha256:16b532691a33e2c5dee1dac32feb31dc6eb41a3dd4ff29a95f9487cb21c054c0", size = 370550, upload-time = "2025-12-17T21:41:44.15Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/3e/57/aa70121b5008f44031be645a61a7c4abc24e0e888ad3fc8fda916f4d188e/fastapi-0.124.4-py3-none-any.whl", hash = "sha256:6d1e703698443ccb89e50abe4893f3c84d9d6689c0cf1ca4fad6d3c15cf69f15", size = 113281, upload-time = "2025-12-12T15:00:42.44Z" },
+    { url = "https://files.pythonhosted.org/packages/34/2f/ff2fcc98f500713368d8b650e1bbc4a0b3ebcdd3e050dcdaad5f5a13fd7e/fastapi-0.125.0-py3-none-any.whl", hash = "sha256:2570ec4f3aecf5cca8f0428aed2398b774fcdfee6c2116f86e80513f2f86a7a1", size = 112888, upload-time = "2025-12-17T21:41:41.286Z" },
 ]
 
 [[package]]
@@ -1183,11 +1183,11 @@ cryptography = [
 
 [[package]]
 name = "python-multipart"
-version = "0.0.20"
+version = "0.0.21"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/f3/87/f44d7c9f274c7ee665a29b885ec97089ec5dc034c7f3fafa03da9e39a09e/python_multipart-0.0.20.tar.gz", hash = "sha256:8dd0cab45b8e23064ae09147625994d090fa46f5b0d1e13af944c331a7fa9d13", size = 37158, upload-time = "2024-12-16T19:45:46.972Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/78/96/804520d0850c7db98e5ccb70282e29208723f0964e88ffd9d0da2f52ea09/python_multipart-0.0.21.tar.gz", hash = "sha256:7137ebd4d3bbf70ea1622998f902b97a29434a9e8dc40eb203bbcf7c2a2cba92", size = 37196, upload-time = "2025-12-17T09:24:22.446Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/45/58/38b5afbc1a800eeea951b9285d3912613f2603bdf897a4ab0f4bd7f405fc/python_multipart-0.0.20-py3-none-any.whl", hash = "sha256:8a62d3a8335e06589fe01f2a3e178cdcc632f3fbe0d492ad9ee0ec35aab1f104", size = 24546, upload-time = "2024-12-16T19:45:44.423Z" },
+    { url = "https://files.pythonhosted.org/packages/aa/76/03af049af4dcee5d27442f71b6924f01f3efb5d2bd34f23fcd563f2cc5f5/python_multipart-0.0.21-py3-none-any.whl", hash = "sha256:cf7a6713e01c87aa35387f4774e812c4361150938d20d232800f75ffcf266090", size = 24541, upload-time = "2025-12-17T09:24:21.153Z" },
 ]
 
 [[package]]
@@ -1391,7 +1391,7 @@ wheels = [
 
 [[package]]
 name = "schemathesis"
-version = "4.7.5"
+version = "4.7.6"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "click" },
@@ -1414,9 +1414,9 @@ dependencies = [
     { name = "typing-extensions" },
     { name = "werkzeug" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ad/f5/176898bc9a3c184827d4635f58be11cabc52031d39d7369226735a1d9415/schemathesis-4.7.5.tar.gz", hash = "sha256:0b858ba5c71c94f6cb662f72758379b01748b667d8b1cf76d3894b753bb773ae", size = 57967207, upload-time = "2025-12-10T19:23:13.41Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/9f/34/6cf539d9801577963d15af938436a4724892fa7a8492345663906e3ebf9b/schemathesis-4.7.6.tar.gz", hash = "sha256:448ad22b2639235309360676c6fd4ca480fb6f7959de44222956734f9c626c73", size = 57968225, upload-time = "2025-12-17T22:27:09.747Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/72/05/08ec2fa804506ec2df0f50878f718e8fa7af96a84a47694e9e626977b316/schemathesis-4.7.5-py3-none-any.whl", hash = "sha256:b09bbc562719eea5c90aa2f251b10115bd912c44ed928f1d9e013fe9629162f7", size = 418771, upload-time = "2025-12-10T19:23:11.113Z" },
+    { url = "https://files.pythonhosted.org/packages/e0/c4/a1abed8493b7d50b57e5a58cb5f33806b4f61ddb924e68d6f340459cc7ea/schemathesis-4.7.6-py3-none-any.whl", hash = "sha256:85c1df8754045f781a13755973c60bf885bc5b0eb306ee789c15f34a2dd4f51d", size = 419329, upload-time = "2025-12-17T22:27:06.964Z" },
 ]
 
 [[package]]
@@ -1653,8 +1653,8 @@ requires-dist = [
     { name = "colorama", specifier = ">=0.4.6" },
     { name = "djlint", marker = "extra == 'dev'", specifier = ">=1.36.4" },
     { name = "email-validator", specifier = ">=2.3.0" },
-    { name = "faker", specifier = ">=38.2.0" },
-    { name = "fastapi", specifier = ">=0.124.4" },
+    { name = "faker", specifier = ">=39.0.0" },
+    { name = "fastapi", specifier = ">=0.125.0" },
     { name = "granian", specifier = ">=2.6.0" },
     { name = "greenlet", specifier = ">=3.3.0" },
     { name = "httpx", marker = "extra == 'dev'", specifier = ">=0.28.1" },
@@ -1673,9 +1673,9 @@ requires-dist = [
     { name = "pytest-cases", marker = "extra == 'dev'", specifier = ">=3.9.1" },
     { name = "python-dotenv", specifier = ">=1.2.1" },
     { name = "python-jose", extras = ["cryptography"], specifier = ">=3.5.0" },
-    { name = "python-multipart", specifier = ">=0.0.20" },
+    { name = "python-multipart", specifier = ">=0.0.21" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.14.9" },
-    { name = "schemathesis", marker = "extra == 'dev'", specifier = ">=4.7.5" },
+    { name = "schemathesis", marker = "extra == 'dev'", specifier = ">=4.7.6" },
     { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0.45" },
     { name = "types-psutil", specifier = ">=7.1.3.20251211" },
     { name = "types-python-jose", marker = "extra == 'dev'", specifier = ">=3.5.0.20250531" },

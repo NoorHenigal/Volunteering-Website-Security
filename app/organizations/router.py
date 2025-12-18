@@ -13,7 +13,7 @@ from app.core.context import (
 )
 from app.core.context_types import form_view_context, list_view_context
 from app.core.dependencies import ImageServiceDep, OrganizationServiceDep
-from app.core.form_fields import ORGANIZATION_EDIT_FIELDS, ORGANIZATION_FIELDS, with_values
+from app.core.form_fields import ORGANIZATION_EDIT_FIELDS, with_values
 from app.core.htmx import handle_htmx_redirect
 from app.core.services.images import ImagePreset
 from app.db.models import Organization
@@ -71,7 +71,6 @@ async def list_organizations(
             items=items,
             page_title="Organizations",
             meta={"page": page, "total": total, "per_page": limit, "total_pages": (total + limit - 1) // limit},
-            create_url="/organizations/new",
             show_create=ctx.user is not None,
             empty_message="No organizations found",
         )
@@ -81,23 +80,6 @@ async def list_organizations(
         items=[OrganizationResponse.model_validate(org) for org in items],
         meta=PaginationMeta(total=total, page=page, per_page=limit),
     )
-
-
-@router.get("/organizations/new", responses=error_responses(auth=True))
-async def new_organization_form(ctx: ContextDep) -> Response:
-    """Show create organization form."""
-    user = ctx.require_authenticated()
-    context = form_view_context(
-        resource_type="organization",
-        form_action="/organizations",
-        back_url="/organizations",
-        form_title="Create New Organization",
-        page_title="Organizations",
-        form_fields=ORGANIZATION_FIELDS,
-        submit_text="Create Organization",
-        submit_color="blue",
-    )
-    return await render_template(ctx.request, "pages/shared.html", user=user, **context)
 
 
 @router.post(
@@ -125,15 +107,23 @@ async def create_organization(
         )
     except HTTPException as e:
         if ctx.is_ui:
+            # For HTMX overlay submissions, return inline error
+            if ctx.is_htmx:
+                return await ctx.error_response(e, template=None, block=None)
             return await ctx.error_response(e, template="pages/shared.html", view="form", block="form_content")
         raise
 
-    organization = await org_svc.create(
-        name=data.name,
-        username=data.username,
-        description=data.description,
-        admin_user_id=user.id,
-    )
+    try:
+        organization = await org_svc.create(
+            name=data.name,
+            username=data.username,
+            description=data.description,
+            admin_user_id=user.id,
+        )
+    except HTTPException as e:
+        if ctx.is_ui and ctx.is_htmx:
+            return await ctx.error_response(e, template=None, block=None)
+        raise
 
     if ctx.is_ui:
         return await handle_htmx_redirect(ctx, f"/{organization.username}")

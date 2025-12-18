@@ -45,7 +45,7 @@
                                             {% if item.status == 'pending' %}
                                                 <div class="flex justify-end">
                                                     {% from "components/buttons.html" import withdraw_button %}
-                                                    {{ withdraw_button(item.id, 'sm') }}
+                                                    {{ withdraw_button(item.id, 'sm', use_htmx=true) }}
                                                 </div>
                                             {% endif %}
                                         {% endcall %}

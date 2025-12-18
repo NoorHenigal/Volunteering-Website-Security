@@ -7,28 +7,47 @@
 {% from "components/user.html" import user_avatar, avatar_initials %}
 {% from "components/image_upload.html" import image_upload_modal %}
 {% from "components/messages.html" import start_conversation_button %}
+{% from "components/feedback.html" import fullscreen_overlay, overlay_actions %}
+{% from "components/forms.html" import form_label, form_input, form_textarea %}
 {% block title %}{{ organization.name }}{% endblock %}
 {% block content %}
-    <div class="animate-enter">
+    <div class="animate-enter"
+         x-data="{ createOppOpen: false, isSubmitting: false }">
         {% set banner_url = '/static/uploads/banners/' ~ organization.banner if organization.banner else None %}
         {% set admin_ctrl %}
             {% if is_admin %}
                 {% call image_upload_modal('banner-upload', 'Update Banner Image', '/organizations/' ~ organization.id ~ '/banner', aspect_ratio=16/9) %}
-                    <div x-data="imageUploader({ endpointUrl: '/organizations/{{ organization.id }}/banner', aspectRatio: 16/9 })">
-                        <button type="button"
-                                @click="triggerSelect()"
-                                class="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/20 rounded-full text-white text-sm font-bold transition-all shadow-lg">
-                            {{ icon('camera', 'sm') }}
-                            Edit Banner
-                        </button>
-                    </div>
+                    <button type="button"
+                            @click="triggerSelect()"
+                            class="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/20 rounded-full text-white text-sm font-bold transition-all shadow-lg">
+                        {{ icon('camera', 'sm') }}
+                        Edit Banner
+                    </button>
                 {% endcall %}
             {% endif %}
         {% endset %}
-        {% call page_hero(gradient_from='purple-900', banner_image=banner_url, admin_controls=admin_ctrl if is_admin else None) %}
+        {% call page_hero(gradient_from='violet-600', gradient_via='purple-800', gradient_to='slate-900', banner_image=banner_url, admin_controls=admin_ctrl if is_admin else None) %}
             <div class="flex flex-col md:flex-row items-end md:items-center gap-8">
-                <div class="group/logo relative">
-                    <div class="w-32 h-32 rounded-full bg-white shadow-2xl flex items-center justify-center flex-shrink-0 text-5xl font-extrabold text-brand-600 transform transition-all duration-500 overflow-hidden">
+                {% if is_admin %}
+                    {% call image_upload_modal('logo-upload', 'Update Logo', '/organizations/' ~ organization.id ~ '/logo', aspect_ratio=1) %}
+                        <div class="group/logo relative w-32 h-32 cursor-pointer"
+                             @click="triggerSelect()">
+                            <div class="w-full h-full rounded-full bg-white shadow-2xl flex items-center justify-center text-5xl font-extrabold text-violet-600 transform transition-all duration-500 overflow-hidden">
+                                {% if organization.logo %}
+                                    <img src="/static/uploads/logos/{{ organization.logo }}"
+                                         alt="{{ organization.name }}"
+                                         class="w-full h-full object-cover">
+                                {% else %}
+                                    {{ organization.name[:1] }}
+                                {% endif %}
+                            </div>
+                            <div class="absolute inset-0 bg-black/50 rounded-full opacity-0 group-hover/logo:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm border-2 border-white/20">
+                                <span class="text-white drop-shadow-md">{{ icon('camera', 'xl') }}</span>
+                            </div>
+                        </div>
+                    {% endcall %}
+                {% else %}
+                    <div class="w-32 h-32 rounded-full bg-white shadow-2xl flex items-center justify-center flex-shrink-0 text-5xl font-extrabold text-violet-600 transform transition-all duration-500 overflow-hidden">
                         {% if organization.logo %}
                             <img src="/static/uploads/logos/{{ organization.logo }}"
                                  alt="{{ organization.name }}"
@@ -37,17 +56,7 @@
                             {{ organization.name[:1] }}
                         {% endif %}
                     </div>
-                    {% if is_admin %}
-                        {% call image_upload_modal('logo-upload', 'Update Logo', '/organizations/' ~ organization.id ~ '/logo', aspect_ratio=1) %}
-                            <div x-data="imageUploader({ endpointUrl: '/organizations/{{ organization.id }}/logo', aspectRatio: 1 })">
-                                <div @click="triggerSelect()"
-                                     class="absolute inset-0 bg-black/50 rounded-full opacity-0 group-hover/logo:opacity-100 transition-opacity flex items-center justify-center cursor-pointer backdrop-blur-sm border-2 border-white/20">
-                                    <span class="text-white drop-shadow-md">{{ icon('camera', 'xl') }}</span>
-                                </div>
-                            </div>
-                        {% endcall %}
-                    {% endif %}
-                </div>
+                {% endif %}
                 <div class="flex-1 text-white space-y-2">
                     <h1 class="text-4xl md:text-5xl font-black tracking-tight mb-2 text-shadow-lg">{{ organization.name }}</h1>
                     <div class="flex flex-wrap gap-4 text-slate-300 font-bold text-lg items-center">
@@ -137,11 +146,12 @@
                         Active Opportunities
                     </h2>
                     {% if is_admin %}
-                        <a href="/opportunities/new"
-                           class="text-sm font-bold text-brand-600 hover:text-brand-700 flex items-center gap-1 bg-brand-50 px-4 py-2 rounded-full hover:bg-brand-100 transition-colors">
+                        <button type="button"
+                                @click="createOppOpen = true"
+                                class="text-sm font-bold text-brand-600 hover:text-brand-700 flex items-center gap-1 bg-brand-50 px-4 py-2 rounded-full hover:bg-brand-100 transition-colors">
                             {{ icon('plus', 'sm') }}
                             Create New
-                        </a>
+                        </button>
                     {% endif %}
                 </div>
                 {% if organization.opportunities %}
@@ -184,15 +194,43 @@
                             opportunities yet.
                         </p>
                         {% if is_admin %}
-                            <a href="/opportunities/new"
-                               class="inline-flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white font-bold py-3 px-8 rounded-full shadow-lg hover:shadow-brand-500/30 transition-all transform hover:-translate-y-1">
+                            <button type="button"
+                                    @click="createOppOpen = true"
+                                    class="inline-flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white font-bold py-3 px-8 rounded-full shadow-lg hover:shadow-brand-500/30 transition-all transform hover:-translate-y-1">
                                 {{ icon('plus', 'md') }}
                                 Post First Opportunity
-                            </a>
+                            </button>
                         {% endif %}
                     </div>
                 {% endif %}
             </div>
         </div>
+        {# Opportunity Creation Overlay #}
+        {% if is_admin %}
+            {% call fullscreen_overlay('createOppOpen', 'Post New Opportunity', 'Create a volunteering opportunity for ' ~ organization.name ~ '.', 'brand-600', 'indigo-600') %}
+                <form hx-post="/opportunities"
+                      hx-ext="response-targets"
+                      hx-target-error="#org-opp-create-error"
+                      @htmx:before-request="isSubmitting = true"
+                      @htmx:after-request="isSubmitting = false"
+                      class="space-y-6">
+                    <div id="org-opp-create-error"></div>
+                    <input type="hidden" name="organization_id" value="{{ organization.id }}">
+                    <div>
+                        {{ form_label('Title', 'title', True) }}
+                        {{ form_input('title', 'text', 'e.g., Community Garden Helper', True) }}
+                    </div>
+                    <div>
+                        {{ form_label('Description', 'description', True) }}
+                        {{ form_textarea('description', 5, 'Describe the volunteering opportunity...', True) }}
+                    </div>
+                    <div>
+                        {{ form_label('Location (Optional)', 'location', False) }}
+                        {{ form_input('location', 'text', 'e.g., Central Station', False) }}
+                    </div>
+                    {{ overlay_actions('createOppOpen', 'Create Opportunity', 'Cancel', 'brand', 'isSubmitting') }}
+                </form>
+            {% endcall %}
+        {% endif %}
     </div>
 {% endblock %}

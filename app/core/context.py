@@ -1,6 +1,7 @@
 """Request context and response helpers."""
 
 import inspect
+import logging
 from collections.abc import Awaitable, Callable
 from functools import wraps
 from typing import TYPE_CHECKING, Annotated, Protocol, cast, runtime_checkable
@@ -9,19 +10,44 @@ from uuid import UUID
 from fastapi import Depends, Header, HTTPException, Request, Response, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, RedirectResponse
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, SecretBytes, SecretStr, ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import serialize_validation_errors
 from app.core.htmx import htmx_redirect, is_htmx, render_block
 from app.core.security import get_user_from_cookie, get_user_from_token
+from app.core.templates import templates
 from app.db.session import get_db
+
+log = logging.getLogger(__name__)
+
+REDACTED = "**********"
+SECRET_TYPES = (SecretStr, SecretBytes)
+
+
+def _get_secret_field_names(schema: type[BaseModel]) -> set[str]:
+    """Extract field names that are typed as SecretStr or SecretBytes."""
+    secret_fields: set[str] = set()
+    for field_name, field_info in schema.model_fields.items():
+        annotation = field_info.annotation
+        # Handle Optional[SecretStr] and similar
+        origin = getattr(annotation, "__origin__", None)
+        if origin is not None:
+            args = getattr(annotation, "__args__", ())
+            if any(isinstance(arg, type) and issubclass(arg, SECRET_TYPES) for arg in args if isinstance(arg, type)):
+                secret_fields.add(field_name)
+        elif isinstance(annotation, type) and issubclass(annotation, SECRET_TYPES):
+            secret_fields.add(field_name)
+    return secret_fields
+
+
+def _redact_dict(data: dict[str, object], secret_keys: set[str]) -> dict[str, object]:
+    """Return a copy of data with secret keys redacted."""
+    return {k: REDACTED if k in secret_keys else v for k, v in data.items()}
+
 
 if TYPE_CHECKING:
     from app.db.models import User
-
-
-from app.core.templates import templates
 
 
 async def render_template(
@@ -226,6 +252,10 @@ class RequestContext:
                     user=self.user,
                     **template_ctx,
                 )
+            # For HTMX requests without template, return inline error HTML
+            if self.is_htmx:
+                error_html = f'<div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm font-medium">{error_msg}</div>'
+                return Response(content=error_html, media_type="text/html", status_code=status_code)
             return RedirectResponse(url="/auth/login", status_code=303)
 
         return JSONResponse(
@@ -278,17 +308,49 @@ class RequestContext:
                 form = getattr(self.request.state, "_cached_form", None)
                 if form is None:
                     form = await self.request.form()
+
+                # Detect secret fields from schema for redaction
+                secret_fields = _get_secret_field_names(schema)
+                # Map form field names to schema field names for redaction
+                form_name_to_schema = {v: k for k, v in form_fields.items()}
+                secret_form_keys = {fn for fn, sf in form_name_to_schema.items() if sf in secret_fields}
+                secret_form_keys.add("csrf_token")  # Always redact CSRF token
+
+                # Log all form fields when in debug mode (with secrets redacted)
+                if log.isEnabledFor(logging.DEBUG):
+                    log.debug("[MULTIPART] Parsing form for schema: %s", schema.__name__)
+                    log.debug("[MULTIPART] Expected fields: %s", form_fields)
+                    log.debug("[MULTIPART] Received form data keys: %s", list(form.keys()))
+                    for key, value in form.items():
+                        if key in secret_form_keys:
+                            log.debug("[MULTIPART] Field '%s': %s", key, REDACTED)
+                        else:
+                            value_preview = str(value)[:100] if value else "[EMPTY]"
+                            log.debug("[MULTIPART] Field '%s': %s", key, value_preview)
+
                 form_data: dict[str, object] = {}
                 for field, form_name in form_fields.items():
                     value = form.get(form_name)
                     if value is not None:
-                        str_value = str(value)
+                        str_value = str(value).strip()
+                        # Convert empty strings to None for optional fields
+                        if str_value == "":
+                            field_info = schema.model_fields.get(field)
+                            if field_info and field_info.is_required() is False:
+                                log.debug("[MULTIPART] Skipping optional empty field: %s", form_name)
+                                continue
                         # Coerce UUID fields for strict models
                         field_info = schema.model_fields.get(field)
                         if field_info and field_info.annotation is UUID:
                             form_data[field] = UUID(str_value)
                         else:
                             form_data[field] = str_value
+
+                if log.isEnabledFor(logging.DEBUG):
+                    log.debug(
+                        "[MULTIPART] Final form_data for schema validation: %s", _redact_dict(form_data, secret_fields)
+                    )
+
                 return schema(**form_data)
         except ValidationError as e:
             raise RequestValidationError(e.errors()) from e

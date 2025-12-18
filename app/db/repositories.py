@@ -276,10 +276,10 @@ class ApplicationRepository(BaseRepository[Application]):
         return await self.find_many(Application.volunteer_id == volunteer_id)
 
     async def get_by_volunteer_with_opportunity(self, volunteer_id: UUID) -> list[Application]:
-        """Get all applications for a volunteer with opportunity eagerly loaded."""
+        """Get all applications for a volunteer with opportunity and organization eagerly loaded."""
         return await self.find_many(
             Application.volunteer_id == volunteer_id,
-            options=[selectinload(Application.opportunity)],
+            options=[selectinload(Application.opportunity).selectinload(Opportunity.organization)],
         )
 
     async def get_by_opportunity_with_volunteer(self, opportunity_id: UUID) -> list[Application]:
