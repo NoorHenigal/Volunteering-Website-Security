@@ -25,6 +25,7 @@ class TokenPayload(StrictModel):
     role: str  # Can be user role or "organization"
     exp: int
     account_type: AccountType = "volunteer"
+    rpr: bool = False  # requires_password_reset flag
 
     @property
     def entity_id(self) -> UUID:

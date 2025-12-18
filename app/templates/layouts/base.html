@@ -22,7 +22,11 @@
                 src="https://cdn.jsdelivr.net/npm/alpinejs@3.15.3/dist/cdn.min.js"
                 integrity="sha384-4E5IZutrbnm0GBnBqEA2tgLsTg6ublElJlpE9qQQNL0WrY9g4GPahFyJYwnDet2+"
                 crossorigin="anonymous"></script>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js"
+                integrity="sha384-jb8JQMbMoBUzgWatfe6COACi2ljcDdZQ2OxczGA3bGNeWe+6DChMTBJemed7ZnvJ"
+                crossorigin="anonymous"></script>
         <script src="/static/js/messaging.js"></script>
+        <script src="/static/js/image-upload.js"></script>
         <script>
             // Re-initialize Alpine components after HTMX swaps
             document.addEventListener("htmx:afterSwap", (event) => {
@@ -178,16 +182,16 @@
                                         Opportunities
                                         <span class="absolute -bottom-1 left-0 w-0 h-0.5 bg-brand-500 transition-all duration-300 group-hover:w-full"></span>
                                     </a>
-                                <a href="/organizations"
+                                    <a href="/organizations"
                                        class="text-sm font-medium text-slate-600 hover:text-brand-600 transition-colors relative group">
                                         Organizations
                                         <span class="absolute -bottom-1 left-0 w-0 h-0.5 bg-brand-500 transition-all duration-300 group-hover:w-full"></span>
-                                </a>
-                                <a href="/auth/event-statistics"
-                                   class="text-sm font-medium text-slate-600 hover:text-brand-600 transition-colors relative group">
-                                    Event Stats
-                                    <span class="absolute -bottom-1 left-0 w-0 h-0.5 bg-brand-500 transition-all duration-300 group-hover:w-full"></span>
-                                </a>
+                                    </a>
+                                    <a href="/auth/event-statistics"
+                                       class="text-sm font-medium text-slate-600 hover:text-brand-600 transition-colors relative group">
+                                        Event Stats
+                                        <span class="absolute -bottom-1 left-0 w-0 h-0.5 bg-brand-500 transition-all duration-300 group-hover:w-full"></span>
+                                    </a>
                                     <div class="pl-4 border-l border-slate-200">{{ user_dropdown(user) }}</div>
                                 {% else %}
                                     <div class="flex items-center gap-4">

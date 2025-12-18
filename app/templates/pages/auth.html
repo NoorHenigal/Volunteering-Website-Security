@@ -6,6 +6,8 @@
 {% block title %}
     {% if view == 'register' %}
         Create Account
+    {% elif view == 'admin_setup' %}
+        Complete Account Setup
     {% else %}
         Sign In
     {% endif %}
@@ -25,6 +27,22 @@
 
         .animate-fade {
             animation: fade-in 0.8s ease-out forwards;
+        }
+
+        @keyframes slide-up-fade {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .animate-slide-up {
+            animation: slide-up-fade 0.5s ease-out forwards;
         }
     </style>
 {% endblock %}
@@ -48,7 +66,78 @@
                         </div>
                         <span class="font-bold text-xl tracking-tight text-slate-900 group-hover:text-brand-600 transition-colors">Volunteering</span>
                     </a>
-                    {% if view == 'register' %}
+                    {% if view == 'admin_setup' %}
+                        {# Admin Setup view - shown when admin needs to reset credentials #}
+                        <div class="animate-slide-up">
+                            <div class="mb-6">
+                                <div class="flex items-center gap-3 mb-4">
+                                    <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center">
+                                        <span class="text-white">{{ icon('fingerprint', 'lg') }}</span>
+                                    </div>
+                                    <div>
+                                        <h1 class="text-2xl font-bold text-slate-900 tracking-tight">Complete Your Setup</h1>
+                                        <p class="text-sm text-slate-500">Update your credentials to continue</p>
+                                    </div>
+                                </div>
+                                <div class="p-4 rounded-xl bg-amber-50 border border-amber-200">
+                                    <div class="flex gap-3">
+                                        <span class="text-amber-600 flex-shrink-0">{{ icon('warning', 'md') }}</span>
+                                        <div>
+                                            <p class="text-sm font-medium text-amber-800">Security Notice</p>
+                                            <p class="text-sm text-amber-700 mt-1">
+                                                You must update your credentials before accessing the admin dashboard.
+                                                Choose a strong password (16-64 characters).
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {{ alert_container() }}
+                            {% call htmx_form('/auth/admin-setup', '#main-content', 'innerHTML') %}
+                                <div class="space-y-4">
+                                    <div class="grid grid-cols-2 gap-3">
+                                        <div>
+                                            {{ form_label('First Name', 'first_name', true) }}
+                                            {{ form_input('first_name', 'text', 'John', true, '', id='first_name', autocomplete='given-name') }}
+                                        </div>
+                                        <div>
+                                            {{ form_label('Last Name', 'last_name', true) }}
+                                            {{ form_input('last_name', 'text', 'Doe', true, '', id='last_name', autocomplete='family-name') }}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        {{ form_label('Username', 'username', true) }}
+                                        {{ form_input('username', 'text', 'admin_user', true, '', id='username', autocomplete='nickname', autocapitalize='none', spellcheck='false') }}
+                                        <p class="mt-1 text-xs text-slate-500 ml-1">Letters, numbers, underscores, and hyphens only</p>
+                                    </div>
+                                    <div>
+                                        {{ form_label('Email Address', 'email', true) }}
+                                        {{ form_input('email', 'email', 'admin@example.com', true, '', id='email', autocomplete='username', inputmode='email', autocapitalize='none', spellcheck='false') }}
+                                    </div>
+                                    <div>
+                                        {{ form_label('New Password', 'password', true) }}
+                                        {{ form_input('password', 'password', '', true, '', id='admin_password', autocomplete='new-password') }}
+                                        <p id="admin-password-help" class="mt-1 text-xs text-slate-500 ml-1">
+                                            16–64 characters. ASCII only. Spaces allowed, but not at the start or end.
+                                        </p>
+                                        <p id="admin-password-error"
+                                           class="mt-1 text-xs text-red-600 ml-1 hidden"></p>
+                                    </div>
+                                    <div>
+                                        {{ form_label('Confirm Password', 'confirm_password', true) }}
+                                        {{ form_input('confirm_password', 'password', '', true, '', id='confirm_password', autocomplete='new-password') }}
+                                    </div>
+                                    <div class="pt-2">
+                                        <button type="submit"
+                                                class="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold rounded-xl hover:from-purple-700 hover:to-indigo-700 focus:ring-2 focus:ring-purple-500/50 focus:ring-offset-2 transition-all shadow-lg shadow-purple-500/25">
+                                            {{ icon('check-circle', 'md') }}
+                                            Complete Setup
+                                        </button>
+                                    </div>
+                                </div>
+                            {% endcall %}
+                        </div>
+                    {% elif view == 'register' %}
                         {# Register view #}
                         <div class="mb-6">
                             <h1 class="text-2xl font-bold text-slate-900 tracking-tight">Create your account</h1>
@@ -314,6 +403,10 @@
                     // Organization registration
                     if (form.querySelector("#org_password") && form.querySelector("#org-password-error")) {
                         wirePasswordValidation(form, "org_password", "org-password-error");
+                    }
+                    // Admin setup
+                    if (form.querySelector("#admin_password") && form.querySelector("#admin-password-error")) {
+                        wirePasswordValidation(form, "admin_password", "admin-password-error");
                     }
                 });
             }

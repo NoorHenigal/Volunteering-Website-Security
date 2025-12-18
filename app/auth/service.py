@@ -56,15 +56,23 @@ def _secret_to_str(value: SecretStr | str) -> str:
     return value
 
 
-def create_jwt_token(entity_id: UUID, role_or_type: str, account_type: AccountType = "volunteer") -> str:
+def create_jwt_token(
+    entity_id: UUID,
+    role_or_type: str,
+    account_type: AccountType = "volunteer",
+    *,
+    requires_password_reset: bool = False,
+) -> str:
     """Create a JWT access token."""
     expire = datetime.now(UTC) + settings.access_token_expiry
-    to_encode = {
+    to_encode: dict[str, object] = {
         "sub": str(entity_id),
         "role": role_or_type,
         "account_type": account_type,
         "exp": int(expire.timestamp()),
     }
+    if requires_password_reset:
+        to_encode["rpr"] = True
     encoded: str = jwt.encode(
         to_encode,
         settings.jwt_secret_key.get_secret_value(),
@@ -163,7 +171,9 @@ async def authenticate_user(email: str, password: SecretStr | str, db: AsyncSess
 
 async def issue_user_tokens(user: User, device: str | None, db: AsyncSession) -> TokenResponse:
     """Create access and refresh tokens for a user."""
-    access_token = create_jwt_token(user.id, user.role, "volunteer")
+    access_token = create_jwt_token(
+        user.id, user.role, "volunteer", requires_password_reset=user.requires_password_reset
+    )
 
     # Generate and store refresh token
     refresh_token = generate_refresh_token()
@@ -236,7 +246,9 @@ async def authenticate_organization(email: str, password: SecretStr | str, db: A
 
 async def issue_org_tokens(user: User) -> TokenResponse:
     """Create access token for an organization."""
-    access_token = create_jwt_token(user.id, "organization", "organization")
+    access_token = create_jwt_token(
+        user.id, "organization", "organization", requires_password_reset=user.requires_password_reset
+    )
     return TokenResponse(access_token=access_token, account_type="organization")
 
 
@@ -258,7 +270,9 @@ async def login_entity(
 async def refresh_tokens(refresh_cookie: str, db: AsyncSession) -> TokenResponse:
     """Create new access token from refresh token."""
     user, _db_token = await validate_refresh_token(refresh_cookie, db)
-    access_token = create_jwt_token(user.id, user.role, "volunteer")
+    access_token = create_jwt_token(
+        user.id, user.role, "volunteer", requires_password_reset=user.requires_password_reset
+    )
     return TokenResponse(access_token=access_token, account_type="volunteer")
 
 

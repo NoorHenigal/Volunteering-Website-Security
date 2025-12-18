@@ -132,6 +132,7 @@ class User(Base, FullModelMixin):
     show_email: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="0", default=False)
     show_organizations: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="1", default=True)
     searchable: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="1", default=True)
+    requires_password_reset: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="0", default=False)
 
     __table_args__ = (
         CheckConstraint("role IN ('volunteer', 'organization', 'system_admin')", name="ck_user_role"),
@@ -209,6 +210,16 @@ class User(Base, FullModelMixin):
         if first and last:
             return (first + last).upper()
         return (first or last or self.username[:2]).upper()
+
+    @property
+    def role_display(self) -> str:
+        """Return a human-readable display name for the user's role."""
+        role_map = {
+            "volunteer": "Volunteer",
+            "organization": "Organization",
+            "system_admin": "System Admin",
+        }
+        return role_map.get(self.role, self.role.replace("_", " ").title())
 
 
 class RefreshToken(Base, FullModelMixin):

@@ -1,8 +1,8 @@
 """Initial Migration.
 
-Revision ID: db28030060a7
+Revision ID: 63bdb6cf715f
 Revises:
-Create Date: 2025-12-16 15:41:35.742463+00:00
+Create Date: 2025-12-18 21:18:07.710809+00:00
 """
 
 from collections.abc import Sequence
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 from alembic import op
 
 # Revision identifiers, used by Alembic.
-revision: str = "db28030060a7"
+revision: str = "63bdb6cf715f"
 down_revision: str | None = None
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
@@ -105,6 +105,7 @@ def upgrade() -> None:
         sa.Column("show_email", sa.Boolean(), server_default="0", nullable=False),
         sa.Column("show_organizations", sa.Boolean(), server_default="1", nullable=False),
         sa.Column("searchable", sa.Boolean(), server_default="1", nullable=False),
+        sa.Column("requires_password_reset", sa.Boolean(), server_default="0", nullable=False),
         sa.Column("id", sa.UUID(), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),

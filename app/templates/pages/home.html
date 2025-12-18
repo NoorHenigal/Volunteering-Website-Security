@@ -6,7 +6,8 @@
     <div class="py-6 md:py-12 animate-enter">
         {% if user %}
             <div class="relative bg-gradient-to-br from-brand-600 to-indigo-800 rounded-3xl overflow-hidden shadow-premium mb-12 p-8 md:p-12 md:min-h-[300px] flex items-center">
-                <div class="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 brightness-100 contrast-150 mix-blend-overlay">
+                <div class="absolute inset-0 opacity-20 mix-blend-overlay"
+                     style="background: radial-gradient(at 20% 30%, rgba(139, 92, 246, 0.15) 0px, transparent 50%), radial-gradient(at 80% 70%, rgba(99, 102, 241, 0.1) 0px, transparent 50%), radial-gradient(at 40% 80%, rgba(168, 85, 247, 0.08) 0px, transparent 50%)">
                 </div>
                 <div class="absolute -top-24 -right-24 w-96 h-96 bg-brand-400 rounded-full mix-blend-multiply filter blur-3xl opacity-50 animate-blob">
                 </div>
@@ -18,7 +19,7 @@
                         user.display_name }}!
                     </h2>
                     <p class="text-brand-100 text-lg md:text-xl font-medium mb-8 max-w-2xl">
-                        Ready to make a difference today? You are logged in as a <span class="text-white underline decoration-brand-300 underline-offset-4">{{ user.role|title }}</span>.
+                        Ready to make a difference today? You are logged in as a <span class="text-white underline decoration-brand-300 underline-offset-4">{{ user.role_display }}</span>.
                     </p>
                     <div class="flex flex-wrap gap-4">
                         <a href="/{{ user.username }}"

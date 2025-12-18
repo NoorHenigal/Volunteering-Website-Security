@@ -63,7 +63,7 @@ async def seed_demo_data(session: AsyncSession) -> DemoSeedRun:
     await session.flush()
 
     try:
-        fake = Faker()
+        fake = Faker("en_US")
         Faker.seed(FAKER_SEED)
         users = await _create_users(session, fake, run)
 

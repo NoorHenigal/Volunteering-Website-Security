@@ -1,3 +1,15 @@
+/**
+ * Messaging WebSocket Component
+ * Provides real-time messaging functionality for conversations between
+ * users and organizations with typing indicators and message delivery.
+ */
+
+/**
+ * Alpine.js component for managing WebSocket connections in message conversations.
+ * Handles real-time message sending/receiving, typing indicators, and connection management.
+ *
+ * @returns {Object} Alpine.js component data object
+ */
 function messageSocket() {
     return {
         ws: null,

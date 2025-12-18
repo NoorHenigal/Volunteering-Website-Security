@@ -65,15 +65,7 @@
                 <span class="text-xs {% if is_own %}text-brand-200{% else %}text-slate-400{% endif %} tabular-nums">
                     {{ message.created_at.strftime("%I:%M %p") }}
                 </span>
-                {% if is_own %}
-                    <svg class="w-4 h-4 text-brand-200"
-                         fill="none"
-                         viewBox="0 0 24 24"
-                         stroke="currentColor"
-                         stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-                    </svg>
-                {% endif %}
+                {% if is_own %}{{ icon('check', 'sm', 'text-brand-200') }}{% endif %}
             </div>
         </div>
     </div>
