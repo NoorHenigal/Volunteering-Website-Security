@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.gzip import GZipMiddleware
@@ -22,6 +22,7 @@ from app.auth.router import router as auth_router
 from app.core.config import settings
 from app.core.context import ContextDep, render_template
 from app.core.exceptions import http_exception_handler, validation_exception_handler
+from app.core.htmx import render_error_page
 from app.core.lifecycle import StartupCheckError, cleanup_shutdown_task, manage_test_shutdown, run_preflight_checks
 from app.demo.router import router as demo_router
 from app.messaging.router import router as messaging_router
@@ -114,7 +115,7 @@ async def add_security_headers(request: Request, call_next: Callable[[Request], 
 
             sent_token = header_token or form_token
             if not cookie_token or not sent_token or sent_token != cookie_token:
-                return Response(status_code=403, content="Forbidden", media_type="text/plain")
+                return Response(status_code=403, content="Forbidden", media_type="text/html")
 
         if not cookie_token:
             request.state.csrf_token = secrets.token_urlsafe(32)
@@ -139,13 +140,10 @@ async def add_security_headers(request: Request, call_next: Callable[[Request], 
 
 
 @app.exception_handler(Exception)
-async def generic_exception_handler(_request: Request, _exc: Exception) -> JSONResponse:
+async def generic_exception_handler(request: Request, _exc: Exception) -> Response:
     """Handle unhandled exceptions - log but don't leak stack traces."""
     log.exception("Unhandled exception")
-    return JSONResponse(
-        status_code=500,
-        content={"detail": "Internal server error", "status_code": 500, "error_code": None},
-    )
+    return await render_error_page(request, 500, "Error 500", "Internal server error")
 
 
 # Mount static files

@@ -5,6 +5,7 @@ from typing import ClassVar
 import pytest
 from fastapi import status
 from pydantic import SecretStr, ValidationError
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.schemas import VolunteerRegisterSchema
 from app.opportunities.schemas import OpportunityCreate
@@ -19,13 +20,12 @@ TEST_PWD = "TestPass123!TestPwd"
 class TestNullByteRejection:
     """Test that null bytes are properly rejected at all levels."""
 
-    # Test data with null bytes in various positions
     NULL_BYTE_STRINGS: ClassVar[list[str]] = [
-        "test\x00",  # Null byte at end
-        "\x00test",  # Null byte at start
-        "te\x00st",  # Null byte in middle
-        "test\x00\x00",  # Multiple null bytes
-        "\x00",  # Only null byte
+        "test\x00",
+        "\x00test",
+        "te\x00st",
+        "test\x00\x00",
+        "\x00",
     ]
 
     @pytest.mark.anyio
@@ -46,7 +46,7 @@ class TestNullByteRejection:
             assert response.status_code in [
                 status.HTTP_422_UNPROCESSABLE_CONTENT,
                 status.HTTP_400_BAD_REQUEST,
-            ], f"Null byte in email was not rejected: {null_string!r}"
+            ], f"Null byte not rejected: {null_string!r}"
 
     @pytest.mark.anyio
     async def test_registration_rejects_null_bytes_in_password(self, api: APIHelper) -> None:
@@ -65,7 +65,7 @@ class TestNullByteRejection:
             assert response.status_code in [
                 status.HTTP_422_UNPROCESSABLE_CONTENT,
                 status.HTTP_400_BAD_REQUEST,
-            ], f"Null byte in password was not rejected: {null_string!r}"
+            ], f"Null byte not rejected: {null_string!r}"
 
     @pytest.mark.anyio
     async def test_registration_rejects_null_bytes_in_names(self, api: APIHelper) -> None:
@@ -85,7 +85,7 @@ class TestNullByteRejection:
             assert response.status_code in [
                 status.HTTP_422_UNPROCESSABLE_CONTENT,
                 status.HTTP_400_BAD_REQUEST,
-            ], f"Null byte in first_name was not rejected: {null_string!r}"
+            ], f"Null byte not rejected: {null_string!r}"
 
             # Test last_name
             response = await api.client.post(
@@ -101,7 +101,7 @@ class TestNullByteRejection:
             assert response.status_code in [
                 status.HTTP_422_UNPROCESSABLE_CONTENT,
                 status.HTTP_400_BAD_REQUEST,
-            ], f"Null byte in last_name was not rejected: {null_string!r}"
+            ], f"Null byte not rejected: {null_string!r}"
 
     @pytest.mark.anyio
     async def test_registration_rejects_null_bytes_in_username(self, api: APIHelper) -> None:
@@ -120,80 +120,97 @@ class TestNullByteRejection:
             assert response.status_code in [
                 status.HTTP_422_UNPROCESSABLE_CONTENT,
                 status.HTTP_400_BAD_REQUEST,
-            ], f"Null byte in username was not rejected: {null_string!r}"
+            ], f"Null byte not rejected: {null_string!r}"
 
     @pytest.mark.anyio
     async def test_organization_creation_rejects_null_bytes(self, api: APIHelper, flows: FlowHelper) -> None:
         """Test that organization creation rejects null bytes."""
         org_user = await flows.create_user("volunteer")
+        csrf_token = api.client.cookies.get("csrf_token", "")
 
         for null_string in self.NULL_BYTE_STRINGS:
             # Test name field
             response = await api.client.post(
                 "/organizations",
-                json={
+                data={
                     "name": f"TestOrg{null_string}",
                     "username": "testorg",
                     "description": "Test description",
+                    "csrf_token": csrf_token,
                 },
-                headers=org_user.auth_header,
+                headers={**org_user.auth_header, "Accept": "text/html"},
             )
             assert response.status_code in [
                 status.HTTP_422_UNPROCESSABLE_CONTENT,
                 status.HTTP_400_BAD_REQUEST,
-            ], f"Null byte in organization name was not rejected: {null_string!r}"
+            ], f"Null byte not rejected: {null_string!r}"
 
             # Test description field
             response = await api.client.post(
                 "/organizations",
-                json={
+                data={
                     "name": "TestOrg",
                     "username": "testorg",
                     "description": f"Test{null_string}",
+                    "csrf_token": csrf_token,
                 },
-                headers=org_user.auth_header,
+                headers={**org_user.auth_header, "Accept": "text/html"},
             )
             assert response.status_code in [
                 status.HTTP_422_UNPROCESSABLE_CONTENT,
                 status.HTTP_400_BAD_REQUEST,
-            ], f"Null byte in organization description was not rejected: {null_string!r}"
+            ], f"Null byte not rejected: {null_string!r}"
 
     @pytest.mark.anyio
-    async def test_opportunity_creation_rejects_null_bytes(self, api: APIHelper, flows: FlowHelper) -> None:
+    async def test_opportunity_creation_rejects_null_bytes(
+        self, api: APIHelper, flows: FlowHelper, test_db: AsyncSession
+    ) -> None:
         """Test that opportunity creation rejects null bytes."""
+        from sqlalchemy import select
+
+        from app.db.models import Organization
+
         org_user = await flows.create_user("volunteer")
         org = await flows.create_org(org_user)
+        csrf_token = api.client.cookies.get("csrf_token", "")
+
+        # Get actual org ID from database
+        result = await test_db.execute(select(Organization).where(Organization.username == org["username"]))
+        db_org = result.scalar_one()
+        org_id = str(db_org.id)
 
         for null_string in self.NULL_BYTE_STRINGS:
             # Test title field
             response = await api.client.post(
                 "/opportunities",
-                json={
+                data={
                     "title": f"TestOpp{null_string}",
                     "description": "Test description",
-                    "organization_id": org["id"],
+                    "organization_id": org_id,
+                    "csrf_token": csrf_token,
                 },
-                headers=org_user.auth_header,
+                headers={**org_user.auth_header, "Accept": "text/html"},
             )
             assert response.status_code in [
                 status.HTTP_422_UNPROCESSABLE_CONTENT,
                 status.HTTP_400_BAD_REQUEST,
-            ], f"Null byte in opportunity title was not rejected: {null_string!r}"
+            ], f"Null byte not rejected: {null_string!r}"
 
             # Test description field
             response = await api.client.post(
                 "/opportunities",
-                json={
+                data={
                     "title": "TestOpp",
                     "description": f"Test{null_string}",
-                    "organization_id": org["id"],
+                    "organization_id": org_id,
+                    "csrf_token": csrf_token,
                 },
-                headers=org_user.auth_header,
+                headers={**org_user.auth_header, "Accept": "text/html"},
             )
             assert response.status_code in [
                 status.HTTP_422_UNPROCESSABLE_CONTENT,
                 status.HTTP_400_BAD_REQUEST,
-            ], f"Null byte in opportunity description was not rejected: {null_string!r}"
+            ], f"Null byte not rejected: {null_string!r}"
 
     @pytest.mark.anyio
     async def test_pydantic_schema_validation_rejects_null_bytes(self) -> None:

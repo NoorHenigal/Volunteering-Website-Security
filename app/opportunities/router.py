@@ -4,10 +4,9 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, File, HTTPException, Response, UploadFile, status
-from fastapi.responses import RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from starlette.concurrency import run_in_threadpool
 
-from app.core.base_schemas import ListResponse, PaginationMeta, error_responses
 from app.core.context import (
     ContextDep,
     render_template,
@@ -22,18 +21,21 @@ from app.core.dependencies import (
 )
 from app.core.htmx import handle_htmx_redirect, render_block
 from app.core.services.images import ImagePreset
+from app.core.types import UI_RESPONSES
 from app.opportunities.schemas import (
     ApplicationCreate,
-    ApplicationResponse,
     ApplicationStatusUpdate,
     OpportunityCreate,
-    OpportunityResponse,
 )
 
-router = APIRouter(tags=["Opportunities"])
+router = APIRouter(
+    tags=["Opportunities"],
+    default_response_class=HTMLResponse,
+    responses=UI_RESPONSES,
+)
 
 
-@router.get("/opportunities", response_model=None, responses=error_responses(auth=True))
+@router.get("/opportunities")
 async def list_opportunities(
     ctx: ContextDep,
     opp_svc: OpportunityServiceDep,
@@ -45,7 +47,6 @@ async def list_opportunities(
 
     items, total = await opp_svc.list_open(page=page, limit=limit)
 
-    # Get user's organizations for the create overlay
     user_orgs = await opp_svc.get_user_organizations(user.id)
     org_options = [(str(org.id), org.name) for org in user_orgs]
 
@@ -58,22 +59,13 @@ async def list_opportunities(
     )
 
     return await ctx.success_response(
-        data=ListResponse[OpportunityResponse](
-            items=[OpportunityResponse.model_validate(opp) for opp in items],
-            meta=PaginationMeta(total=total, page=page, per_page=limit),
-        ),
         template="pages/opportunities/list.html",
         organizations=org_options,
         **context,
     )
 
 
-@router.post(
-    "/opportunities",
-    response_model=None,
-    status_code=status.HTTP_201_CREATED,
-    responses=error_responses(auth=True),
-)
+@router.post("/opportunities")
 async def create_opportunity(
     ctx: ContextDep,
     opp_svc: OpportunityServiceDep,
@@ -93,18 +85,21 @@ async def create_opportunity(
             },
         )
     except HTTPException as e:
-        if ctx.is_ui and ctx.is_htmx:
+        if ctx.is_htmx:
             return await ctx.error_response(e, template=None, block=None)
-        raise
+        return await ctx.error_response(
+            e, template="pages/shared.html", view="form", block="form_content", page_title="Opportunities"
+        )
 
-    # Verify user is member of organization
     try:
         await org_svc.get_by_id(data.organization_id)
         await org_svc.require_member(user.id, data.organization_id)
     except HTTPException as e:
-        if ctx.is_ui and ctx.is_htmx:
+        if ctx.is_htmx:
             return await ctx.error_response(e, template=None, block=None)
-        raise
+        return await ctx.error_response(
+            e, template="pages/shared.html", view="form", block="form_content", page_title="Opportunities"
+        )
 
     try:
         opportunity = await opp_svc.create(
@@ -115,19 +110,16 @@ async def create_opportunity(
             location=data.location,
         )
 
-        if ctx.is_ui:
-            return await handle_htmx_redirect(ctx, f"/opportunities/{opportunity.id}")
-
-        return await ctx.success_response(data=OpportunityResponse.model_validate(opportunity), status_code=201)
+        return await handle_htmx_redirect(ctx, f"/opportunities/{opportunity.id}")
     except HTTPException as e:
-        if ctx.is_ui and ctx.is_htmx:
+        if ctx.is_htmx:
             return await ctx.error_response(e, template=None, block=None)
-        return await ctx.error_response(e, template="pages/shared.html", view="form", block="form_content")
+        return await ctx.error_response(
+            e, template="pages/shared.html", view="form", block="form_content", page_title="Opportunities"
+        )
 
 
-@router.get(
-    "/opportunities/{opportunity_id}", response_model=None, responses=error_responses(auth=True, not_found=True)
-)
+@router.get("/opportunities/{opportunity_id}")
 async def get_opportunity(
     opportunity_id: UUID,
     ctx: ContextDep,
@@ -139,29 +131,24 @@ async def get_opportunity(
     user = ctx.require_authenticated()
     opportunity = await opp_svc.get_by_id(opportunity_id)
 
-    if ctx.is_ui:
-        # Check if user has already applied (for volunteers)
-        user_application = None
-        if user.role == "volunteer":
-            user_application = await app_svc.check_already_applied(user.id, opportunity_id)
+    user_application = None
+    if user.role == "volunteer":
+        user_application = await app_svc.check_already_applied(user.id, opportunity_id)
 
-        # Check if user is organization admin
-        is_admin = False
-        if user.role == "organization":
-            is_admin = await org_svc.is_admin(user.id, opportunity.organization_id)
+    is_admin = False
+    if user.role == "organization":
+        is_admin = await org_svc.is_admin(user.id, opportunity.organization_id)
 
-        return await ctx.success_response(
-            template="pages/opportunities.html",
-            block="opp_detail" if ctx.is_htmx else None,
-            opportunity=opportunity,
-            user_application=user_application,
-            is_admin=is_admin,
-        )
-
-    return await ctx.success_response(data=OpportunityResponse.model_validate(opportunity))
+    return await ctx.success_response(
+        template="pages/opportunities.html",
+        block="opp_detail" if ctx.is_htmx else None,
+        opportunity=opportunity,
+        user_application=user_application,
+        is_admin=is_admin,
+    )
 
 
-@router.get("/opportunities/{opportunity_id}/apply", response_model=None, responses=error_responses(auth=True))
+@router.get("/opportunities/{opportunity_id}/apply")
 async def apply_form(
     ctx: ContextDep,
     opp_svc: OpportunityServiceDep,
@@ -185,12 +172,7 @@ async def apply_form(
     )
 
 
-@router.post(
-    "/opportunities/{opportunity_id}/apply",
-    response_model=None,
-    status_code=status.HTTP_201_CREATED,
-    responses=error_responses(auth=True, forbidden=True, not_found=True, conflict=True),
-)
+@router.post("/opportunities/{opportunity_id}/apply")
 async def apply_to_opportunity(
     opportunity_id: UUID,
     ctx: ContextDep,
@@ -202,75 +184,55 @@ async def apply_to_opportunity(
     require_volunteer_role(user)
 
     data = await ctx.parse_body_or_400(ApplicationCreate, {"message": "message"})
-    if ctx.is_ui:
-        opportunity = await opp_svc.get_by_id(opportunity_id)
+    opportunity = await opp_svc.get_by_id(opportunity_id)
 
     try:
-        application = await app_svc.apply(
+        await app_svc.apply(
             opportunity_id=opportunity_id,
             volunteer_id=user.id,
             message=data.message,
         )
 
-        if ctx.is_ui:
-            # For HTMX requests, return the updated application card
-            if ctx.is_htmx:
-                user_application = await app_svc.check_already_applied(user.id, opportunity_id)
-                return await render_block(
-                    ctx.request,
-                    "pages/opportunities.html",
-                    "user_application_status",
-                    opportunity=opportunity,
-                    user_application=user_application,
-                    user=ctx.user,
-                )
-            # For non-HTMX requests, redirect to the opportunity page
-            return await handle_htmx_redirect(ctx, f"/opportunities/{opportunity_id}")
-
-        return await ctx.success_response(data=ApplicationResponse.model_validate(application), status_code=201)
-    except HTTPException as e:
-        if ctx.is_ui:
-            # For errors in modal, return error message
-            if ctx.is_htmx:
-                return await ctx.error_response(e, template=None, block=None)
-            # For non-HTMX, return the full form page with error
-            return await ctx.error_response(
-                e, template="pages/opportunities.html", view="apply", block="form_content", opportunity=opportunity
+        if ctx.is_htmx:
+            user_application = await app_svc.check_already_applied(user.id, opportunity_id)
+            return await render_block(
+                ctx.request,
+                "pages/opportunities.html",
+                "user_application_status",
+                opportunity=opportunity,
+                user_application=user_application,
+                user=ctx.user,
             )
-        raise
+        return await handle_htmx_redirect(ctx, f"/opportunities/{opportunity_id}")
+    except HTTPException as e:
+        if ctx.is_htmx:
+            return await ctx.error_response(e, template=None, block=None)
+        return await ctx.error_response(
+            e, template="pages/opportunities.html", view="apply", block="form_content", opportunity=opportunity
+        )
 
 
-@router.get("/applications", response_model=None, responses=error_responses(auth=True))
+@router.get("/applications")
 async def list_user_applications(ctx: ContextDep, app_svc: ApplicationServiceDep) -> Response:
     """List all applications for the current user."""
     user = ctx.require_authenticated()
 
-    if ctx.is_ui:
-        applications = await app_svc.get_by_volunteer_with_opportunity(user.id)
-        context = list_view_context(
-            items=applications,
-            page_title="My Applications",
-            resource_type="application",
-            create_url="/opportunities",
-            create_text="Browse Opportunities",
-            create_color="blue",
-            show_create=True,
-            empty_message="You haven't applied to any opportunities yet",
-            grid_cols="space-y-4",
-        )
-        return await render_template(ctx.request, "pages/shared.html", view="list", user=user, **context)
-
-    applications = await app_svc.get_by_volunteer(user.id)
-    return await ctx.success_response(
-        data=ListResponse[ApplicationResponse](items=[ApplicationResponse.model_validate(app) for app in applications])
+    applications = await app_svc.get_by_volunteer_with_opportunity(user.id)
+    context = list_view_context(
+        items=applications,
+        page_title="My Applications",
+        resource_type="application",
+        create_url="/opportunities",
+        create_text="Browse Opportunities",
+        create_color="blue",
+        show_create=True,
+        empty_message="You haven't applied to any opportunities yet",
+        grid_cols="space-y-4",
     )
+    return await render_template(ctx.request, "pages/shared.html", view="list", user=user, **context)
 
 
-@router.put(
-    "/applications/{application_id}/status",
-    response_model=None,
-    responses=error_responses(auth=True, forbidden=True, not_found=True),
-)
+@router.put("/applications/{application_id}/status")
 async def update_application_status(
     application_id: UUID,
     ctx: ContextDep,
@@ -287,40 +249,42 @@ async def update_application_status(
     application = await app_svc.get_by_id(application_id)
     opportunity = await opp_svc.get_by_id(application.opportunity_id)
 
-    # Check if user is organization admin
     await org_svc.require_admin(user.id, opportunity.organization_id)
 
-    application = await app_svc.update_status(application, data.status)
+    await app_svc.update_status(application, data.status)
 
-    if ctx.is_ui:
-        # Redirect back to applicants list
-        return RedirectResponse(url=f"/opportunities/{opportunity.id}/applicants", status_code=303)
-
-    return await ctx.success_response(data=ApplicationResponse.model_validate(application))
+    # Redirect back to applicants list
+    return RedirectResponse(url=f"/opportunities/{opportunity.id}/applicants", status_code=303)
 
 
-@router.delete(
-    "/applications/{application_id}",
-    status_code=status.HTTP_204_NO_CONTENT,
-    responses=error_responses(auth=True, forbidden=True, not_found=True),
-)
+@router.delete("/applications/{application_id}")
 async def withdraw_application(
     application_id: UUID,
     ctx: ContextDep,
     app_svc: ApplicationServiceDep,
+    opp_svc: OpportunityServiceDep,
 ) -> Response:
     """Withdraw an application (volunteers only)."""
     user = ctx.require_authenticated()
     require_volunteer_role(user)
+    application = await app_svc.get_by_id(application_id)
+    opportunity = await opp_svc.get_by_id(application.opportunity_id)
     await app_svc.withdraw(application_id, user)
-    return Response(status_code=204)
+
+    if ctx.is_htmx:
+        return await render_block(
+            ctx.request,
+            "pages/opportunities.html",
+            "user_application_status",
+            opportunity=opportunity,
+            user_application=None,
+            user=ctx.user,
+        )
+
+    return await ctx.success_response(redirect_url="/applications")
 
 
-@router.delete(
-    "/opportunities/{opportunity_id}",
-    status_code=status.HTTP_204_NO_CONTENT,
-    responses=error_responses(auth=True, forbidden=True, not_found=True),
-)
+@router.delete("/opportunities/{opportunity_id}")
 async def delete_opportunity(
     opportunity_id: UUID,
     ctx: ContextDep,
@@ -332,7 +296,7 @@ async def delete_opportunity(
     opportunity = await opp_svc.get_by_id_including_deleted(opportunity_id)
     await org_svc.require_admin(user.id, opportunity.organization_id)
     await opp_svc.soft_delete(opportunity_id)
-    return Response(status_code=204)
+    return await handle_htmx_redirect(ctx, "/opportunities")
 
 
 @router.post("/opportunities/{opportunity_id}/delete", include_in_schema=False)
@@ -366,7 +330,6 @@ async def withdraw_application_post(
     await app_svc.withdraw(application_id, user)
 
     if ctx.is_htmx:
-        # Return the application card in the "open" state after withdrawal
         return await render_block(
             ctx.request,
             "pages/opportunities.html",
@@ -379,7 +342,7 @@ async def withdraw_application_post(
     return await ctx.success_response(redirect_url="/applications")
 
 
-@router.get("/opportunities/{opportunity_id}/applicants", response_model=None, responses=error_responses(auth=True))
+@router.get("/opportunities/{opportunity_id}/applicants")
 async def view_applicants(
     ctx: ContextDep,
     opp_svc: OpportunityServiceDep,
@@ -458,9 +421,7 @@ async def reject_applicant(
     return RedirectResponse(url=f"/opportunities/{opportunity_id}/applicants", status_code=303)
 
 
-@router.post(
-    "/opportunities/{opportunity_id}/banner", response_model=OpportunityResponse, responses=error_responses(auth=True)
-)
+@router.post("/opportunities/{opportunity_id}/banner")
 async def upload_opportunity_banner(
     opportunity_id: UUID,
     ctx: ContextDep,
@@ -468,15 +429,13 @@ async def upload_opportunity_banner(
     org_svc: OrganizationServiceDep,
     image_svc: ImageServiceDep,
     file: Annotated[UploadFile, File(...)],
-) -> OpportunityResponse:
+) -> Response:
     """Upload opportunity banner image."""
     user = ctx.require_authenticated()
     opportunity = await opp_svc.get_by_id(opportunity_id)
 
-    # Check permission
     await org_svc.require_admin(user.id, opportunity.organization_id)
 
-    # Use ImageService to process file
     content = await file.read()
     filename = await run_in_threadpool(
         image_svc.process_and_save,
@@ -484,8 +443,6 @@ async def upload_opportunity_banner(
         opportunity_id,
         ImagePreset.BANNER,
     )
+    await opp_svc.update_banner(opportunity.id, filename)
 
-    # Update database
-    opportunity = await opp_svc.update_banner(opportunity.id, filename)
-
-    return OpportunityResponse.model_validate(opportunity)
+    return await handle_htmx_redirect(ctx, f"/opportunities/{opportunity_id}")
