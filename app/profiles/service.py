@@ -1,11 +1,11 @@
 """Profile and follow business logic."""
 
 import logging
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from email_validator import EmailNotValidError, validate_email
 from fastapi import HTTPException, status
-from sqlalchemy import delete, update
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import require
@@ -71,6 +71,10 @@ class ProfileService(BaseService):
             is_following = await self.follow_repo.is_following(viewer.id, profile_user.id)
             is_followed_by = await self.follow_repo.is_following(profile_user.id, viewer.id)
 
+        # Get application counts for profile stats
+        applications_count = await self._get_applications_count(profile_user.id)
+        accepted_applications_count = await self._get_applications_count(profile_user.id, status="accepted")
+
         return FullProfileSchema(
             id=profile_user.id,
             username=profile_user.username,
@@ -86,6 +90,8 @@ class ProfileService(BaseService):
             profile_visibility=profile_user.profile_visibility,  # type: ignore[arg-type]
             is_following=is_following,
             is_followed_by=is_followed_by,
+            applications_count=applications_count,
+            accepted_applications_count=accepted_applications_count,
         )
 
     async def _can_view_full_profile(self, profile_user: User, viewer: User | None) -> bool:
@@ -109,6 +115,14 @@ class ProfileService(BaseService):
 
         # private - only owner can see (handled above)
         return False
+
+    async def _get_applications_count(self, user_id: UUID, status: str | None = None) -> int:
+        """Get count of applications for a user, optionally filtered by status."""
+        query = select(func.count()).select_from(Application).where(Application.volunteer_id == user_id)
+        if status:
+            query = query.where(Application.status == status)
+        result = await self.db.execute(query)
+        return result.scalar() or 0
 
     async def update_profile(self, user: User, data: ProfileUpdateSchema) -> User:
         """Update user profile fields."""

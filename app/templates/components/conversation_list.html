@@ -1,0 +1,22 @@
+{% from "components/messages.html" import conversation_card, empty_inbox %}
+<div id="conversation-list-inner" class="divide-y divide-slate-50">
+    {% if conversations %}
+        {% for conv in conversations %}
+            {% set other = conv.other_party %}
+            {% if other %}
+                <a href="{% if acting_as == 'organization' %}/org/{{ acting_id }}/messages/{{ conv.id }}{% else %}/messages/{{ conv.id }}{% endif %}"
+                   class="block p-3 hover:bg-gradient-to-r hover:from-brand-50/50 hover:to-transparent transition-all duration-200 group cursor-pointer"
+                   :class="{ 'bg-brand-50 border-l-2 border-l-brand-500': selectedId === '{{ conv.id }}' }"
+                   @click.prevent="selectedId = '{{ conv.id }}'; showConversation = true; $el.querySelector('.unread-dot')?.remove(); $el.querySelector('.font-medium')?.classList.remove('font-medium', 'text-slate-700')"
+                   x-show="!searchQuery || '{{ other.name|lower }}'.includes(searchQuery.toLowerCase())"
+                   hx-get="{% if acting_as == 'organization' %}/org/{{ acting_id }}/messages/{{ conv.id }}{% else %}/messages/{{ conv.id }}{% endif %}?partial=true"
+                   hx-target="#conversation-panel"
+                   hx-swap="innerHTML"
+                   hx-push-url="{% if acting_as == 'organization' %}/org/{{ acting_id }}/messages/{{ conv.id }}{% else %}/messages/{{ conv.id }}{% endif %}"
+                   data-conversation-id="{{ conv.id }}">{{ conversation_card(conv, acting_as, acting_id) }}</a>
+            {% endif %}
+        {% endfor %}
+    {% else %}
+        {{ empty_inbox() }}
+    {% endif %}
+</div>

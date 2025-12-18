@@ -18,6 +18,8 @@ from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.gzip import GZipMiddleware
 
+from app.admin.middleware import enforce_admin_password_reset
+from app.admin.router import router as admin_router
 from app.auth.router import router as auth_router
 from app.core.config import settings
 from app.core.context import ContextDep, render_template
@@ -29,6 +31,7 @@ from app.messaging.router import router as messaging_router
 from app.opportunities.router import router as opp_router
 from app.organizations.router import router as org_router
 from app.profiles.router import router as profiles_router
+from app.reports.router import router as reports_router
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
@@ -139,6 +142,9 @@ async def add_security_headers(request: Request, call_next: Callable[[Request], 
     return response
 
 
+app.middleware("http")(enforce_admin_password_reset)
+
+
 @app.exception_handler(Exception)
 async def generic_exception_handler(request: Request, _exc: Exception) -> Response:
     """Handle unhandled exceptions - log but don't leak stack traces."""
@@ -157,9 +163,11 @@ async def home(ctx: ContextDep) -> Response:
     return await render_template(ctx.request, "pages/home.html", user=ctx.user)
 
 
+app.include_router(admin_router)
 app.include_router(auth_router)
 app.include_router(demo_router)
 app.include_router(messaging_router)
 app.include_router(opp_router)
 app.include_router(org_router)
 app.include_router(profiles_router)
+app.include_router(reports_router)

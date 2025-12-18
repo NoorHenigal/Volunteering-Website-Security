@@ -18,7 +18,7 @@
                 </div>
                 <div class="text-xs text-slate-500 group-hover:text-brand-600 transition-colors font-medium">
                     {{
-                    user.role|title }}
+                    user.role_display }}
                 </div>
             </div>
             <span class="text-slate-400 group-hover:text-brand-500 transition-all duration-200"
@@ -37,7 +37,7 @@
                 <p class="text-sm font-bold text-slate-900">{{ user.display_name }}</p>
                 <p class="text-xs text-slate-500 truncate mt-0.5">{{ user.email }}</p>
                 <span class="inline-flex items-center mt-3 px-2.5 py-0.5 text-xs font-semibold rounded-full bg-brand-100 text-brand-700 border border-brand-200">
-                    {{ user.role|title }}
+                    {{ user.role_display }}
                 </span>
             </div>
             <div class="py-2">
@@ -73,6 +73,14 @@
                        class="group flex items-center px-5 py-2.5 text-sm text-slate-600 hover:bg-brand-50 hover:text-brand-700 transition-all duration-200">
                         <span class="mr-3 text-slate-400 group-hover:text-brand-500 transition-colors">{{ icon('document', 'md') }}</span>
                         My Applications
+                    </a>
+                {% endif %}
+                {% if user.role == 'system_admin' %}
+                    <div class="border-t border-slate-100 my-2"></div>
+                    <a href="/admin/dashboard"
+                       class="group flex items-center px-5 py-2.5 text-sm text-purple-600 hover:bg-purple-50 hover:text-purple-700 transition-all duration-200">
+                        <span class="mr-3 text-purple-400 group-hover:text-purple-500 transition-colors">{{ icon('fingerprint', 'md') }}</span>
+                        Admin Dashboard
                     </a>
                 {% endif %}
             </div>

@@ -1,3 +1,15 @@
+/**
+ * Messaging WebSocket Component
+ * Provides real-time messaging functionality for conversations between
+ * users and organizations with typing indicators and message delivery.
+ */
+
+/**
+ * Alpine.js component for managing WebSocket connections in message conversations.
+ * Handles real-time message sending/receiving, typing indicators, and connection management.
+ *
+ * @returns {Object} Alpine.js component data object
+ */
 function messageSocket() {
     return {
         ws: null,
@@ -15,12 +27,14 @@ function messageSocket() {
         reconnectTimeout: null,
         typingTimeout: null,
         isTyping: false,
-        init(conversationId, actingAs, actingId, userId, token) {
+        isDemoBot: false,
+        init(conversationId, actingAs, actingId, userId, token, isDemoBot = false) {
             this.conversationId = conversationId;
             this.actingAs = actingAs;
             this.actingId = actingId;
             this.userId = userId;
             this.token = token;
+            this.isDemoBot = isDemoBot;
             this.$nextTick(() => this.scrollToBottom());
             this.connect();
         },
@@ -174,6 +188,15 @@ function messageSocket() {
                 // Reset textarea height
                 if (this.$refs.messageInput) {
                     this.$refs.messageInput.style.height = 'auto';
+                }
+                // Trigger demo bot reply if in demo mode
+                if (this.isDemoBot) {
+                    const csrfToken = document.cookie.split('; ').find(row => row.startsWith('csrf_token='))?.split('=')[1];
+                    fetch('/demo/bot/reply', {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: csrfToken ? { 'X-CSRF-Token': csrfToken } : {}
+                    });
                 }
             } catch (error) {
                 console.error('Failed to send message:', error);

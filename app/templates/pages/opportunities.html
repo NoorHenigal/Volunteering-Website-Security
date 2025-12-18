@@ -9,6 +9,7 @@ detail_row, page_hero %}
 {% from "components/feedback.html" import info_box, modal, modal_actions %}
 {% from "components/forms.html" import form_label, form_textarea, htmx_form, modal_field %}
 {% from "components/image_upload.html" import image_upload_modal %}
+{% from "components/report.html" import report_button_with_text %}
 {% block title %}
     {% if view == 'apply' %}
         Apply to {{ opportunity.title }}
@@ -109,7 +110,7 @@ detail_row, page_hero %}
                                                                 <span class="w-2 h-8 rounded-full bg-brand-500"></span>
                                                                 About this Opportunity
                                                             </h2>
-                                                            <div class="prose prose-slate prose-lg max-w-none text-slate-600 leading-relaxed whitespace-pre-wrap">
+                                                            <div class="prose prose-slate prose-lg max-w-none text-slate-600 leading-relaxed whitespace-pre-wrap text-left">
                                                                 {{
                                                                 opportunity.description }}
                                                             </div>
@@ -294,6 +295,12 @@ detail_row, page_hero %}
                             {% endcall %}
                         {% endif %}
                     </div>
+                    {% if user and not is_admin %}
+                        <div class="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm"
+                             x-data>
+                            {{ report_button_with_text('opportunity', opportunity.id, 'Report Opportunity') }}
+                        </div>
+                    {% endif %}
                 </div>
             </div>
         </div>

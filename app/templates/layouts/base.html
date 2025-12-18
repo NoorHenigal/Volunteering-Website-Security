@@ -22,7 +22,11 @@
                 src="https://cdn.jsdelivr.net/npm/alpinejs@3.15.3/dist/cdn.min.js"
                 integrity="sha384-4E5IZutrbnm0GBnBqEA2tgLsTg6ublElJlpE9qQQNL0WrY9g4GPahFyJYwnDet2+"
                 crossorigin="anonymous"></script>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js"
+                integrity="sha384-jb8JQMbMoBUzgWatfe6COACi2ljcDdZQ2OxczGA3bGNeWe+6DChMTBJemed7ZnvJ"
+                crossorigin="anonymous"></script>
         <script src="/static/js/messaging.js"></script>
+        <script src="/static/js/image-upload.js"></script>
         <script>
             // Re-initialize Alpine components after HTMX swaps
             document.addEventListener("htmx:afterSwap", (event) => {
@@ -356,5 +360,9 @@
                 </template>
             </div>
         {% endblock body_content %}
+        {% if user %}
+            {% from "components/report.html" import report_modal %}
+            {{ report_modal() }}
+        {% endif %}
     </body>
 </html>

@@ -13,7 +13,7 @@ from alembic.script import ScriptDirectory
 from sqlalchemy import text
 
 from app.core.config import settings
-from app.db.session import sync_engine
+from app.db.session import AsyncSessionLocal, sync_engine
 
 log = logging.getLogger(__name__)
 
@@ -82,6 +82,39 @@ def _check_migrations() -> None:
     log.info("✓ Database schema up to date")
 
 
+async def _ensure_admin_account() -> None:
+    """Create initial admin account if enabled and none exists."""
+    if not settings.create_admin_on_launch:
+        return
+
+    from app.admin.setup import create_initial_admin  # noqa: PLC0415
+
+    async with AsyncSessionLocal() as db:
+        result = await create_initial_admin(db)
+        if result:
+            email, password = result
+            log.warning("=" * 60)
+            log.warning("INITIAL ADMIN ACCOUNT CREATED")
+            log.warning("Email: %s", email)
+            log.warning("Password: %s", password)
+            log.warning("You MUST change these credentials on first login!")
+            log.warning("=" * 60)
+        else:
+            log.info("✓ Admin account exists")
+
+
+def _init_faker() -> None:
+    """Pre-initialize Faker to avoid slow first request in demo mode."""
+    from app.core.config import settings  # noqa: PLC0415
+
+    if settings.demo_data:
+        log.info("  Initializing Faker for demo mode (this may take a few seconds)...")
+        from app.demo.bot import init_faker  # noqa: PLC0415
+
+        init_faker()
+        log.info("✓ Faker initialized for demo mode")
+
+
 async def run_preflight_checks() -> None:
     """Run all pre-flight checks before starting the application."""
     if os.getenv("SKIP_PREFLIGHT_CHECKS") == "1":
@@ -92,6 +125,8 @@ async def run_preflight_checks() -> None:
     _check_argon2_profile_compatibility()
     _check_database_connection()
     _check_migrations()
+    await _ensure_admin_account()
+    _init_faker()
 
     log.info("All startup checks passed\n")
 

@@ -43,6 +43,14 @@
 
 6. Copy the generated values into `.env`, replacing all placeholder keys.
 
+7. Run the following command to start the app:
+
+   ```bash
+   make run
+   ```
+
+8. Open your browser and navigate to `http://127.0.0.1:8000` to access the app.
+
 ---
 
 ## Database Setup Guide
@@ -98,9 +106,4 @@ The app will start using the active database and environment configuration.
 
 ## Demo Data (Optional)
 
-If `DEMO_DATA=true` is set in `.env`, demo data can be managed via the UI:
-
-* Seed demo data from the demo settings modal
-* Unseed safely without touching real data
-* Requires authentication
-* No auto-seeding on startup
+If `DEMO_DATA=true` is set in `.env`, demo data can be managed via the UI

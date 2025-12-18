@@ -27,9 +27,10 @@
     </span>
 {% endmacro %}
 {% macro role_badge(role) %}
-    {# User role badge #}
+    {# User role badge - accepts role string and formats it for display #}
+    {% set role_display = {"volunteer": "Volunteer", "organization": "Organization", "system_admin": "System Admin"} %}
     <span class="inline-flex items-center px-2.5 py-0.5 text-xs font-bold uppercase tracking-wide rounded-full bg-brand-50 text-brand-700 border border-brand-200">
-        {{ role|title }}
+        {{ role_display.get(role, role.replace("_", " ") |title) }}
     </span>
 {% endmacro %}
 {% macro privacy_badge(visibility_level, size='sm') %}
@@ -41,7 +42,6 @@
         "private": "bg-slate-100 text-slate-600 border-slate-200"
     } %}
     {% set visibility_icons = {"public": "Globe", "authenticated": "UserCheck", "followers": "Users", "private": "Lock"} %}
-    {# Using text/emoji for icons to avoid SVG bloat here, or could use SVG #}
     <span class="{{ size_classes.get(size, size_classes['sm']) }} {{ visibility_classes.get(visibility_level, 'bg-slate-100 text-slate-800') }} rounded-full font-bold border inline-flex items-center gap-1.5">
         <span>{{ visibility_level|title }}</span>
     </span>

@@ -52,6 +52,9 @@ class Settings(BaseSettings):
     # Demo Data
     demo_data: bool = Field(default=False, alias="DEMO_DATA")
 
+    # Admin Account Auto-Creation
+    create_admin_on_launch: bool = Field(default=True, alias="CREATE_ADMIN_ON_LAUNCH")
+
     # Argon2
     argon2_profile: Literal["RFC_9106_LOW_MEMORY", "RFC_9106_HIGH_MEMORY"] = Field(
         default="RFC_9106_LOW_MEMORY",

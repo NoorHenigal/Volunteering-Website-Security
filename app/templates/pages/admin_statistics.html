@@ -1,0 +1,181 @@
+{% extends "layouts/base.html" %}
+{% from "components/cards.html" import page_card %}
+{% from "components/layout.html" import page_header %}
+{% block title %}Admin Statistics{% endblock %}
+{% block content %}
+    <div class="space-y-10">
+        {{ page_header("Admin Dashboard", show_action=False) }}
+        {% call page_card('5xl') %}
+            <div class="space-y-10">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <article class="bg-gray-50 rounded-xl p-6 border border-gray-100">
+                        <p class="text-sm font-semibold text-gray-500 uppercase tracking-wide">Sessions</p>
+                        <p class="text-4xl font-bold text-blue-600 mt-3">2,410</p>
+                    </article>
+                    <article class="bg-gray-50 rounded-xl p-6 border border-gray-100">
+                        <p class="text-sm font-semibold text-gray-500 uppercase tracking-wide">Avg. Session Duration</p>
+                        <p class="text-4xl font-bold text-green-600 mt-3">8m 36s</p>
+                    </article>
+                    <article class="bg-gray-50 rounded-xl p-6 border border-gray-100">
+                        <p class="text-sm font-semibold text-gray-500 uppercase tracking-wide">Total Events Listed</p>
+                        <p class="text-4xl font-bold text-purple-600 mt-3">1.2k</p>
+                    </article>
+                </div>
+                <div class="bg-white rounded-2xl shadow-lg p-6 h-[32rem]">
+                    <div class="flex items-center justify-between mb-4">
+                        <div>
+                            <h2 class="text-2xl font-semibold text-gray-900">Platform Activity Overview</h2>
+                        </div>
+                    </div>
+                    <div class="h-full">
+                        <canvas id="admin-activity-chart" class="w-full h-full"></canvas>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 gap-6">
+                    <section class="bg-white rounded-2xl shadow-lg p-6 space-y-4">
+                        <div class="flex items-center justify-between">
+                            <h3 class="text-xl font-semibold text-gray-900">Flagged Content</h3>
+                        </div>
+                        <p class="text-sm text-gray-500">Admin can approve or remove flagged submissions.</p>
+                        <div class="space-y-3">
+                            {% for report in [
+                                {
+                                "title": "Community Outreach Helpers Needed",
+                                "reason": "Requests payment from volunteers (£20 fee)",
+                                "excerpt": "“There is a small £20 registration fee to cover materials. Please send payment before attending.”",
+                                "user": "@org_outreach"
+                                },
+                                {
+                                "title": "Mentor a Child",
+                                "reason": "Involves minors without safeguarding details",
+                                "excerpt": "“Spend one-on-one time mentoring children after school. No experience needed.”",
+                                "user": "@org_childcare"
+                                },
+                                {
+                                "title": "Help Needed at Private Location",
+                                "reason": "Missing safe location details (private address)",
+                                "excerpt": "“Volunteers will meet at a private address to help with various tasks. Location will be shared after signup.”",
+                                "user": "@org_privatesupport"
+                                },
+                                ] %}
+                                <div class="flag-card border border-gray-100 rounded-xl p-4 space-y-2">
+                                    <div class="flex items-center justify-between">
+                                        <p class="font-semibold text-gray-900 truncate w-3/4">{{ report.title }}</p>
+                                        <span class="text-xs font-semibold text-gray-500">{{ report.user }}</span>
+                                    </div>
+                                    <p class="text-xs text-gray-500">{{ report.excerpt }}</p>
+                                    <p class="text-xs font-semibold text-amber-600">{{ report.reason }}</p>
+                                    <div class="flex flex-wrap gap-2">
+                                        <button class="flag-action order-1 px-4 py-1.5 text-xs font-semibold text-white bg-slate-900 rounded-lg hover:bg-slate-800 shadow-sm"
+                                                data-action="approved">Approve</button>
+                                        <button class="flag-action px-3 py-1.5 text-xs font-semibold text-white bg-red-600 rounded-lg hover:bg-red-700"
+                                                data-action="removed">Remove</button>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </section>
+                </div>
+            {% endcall %}
+        </div>
+        <script>
+            document.addEventListener("DOMContentLoaded", () => {
+                const canvas = document.getElementById("admin-activity-chart");
+                if (!canvas) {
+                    return;
+                }
+                document.querySelectorAll(".flag-card .flag-action").forEach((btn) => {
+                    btn.addEventListener("click", (event) => {
+                        const card = event.currentTarget.closest(".flag-card");
+                        const action = event.currentTarget.dataset.action;
+                        card.classList.add("opacity-50");
+                        setTimeout(() => {
+                            card.remove();
+                            window.dispatchEvent(new CustomEvent("show-toast", {
+                                detail: {
+                                    type: action === "approved" ? "success" : "warning",
+                                    message: `Content ${action}.`,
+                                },
+                            }));
+                        }, 300);
+                    });
+                });
+
+                new Chart(canvas, {
+                    type: "bar",
+                    data: {
+                        labels: ["Q1", "Q2", "Q3", "Q4"],
+                        datasets: [{
+                            label: "Sessions",
+                            data: [2100, 2250, 2350, 2410],
+                            backgroundColor: "rgba(59,130,246,0.6)",
+                            borderColor: "rgb(59,130,246)",
+                            borderWidth: 2,
+                            borderRadius: 8,
+                        }, {
+                            label: "Events Listed",
+                            data: [280, 300, 310, 310],
+                            backgroundColor: "rgba(139,92,246,0.6)",
+                            borderColor: "rgb(139,92,246)",
+                            borderWidth: 2,
+                            borderRadius: 8,
+                        }, ],
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        layout: {
+                            padding: {
+                                left: 14,
+                                right: 14,
+                                top: 14,
+                                bottom: 38,
+                            },
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: "Count",
+                                },
+                                ticks: {
+                                    color: "#6b7280",
+                                    font: {
+                                        size: 11
+                                    },
+                                },
+                                grid: {
+                                    color: "rgba(209,213,219,0.4)",
+                                },
+                            },
+                            x: {
+                                ticks: {
+                                    color: "#6b7280",
+                                    font: {
+                                        size: 11
+                                    },
+                                    padding: 6,
+                                },
+                                grid: {
+                                    display: false
+                                },
+                            },
+                        },
+                        plugins: {
+                            tooltip: {},
+                            legend: {
+                                display: true,
+                                labels: {
+                                    font: {
+                                        size: 11
+                                    },
+                                    color: "#374151",
+                                },
+                            },
+                        },
+                    },
+                });
+            });
+        </script>
+    {% endblock %}

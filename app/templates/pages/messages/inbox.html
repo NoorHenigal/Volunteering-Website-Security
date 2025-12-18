@@ -13,7 +13,8 @@
          x-init="init('{{ acting_as }}', '{{ acting_id }}', '{{ ws_token }}')"
          @close-conversation.window="showConversation = false; selectedId = ''"
          @keydown.escape.window="if(showConversation && window.innerWidth < 1024) { showConversation = false; selectedId = ''; }"
-         @beforeunload.window="disconnect()">
+         @beforeunload.window="disconnect()"
+         @demo-bot-stopped.window="showConversation = false; selectedId = ''; history.pushState({}, '', '/messages'); $refs.conversationPanel.innerHTML = $refs.emptyState.innerHTML">
         <div class="w-full lg:w-[380px] flex flex-col bg-white rounded-l-2xl lg:rounded-l-2xl lg:rounded-r-none shadow-xl shadow-slate-200/50 border border-slate-100 overflow-hidden"
              :class="{ 'hidden lg:flex': showConversation }">
             <div class="p-4 border-b border-slate-100 bg-gradient-to-r from-white to-slate-50/50">
@@ -96,33 +97,20 @@
                     <div class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">{{ icon('search', 'sm') }}</div>
                 </div>
             </div>
-            <div class="flex-1 overflow-y-auto">
-                {% if conversations %}
-                    <div class="divide-y divide-slate-50">
-                        {% for conv in conversations %}
-                            {% set other = conv.other_party %}
-                            {% if other %}
-                                <a href="{% if acting_as == 'organization' %}/org/{{ acting_id }}/messages/{{ conv.id }}{% else %}/messages/{{ conv.id }}{% endif %}"
-                                   class="block p-3 hover:bg-gradient-to-r hover:from-brand-50/50 hover:to-transparent transition-all duration-200 group cursor-pointer"
-                                   :class="{ 'bg-brand-50 border-l-2 border-l-brand-500': selectedId === '{{ conv.id }}' }"
-                                   @click.prevent="selectedId = '{{ conv.id }}'; showConversation = true; $el.querySelector('.unread-dot')?.remove(); $el.querySelector('.font-medium')?.classList.remove('font-medium', 'text-slate-700')"
-                                   x-show="!searchQuery || '{{ other.name|lower }}'.includes(searchQuery.toLowerCase())"
-                                   hx-get="{% if acting_as == 'organization' %}/org/{{ acting_id }}/messages/{{ conv.id }}{% else %}/messages/{{ conv.id }}{% endif %}?partial=true"
-                                   hx-target="#conversation-panel"
-                                   hx-swap="innerHTML"
-                                   hx-push-url="{% if acting_as == 'organization' %}/org/{{ acting_id }}/messages/{{ conv.id }}{% else %}/messages/{{ conv.id }}{% endif %}"
-                                   data-conversation-id="{{ conv.id }}">
-                                    {{ conversation_card(conv, acting_as, acting_id) }}
-                                </a>
-                            {% endif %}
-                        {% endfor %}
-                    </div>
-                {% else %}
-                    {{ empty_inbox() }}
-                {% endif %}
-            </div>
+            {% if settings.demo_data and acting_as == 'user' %}
+                <div class="p-3 border-b border-slate-100"
+                     hx-get="/demo/messaging"
+                     hx-trigger="load, demo-bot-stopped from:body, demo-data-changed from:body"
+                     hx-swap="innerHTML"></div>
+            {% endif %}
+            <div id="conversation-list"
+                 class="flex-1 overflow-y-auto"
+                 hx-get="/messages?partial=list"
+                 hx-trigger="demo-bot-started from:body, demo-bot-stopped from:body"
+                 hx-swap="innerHTML">{% include "components/conversation_list.html" %}</div>
         </div>
         <div id="conversation-panel"
+             x-ref="conversationPanel"
              class="flex-1 flex flex-col bg-white lg:rounded-r-2xl lg:border-l-0 shadow-xl shadow-slate-200/50 border border-slate-100 lg:border-l-0 overflow-hidden"
              :class="{ 'hidden lg:flex': !showConversation, 'flex': showConversation }">
             {% if selected_conversation %}
@@ -141,5 +129,18 @@
                 </div>
             {% endif %}
         </div>
+        <template x-ref="emptyState">
+            <div class="flex-1 flex items-center justify-center">
+                <div class="text-center p-8">
+                    <div class="w-24 h-24 bg-gradient-to-br from-slate-100 to-slate-50 rounded-3xl mx-auto mb-6 flex items-center justify-center shadow-inner">
+                        {{ icon('chat-bubble-left-right', '2xl', 'text-slate-300') }}
+                    </div>
+                    <h3 class="text-xl font-bold text-slate-800 mb-2">Select a conversation</h3>
+                    <p class="text-slate-500 text-sm max-w-sm mx-auto leading-relaxed">
+                        Choose a conversation from the list to start messaging, or visit someone's profile to start a new chat.
+                    </p>
+                </div>
+            </div>
+        </template>
     </div>
 {% endblock %}
