@@ -5,16 +5,14 @@ import re
 import secrets
 import string
 import warnings
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import requests
 import schemathesis
 from hypothesis import strategies as st
+from hypothesis.strategies import SearchStrategy
 
 warnings.filterwarnings("ignore", message="Overriding standard format")
-
-if TYPE_CHECKING:
-    from hypothesis.strategies import SearchStrategy
 
 type HookContext = object
 
