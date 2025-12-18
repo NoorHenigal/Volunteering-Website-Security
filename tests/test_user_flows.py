@@ -258,33 +258,37 @@ class TestUIFlows:
     """Test UI-based user flows with cookie authentication."""
 
     @pytest.mark.anyio
-    async def test_ui_user_can_access_create_form_if_org_member(
+    async def test_ui_user_can_access_opportunities_list_with_create_overlay(
         self,
         client: AsyncClient,
         flows: FlowHelper,
         test_db: AsyncSession,
     ) -> None:
-        """Test: User who is org member can access opportunity creation form."""
+        """Test: User who is org member can access opportunities list with create overlay."""
         user = await flows.create_user("volunteer")
         await flows.create_org(user)  # creates org and makes user admin
         await flows.login_via_ui(user.email, user.password)
-        response = await client.get("/opportunities/new", headers={"Accept": "text/html"}, follow_redirects=True)
+        response = await client.get("/opportunities", headers={"Accept": "text/html"}, follow_redirects=True)
         assert response.status_code == status.HTTP_200_OK
+        # Verify the create overlay form is present
+        assert "Post New Opportunity" in response.text
+        assert "createOppOpen" in response.text
 
     @pytest.mark.anyio
-    async def test_ui_user_without_org_gets_warning_page(
+    async def test_ui_user_without_org_sees_org_creation_overlay(
         self,
         client: AsyncClient,
         ctx: FixtureContext,
         flows: FlowHelper,
     ) -> None:
-        """Test: User without org membership gets warning page instead of form."""
+        """Test: User without org membership sees org creation overlay option."""
         volunteer = await ctx.volunteer()
         await flows.login_via_ui(volunteer.email, volunteer.password)
-        response = await client.get("/opportunities/new", headers={"Accept": "text/html"}, follow_redirects=False)
+        response = await client.get("/opportunities", headers={"Accept": "text/html"}, follow_redirects=False)
 
-        # Should NOT redirect, but return 200 with warning
+        # Should return 200 with org creation overlay for users without orgs
         assert response.status_code == status.HTTP_200_OK
+        assert "Create Organization First" in response.text
         assert "Organization Required" in response.text
 
 

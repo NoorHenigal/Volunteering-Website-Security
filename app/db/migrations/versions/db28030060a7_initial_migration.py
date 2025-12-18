@@ -1,8 +1,8 @@
 """Initial Migration.
 
-Revision ID: 2f9824e7035b
+Revision ID: db28030060a7
 Revises:
-Create Date: 2025-12-15 02:53:17.916173+00:00
+Create Date: 2025-12-16 15:41:35.742463+00:00
 """
 
 from collections.abc import Sequence
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 from alembic import op
 
 # Revision identifiers, used by Alembic.
-revision: str = "2f9824e7035b"
+revision: str = "db28030060a7"
 down_revision: str | None = None
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
@@ -36,6 +36,26 @@ def upgrade() -> None:
         ["is_active"],
         unique=True,
         postgresql_where=sa.text("is_active = true"),
+    )
+    op.create_table(
+        "conversations",
+        sa.Column("demo_seed_run_id", sa.UUID(), nullable=True),
+        sa.Column("dm_key", sa.String(length=192), nullable=False),
+        sa.Column("last_message_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("id", sa.UUID(), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.ForeignKeyConstraint(["demo_seed_run_id"], ["demo_seed_runs.id"], ondelete="SET NULL"),
+        sa.PrimaryKeyConstraint("id"),
+    )
+    op.create_index(op.f("ix_conversations_demo_seed_run_id"), "conversations", ["demo_seed_run_id"], unique=False)
+    op.create_index(op.f("ix_conversations_dm_key"), "conversations", ["dm_key"], unique=True)
+    op.create_index(op.f("ix_conversations_last_message_at"), "conversations", ["last_message_at"], unique=False)
+    op.create_index(
+        "ix_conversations_last_message_at_nulls_last",
+        "conversations",
+        [sa.literal_column("last_message_at DESC NULLS LAST")],
+        unique=False,
     )
     op.create_table(
         "organizations",
@@ -109,6 +129,55 @@ def upgrade() -> None:
     )
     op.create_index(op.f("ix_users_username"), "users", ["username"], unique=True)
     op.create_table(
+        "conversation_participants",
+        sa.Column("demo_seed_run_id", sa.UUID(), nullable=True),
+        sa.Column("conversation_id", sa.UUID(), nullable=False),
+        sa.Column("user_id", sa.UUID(), nullable=True),
+        sa.Column("organization_id", sa.UUID(), nullable=True),
+        sa.Column("last_read_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("id", sa.UUID(), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.CheckConstraint(
+            "(user_id IS NOT NULL AND organization_id IS NULL) OR (user_id IS NULL AND organization_id IS NOT NULL)",
+            name="ck_participant_one_entity",
+        ),
+        sa.ForeignKeyConstraint(["conversation_id"], ["conversations.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(["demo_seed_run_id"], ["demo_seed_runs.id"], ondelete="SET NULL"),
+        sa.ForeignKeyConstraint(["organization_id"], ["organizations.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
+        sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint("conversation_id", "organization_id", name="uq_conv_org"),
+        sa.UniqueConstraint("conversation_id", "user_id", name="uq_conv_user"),
+    )
+    op.create_index(
+        "ix_conv_participants_org", "conversation_participants", ["organization_id", "conversation_id"], unique=False
+    )
+    op.create_index(
+        "ix_conv_participants_user", "conversation_participants", ["user_id", "conversation_id"], unique=False
+    )
+    op.create_index(
+        op.f("ix_conversation_participants_conversation_id"),
+        "conversation_participants",
+        ["conversation_id"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_conversation_participants_demo_seed_run_id"),
+        "conversation_participants",
+        ["demo_seed_run_id"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_conversation_participants_organization_id"),
+        "conversation_participants",
+        ["organization_id"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_conversation_participants_user_id"), "conversation_participants", ["user_id"], unique=False
+    )
+    op.create_table(
         "follows",
         sa.Column("demo_seed_run_id", sa.UUID(), nullable=True),
         sa.Column("follower_id", sa.UUID(), nullable=False),
@@ -121,6 +190,32 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("follower_id", "followed_id"),
     )
     op.create_index("ix_follows_followed_id", "follows", ["followed_id"], unique=False)
+    op.create_table(
+        "messages",
+        sa.Column("demo_seed_run_id", sa.UUID(), nullable=True),
+        sa.Column("conversation_id", sa.UUID(), nullable=False),
+        sa.Column("sender_user_id", sa.UUID(), nullable=True),
+        sa.Column("sender_organization_id", sa.UUID(), nullable=True),
+        sa.Column("content_ciphertext", sa.Text(), nullable=False),
+        sa.Column("id", sa.UUID(), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.CheckConstraint(
+            "(sender_user_id IS NOT NULL AND sender_organization_id IS NULL) OR (sender_user_id IS NULL AND sender_organization_id IS NOT NULL)",
+            name="ck_message_one_sender",
+        ),
+        sa.ForeignKeyConstraint(["conversation_id"], ["conversations.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(["demo_seed_run_id"], ["demo_seed_runs.id"], ondelete="SET NULL"),
+        sa.ForeignKeyConstraint(["sender_organization_id"], ["organizations.id"], ondelete="SET NULL"),
+        sa.ForeignKeyConstraint(["sender_user_id"], ["users.id"], ondelete="SET NULL"),
+        sa.PrimaryKeyConstraint("id"),
+    )
+    op.create_index("ix_messages_conv_created", "messages", ["conversation_id", "created_at"], unique=False)
+    op.create_index("ix_messages_conv_created_id", "messages", ["conversation_id", "created_at", "id"], unique=False)
+    op.create_index(op.f("ix_messages_conversation_id"), "messages", ["conversation_id"], unique=False)
+    op.create_index(op.f("ix_messages_demo_seed_run_id"), "messages", ["demo_seed_run_id"], unique=False)
+    op.create_index(op.f("ix_messages_sender_organization_id"), "messages", ["sender_organization_id"], unique=False)
+    op.create_index(op.f("ix_messages_sender_user_id"), "messages", ["sender_user_id"], unique=False)
     op.create_table(
         "opportunities",
         sa.Column("demo_seed_run_id", sa.UUID(), nullable=True),
@@ -265,8 +360,22 @@ def downgrade() -> None:
     op.drop_index(op.f("ix_opportunities_demo_seed_run_id"), table_name="opportunities")
     op.drop_index("ix_opportunities_created_at", table_name="opportunities")
     op.drop_table("opportunities")
+    op.drop_index(op.f("ix_messages_sender_user_id"), table_name="messages")
+    op.drop_index(op.f("ix_messages_sender_organization_id"), table_name="messages")
+    op.drop_index(op.f("ix_messages_demo_seed_run_id"), table_name="messages")
+    op.drop_index(op.f("ix_messages_conversation_id"), table_name="messages")
+    op.drop_index("ix_messages_conv_created_id", table_name="messages")
+    op.drop_index("ix_messages_conv_created", table_name="messages")
+    op.drop_table("messages")
     op.drop_index("ix_follows_followed_id", table_name="follows")
     op.drop_table("follows")
+    op.drop_index(op.f("ix_conversation_participants_user_id"), table_name="conversation_participants")
+    op.drop_index(op.f("ix_conversation_participants_organization_id"), table_name="conversation_participants")
+    op.drop_index(op.f("ix_conversation_participants_demo_seed_run_id"), table_name="conversation_participants")
+    op.drop_index(op.f("ix_conversation_participants_conversation_id"), table_name="conversation_participants")
+    op.drop_index("ix_conv_participants_user", table_name="conversation_participants")
+    op.drop_index("ix_conv_participants_org", table_name="conversation_participants")
+    op.drop_table("conversation_participants")
     op.drop_index(op.f("ix_users_username"), table_name="users")
     op.drop_index("ix_users_searchable", table_name="users", postgresql_where=sa.text("searchable = true"))
     op.drop_index("ix_users_role", table_name="users")
@@ -281,6 +390,11 @@ def downgrade() -> None:
     )
     op.drop_index(op.f("ix_organizations_demo_seed_run_id"), table_name="organizations")
     op.drop_table("organizations")
+    op.drop_index("ix_conversations_last_message_at_nulls_last", table_name="conversations")
+    op.drop_index(op.f("ix_conversations_last_message_at"), table_name="conversations")
+    op.drop_index(op.f("ix_conversations_dm_key"), table_name="conversations")
+    op.drop_index(op.f("ix_conversations_demo_seed_run_id"), table_name="conversations")
+    op.drop_table("conversations")
     op.drop_index(
         "ux_demo_seed_runs_one_active", table_name="demo_seed_runs", postgresql_where=sa.text("is_active = true")
     )

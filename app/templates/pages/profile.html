@@ -3,6 +3,7 @@
 {% from "components/user.html" import user_avatar, follow_button, follower_stats %}
 {% from "components/badges.html" import privacy_badge, role_badge %}
 {% from "components/forms.html" import htmx_form, radio_option, checkbox_toggle, modal_field %}
+{% from "components/messages.html" import start_conversation_button %}
 {% from "components/feedback.html" import modal, modal_actions %}
 {% from "components/buttons.html" import back_link, action_buttons %}
 {% from "components/layout.html" import settings_section_header, profile_hero %}
@@ -18,33 +19,31 @@
                         <div class="bg-white rounded-3xl shadow-premium p-8 border border-slate-100 text-center relative overflow-hidden group">
                             <div class="relative inline-block mx-auto mb-6 group/avatar">
                                 {% if user and user.id == profile_user.id %}
-                                    <div x-data="imageUploader({ endpointUrl: '/settings/profile/picture', aspectRatio: 1 })">
-                                        {% call image_upload_modal('avatar-upload', 'Update Profile Picture', '/settings/profile/picture', aspect_ratio=1) %}
-                                            <div class="w-40 h-40 rounded-full p-1 bg-white ring-2 ring-brand-100 shadow-lg">
-                                                <div class="relative w-full h-full group">
-                                                    <div class="w-full h-full rounded-full overflow-hidden bg-white shadow-xl">
-                                                        {% if profile_user.profile_picture %}
-                                                            <img src="/static/uploads/avatars/{{ profile_user.profile_picture }}"
-                                                                 alt="{{ profile_user.username }}"
-                                                                 class="w-full h-full object-cover">
-                                                        {% else %}
-                                                            <div class="w-full h-full rounded-full bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center text-4xl font-bold text-white">
-                                                                {{ profile_user.first_name[0] if profile_user.first_name else
-                                                                profile_user.username[0] | upper }}
-                                                            </div>
-                                                        {% endif %}
-                                                    </div>
-                                                    <button type="button"
-                                                            @click="triggerSelect()"
-                                                            class="absolute -bottom-2 -right-2 flex items-center justify-center">
-                                                        <div class="h-10 w-10 rounded-full bg-slate-900 text-white flex items-center justify-center shadow-lg ring-4 ring-white hover:bg-slate-800 transition-colors cursor-pointer">
-                                                            {{ icon('pencil', 'sm') }}
+                                    {% call image_upload_modal('avatar-upload', 'Update Profile Picture', '/settings/profile/picture', aspect_ratio=1) %}
+                                        <div class="w-40 h-40 rounded-full p-1 bg-white ring-2 ring-brand-100 shadow-lg">
+                                            <div class="relative w-full h-full group">
+                                                <div class="w-full h-full rounded-full overflow-hidden bg-white shadow-xl">
+                                                    {% if profile_user.profile_picture %}
+                                                        <img src="/static/uploads/avatars/{{ profile_user.profile_picture }}"
+                                                             alt="{{ profile_user.username }}"
+                                                             class="w-full h-full object-cover">
+                                                    {% else %}
+                                                        <div class="w-full h-full rounded-full bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center text-4xl font-bold text-white">
+                                                            {{ profile_user.first_name[0] if profile_user.first_name else
+                                                            profile_user.username[0] | upper }}
                                                         </div>
-                                                    </button>
+                                                    {% endif %}
                                                 </div>
+                                                <button type="button"
+                                                        @click="triggerSelect()"
+                                                        class="absolute -bottom-2 -right-2 flex items-center justify-center">
+                                                    <div class="h-10 w-10 rounded-full bg-slate-900 text-white flex items-center justify-center shadow-lg ring-4 ring-white hover:bg-slate-800 transition-colors cursor-pointer">
+                                                        {{ icon('pencil', 'sm') }}
+                                                    </div>
+                                                </button>
                                             </div>
-                                        {% endcall %}
-                                    </div>
+                                        </div>
+                                    {% endcall %}
                                 {% else %}
                                     <div class="w-40 h-40 rounded-full p-1 bg-white ring-2 ring-brand-100 shadow-lg">
                                         <div class="w-full h-full rounded-full overflow-hidden shadow-xl">
@@ -116,8 +115,11 @@
                                     </button>
                                 </div>
                             {% elif user and profile and profile.is_following is not none %}
-                                <div id="follow-button-container">
-                                    {% block follow_button scoped %}{{ follow_button(profile_user.username, profile.is_following, 'lg') }}{% endblock %}
+                                <div class="flex flex-col gap-3">
+                                    <div id="follow-button-container">
+                                        {% block follow_button scoped %}{{ follow_button(profile_user.username, profile.is_following, 'lg') }}{% endblock %}
+                                    </div>
+                                    {{ start_conversation_button('user', profile_user.id, size='lg') }}
                                 </div>
                             {% endif %}
                         </div>

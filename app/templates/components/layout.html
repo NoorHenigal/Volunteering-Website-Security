@@ -25,10 +25,17 @@
     <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-8 animate-enter">
         <h1 class="text-3xl md:text-4xl font-bold text-slate-900 tracking-tight">{{ title }}</h1>
         {% if action_url and action_text and show_action %}
-            <a href="{{ action_url }}"
-               class="inline-flex items-center justify-center px-6 py-2.5 border border-transparent text-sm font-medium rounded-full shadow-lg text-white bg-{{ action_color }}-600 hover:bg-{{ action_color }}-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-{{ action_color }}-500 transition-all transform hover:-translate-y-0.5">
-                {{ action_text }}
-            </a>
+            {% if action_color == 'blue' %}
+                <a href="{{ action_url }}"
+                   class="inline-flex items-center justify-center px-6 py-2.5 border border-transparent text-sm font-medium rounded-full shadow-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all transform hover:-translate-y-0.5">
+                    {{ action_text }}
+                </a>
+            {% else %}
+                <a href="{{ action_url }}"
+                   class="inline-flex items-center justify-center px-6 py-2.5 border border-transparent text-sm font-medium rounded-full shadow-lg text-white bg-{{ action_color }}-600 hover:bg-{{ action_color }}-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-{{ action_color }}-500 transition-all transform hover:-translate-y-0.5">
+                    {{ action_text }}
+                </a>
+            {% endif %}
         {% endif %}
     </div>
 {% endmacro %}
@@ -93,7 +100,7 @@
         </div>
         {# Admin Controls (banner upload etc) #}
         {% if admin_controls %}
-            <div class="absolute top-28 right-4 md:right-8 z-20 opacity-0 group-hover/hero:opacity-100 transition-opacity">
+            <div class="absolute bottom-4 right-4 md:bottom-6 md:right-8 z-20 opacity-0 group-hover/hero:opacity-100 transition-opacity duration-200">
                 {{ admin_controls }}
             </div>
         {% endif %}
