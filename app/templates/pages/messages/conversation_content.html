@@ -1,0 +1,133 @@
+{% from "components/icons.html" import icon %}
+{% from "components/messages.html" import message_bubble %}
+{% from "components/user.html" import entity_avatar %}
+<div class="flex flex-col h-full"
+     x-data="messageSocket()"
+     x-init="init('{{ conversation.id }}', '{{ acting_as }}', '{{ acting_id }}', '{{ user.id }}', '{{ ws_token }}')"
+     @beforeunload.window="disconnect()">
+    <div class="bg-white/80 backdrop-blur-xl border-b border-slate-100/50 px-4 py-3 flex items-center gap-3 sticky top-0 z-10">
+        <button @click="$dispatch('close-conversation')"
+                class="lg:hidden text-slate-400 hover:text-slate-600 transition-colors p-2 -ml-2 rounded-xl hover:bg-slate-100">
+            {{ icon('arrow-left', 'md') }}
+        </button>
+        {% if other_party %}
+            {{ entity_avatar(other_party, size='lg', online_dot=True) }}
+            <div class="flex-1 min-w-0">
+                <a href="/{{ other_party.username }}"
+                   class="font-semibold text-slate-900 hover:text-brand-600 transition-colors block truncate">{{ other_party.name }}</a>
+                <p class="text-xs text-slate-500 flex items-center gap-1">
+                    <span class="w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>
+                    <span x-text="connectionStatus === 'connected' ? 'Online' : 'Connecting...'">Online</span>
+                </p>
+            </div>
+        {% endif %}
+        {% if acting_as == 'organization' and organization %}
+            <div class="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-purple-50 rounded-full border border-purple-100">
+                <div class="w-5 h-5 rounded-full bg-purple-500 flex items-center justify-center text-white text-xs font-bold">
+                    {{ organization.name[:1] }}
+                </div>
+                <span class="text-xs font-medium text-purple-700">{{ organization.name }}</span>
+            </div>
+        {% endif %}
+    </div>
+    <div class="relative flex-1">
+        <div x-show="connectionStatus === 'connecting'"
+             x-transition
+             class="absolute top-2 left-1/2 -translate-x-1/2 z-20 px-4 py-2 bg-amber-50 border border-amber-200 rounded-full text-amber-700 text-xs font-medium flex items-center gap-2 shadow-lg">
+            <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                </path>
+            </svg>
+            Connecting...
+        </div>
+        <div x-show="connectionStatus === 'disconnected'"
+             x-transition
+             class="absolute top-2 left-1/2 -translate-x-1/2 z-20 px-4 py-2 bg-red-50 border border-red-200 rounded-full text-red-700 text-xs font-medium flex items-center gap-2 shadow-lg">
+            <span class="w-2 h-2 bg-red-500 rounded-full"></span>
+            Disconnected - Reconnecting...
+        </div>
+        <div id="message-list"
+             class="absolute inset-0 overflow-y-auto p-4 space-y-3 bg-gradient-to-b from-slate-50/80 to-white scroll-smooth"
+             x-ref="messageList"
+             @scroll="onScroll()">
+            <div id="load-older-sentinel" class="h-1"></div>
+            <div id="message-container" class="space-y-3">
+                {% for message in messages %}
+                    {% set is_own = (message.sender_type == 'user' and message.sender_id == user.id) if acting_as == 'user' else (message.sender_type == 'organization' and message.sender_id == acting_id) %}
+                    {{ message_bubble(message, is_own, user) }}
+                {% endfor %}
+            </div>
+            <div x-show="typingUser"
+                 x-transition.opacity
+                 class="flex items-center gap-2 text-slate-500 text-sm pl-1">
+                <div class="flex gap-1">
+                    <span class="w-2 h-2 bg-slate-400 rounded-full animate-bounce"
+                          style="animation-delay: 0ms;
+                                 animation-duration: 1s"></span>
+                    <span class="w-2 h-2 bg-slate-400 rounded-full animate-bounce"
+                          style="animation-delay: 150ms;
+                                 animation-duration: 1s"></span>
+                    <span class="w-2 h-2 bg-slate-400 rounded-full animate-bounce"
+                          style="animation-delay: 300ms;
+                                 animation-duration: 1s"></span>
+                </div>
+                <span x-text="typingUser + ' is typing...'"></span>
+            </div>
+        </div>
+        <div x-show="showScrollButton"
+             x-transition
+             class="absolute bottom-4 right-4 z-10">
+            <button @click="scrollToBottom()"
+                    class="w-10 h-10 bg-white border border-slate-200 rounded-full shadow-lg flex items-center justify-center text-slate-500 hover:text-brand-600 hover:border-brand-200 transition-all">
+                {{ icon('chevron-down', 'md') }}
+            </button>
+        </div>
+    </div>
+    <div class="border-t border-slate-100/50 bg-white/80 backdrop-blur-xl p-4">
+        <form @submit.prevent="sendMessage()" class="flex items-end gap-3">
+            <div class="flex-1 relative">
+                <textarea x-model="newMessage"
+                          x-ref="messageInput"
+                          placeholder="Type a message..."
+                          autocomplete="off"
+                          rows="1"
+                          @keydown.enter.prevent="if (!$event.shiftKey && newMessage.trim()) { sendMessage(); }"
+                          @input="handleTyping(); $el.style.height = 'auto'; $el.style.height = Math.min($el.scrollHeight, 120) + 'px'"
+                          @blur="stopTyping()"
+                          class="w-full px-4 py-3 border-0 bg-slate-100 rounded-2xl text-sm placeholder:text-slate-400 focus:bg-slate-50 focus:ring-2 focus:ring-brand-500/20 transition-all outline-none resize-none min-h-[48px] max-h-[120px]"></textarea>
+            </div>
+            <button type="submit"
+                    :disabled="!newMessage.trim() || sending"
+                    class="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-brand-500 to-brand-600 text-white rounded-2xl hover:from-brand-600 hover:to-brand-700 transition-all shadow-lg shadow-brand-500/25 hover:shadow-xl hover:shadow-brand-500/30 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none flex items-center justify-center">
+                <template x-if="!sending">
+                    {{ icon('paper-airplane', 'md') }}
+                </template>
+                <template x-if="sending">
+                    <svg class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                        </path>
+                    </svg>
+                </template>
+            </button>
+        </form>
+    </div>
+</div>
+<style>
+    @keyframes message-in {
+        from {
+            opacity: 0;
+            transform: translateY(10px) scale(0.95);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+    }
+
+    .message-enter {
+        animation: message-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+</style>

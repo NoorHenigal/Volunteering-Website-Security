@@ -2,6 +2,7 @@
 
 import pytest
 from fastapi import status
+from httpx import AsyncClient
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -128,3 +129,24 @@ class TestAuthRoundtrip:
             "/auth/login",
             json={"email": user.email, "password": new_password, "account_type": "volunteer"},
         )
+
+    @pytest.mark.anyio
+    async def test_api_keys_loaded_correctly(self) -> None:
+        """Critical: Verify API keys loaded correctly."""
+        from app.core.config import settings
+
+        assert settings.jwt_secret_key is not None
+        jwt_value = settings.jwt_secret_key.get_secret_value()
+        assert len(jwt_value) > 20, "JWT key should be at least 20 characters"
+
+        assert settings.encryption_key is not None
+        encryption_value = settings.encryption_key.get_secret_value()
+        assert len(encryption_value) == 64, "Encryption key must be exactly 64 hex characters"
+
+    @pytest.mark.anyio
+    async def test_auth_library_initialized(self, client: AsyncClient) -> None:
+        """Critical: Verify library initialized correctly."""
+        response = await client.get("/auth/me")
+
+        assert response.status_code in (401, 303), f"Auth system may not be initialized properly, got {response.status_code}"
+

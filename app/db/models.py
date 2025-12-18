@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from typing import Literal
 from uuid import UUID, uuid4
 
-from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Index, String, UniqueConstraint, func, text
+from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Index, String, Text, UniqueConstraint, func, text
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, declarative_mixin, mapped_column, relationship
 
@@ -13,6 +13,7 @@ from app.core.types import ProfileVisibilityType
 
 RoleType = Literal["volunteer", "organization", "system_admin"]
 ApplicationStatusType = Literal["pending", "accepted", "rejected", "withdrawn"]
+ParticipantType = Literal["user", "organization"]
 
 
 def _pg_check(expression: str, name: str) -> CheckConstraint:
@@ -388,16 +389,173 @@ class Follow(Base):
     followed: Mapped[User] = relationship("User", foreign_keys=[followed_id], back_populates="followers")
 
 
+class Conversation(Base, FullModelMixin):
+    """A DM conversation between two participants (user/org/org-org)."""
+
+    __tablename__ = "conversations"
+    demo_seed_run_id: Mapped[UUID | None] = _demo_seed_fk()
+
+    dm_key: Mapped[str] = mapped_column(String(192), unique=True, nullable=False, index=True)
+
+    last_message_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+
+    __table_args__ = (
+        Index(
+            "ix_conversations_last_message_at_nulls_last",
+            last_message_at.desc().nulls_last(),
+        ).ddl_if(dialect="postgresql"),
+    )
+
+    participants: Mapped[list[ConversationParticipant]] = relationship(
+        "ConversationParticipant",
+        back_populates="conversation",
+        cascade="all, delete-orphan",
+    )
+    messages: Mapped[list[Message]] = relationship(
+        "Message",
+        back_populates="conversation",
+        cascade="all, delete-orphan",
+        order_by="Message.created_at.desc()",
+    )
+
+
+class ConversationParticipant(Base, FullModelMixin):
+    """Links a user or organization to a conversation."""
+
+    __tablename__ = "conversation_participants"
+    demo_seed_run_id: Mapped[UUID | None] = _demo_seed_fk()
+
+    conversation_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("conversations.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+
+    user_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
+    organization_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
+
+    last_read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    __table_args__ = (
+        _pg_check(
+            "(user_id IS NOT NULL AND organization_id IS NULL) OR (user_id IS NULL AND organization_id IS NOT NULL)",
+            "ck_participant_one_entity",
+        ),
+        UniqueConstraint("conversation_id", "user_id", name="uq_conv_user"),
+        UniqueConstraint("conversation_id", "organization_id", name="uq_conv_org"),
+        Index("ix_conv_participants_user", "user_id", "conversation_id"),
+        Index("ix_conv_participants_org", "organization_id", "conversation_id"),
+    )
+
+    conversation: Mapped[Conversation] = relationship("Conversation", back_populates="participants")
+    user: Mapped[User | None] = relationship("User", foreign_keys=[user_id])
+    organization: Mapped[Organization | None] = relationship("Organization", foreign_keys=[organization_id])
+
+    @property
+    def participant_type(self) -> ParticipantType:
+        """Return the type of participant."""
+        return "user" if self.user_id else "organization"
+
+    @property
+    def entity_id(self) -> UUID:
+        """Return the ID of the participant entity."""
+        return self.user_id if self.user_id else self.organization_id  # type: ignore[return-value]
+
+    @property
+    def has_unread(self) -> bool:
+        """Check if there are unread messages (O(1) boolean check)."""
+        if not self.conversation.last_message_at:
+            return False
+        if not self.last_read_at:
+            return True
+        return self.conversation.last_message_at > self.last_read_at
+
+
+class Message(Base, FullModelMixin):
+    """A message within a conversation."""
+
+    __tablename__ = "messages"
+    demo_seed_run_id: Mapped[UUID | None] = _demo_seed_fk()
+
+    conversation_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("conversations.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+
+    sender_user_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    sender_organization_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("organizations.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+
+    content_ciphertext: Mapped[str] = mapped_column(Text, nullable=False)
+
+    __table_args__ = (
+        _pg_check(
+            "(sender_user_id IS NOT NULL AND sender_organization_id IS NULL) OR "
+            "(sender_user_id IS NULL AND sender_organization_id IS NOT NULL)",
+            "ck_message_one_sender",
+        ),
+        Index("ix_messages_conv_created", "conversation_id", "created_at"),
+        Index("ix_messages_conv_created_id", "conversation_id", "created_at", "id"),
+    )
+
+    conversation: Mapped[Conversation] = relationship("Conversation", back_populates="messages")
+    sender_user: Mapped[User | None] = relationship("User", foreign_keys=[sender_user_id])
+    sender_organization: Mapped[Organization | None] = relationship(
+        "Organization", foreign_keys=[sender_organization_id]
+    )
+
+    @property
+    def content(self) -> str:
+        """Decrypt and return message content."""
+        return decrypt_field(self.content_ciphertext) or ""
+
+    @property
+    def sender_type(self) -> ParticipantType:
+        """Return the type of sender."""
+        return "user" if self.sender_user_id else "organization"
+
+    @property
+    def sender_id(self) -> UUID:
+        """Return the ID of the sender entity."""
+        return self.sender_user_id if self.sender_user_id else self.sender_organization_id  # type: ignore[return-value]
+
+
 __all__ = [
     "Application",
     "ApplicationStatusType",
     "Base",
+    "Conversation",
+    "ConversationParticipant",
     "DemoSeedRun",
     "Follow",
     "FullModelMixin",
     "IDMixin",
+    "Message",
     "Opportunity",
     "Organization",
+    "ParticipantType",
     "ProfileVisibilityType",
     "RefreshToken",
     "RoleType",

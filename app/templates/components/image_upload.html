@@ -15,11 +15,10 @@
                     error: null,
                     cropperOpen: false,
                     cropImage: null,
-                    // zoom state
-                    scale: 0.55,
-                    minScale: 0.55,
-                    maxScale: 2.5,
-                    // pan state
+                    scale: 1,
+                    minScale: 0.1,
+                    coverScale: 1,
+                    maxScale: 3,
                     imageX: 0,
                     imageY: 0,
                     isDragging: false,
@@ -37,6 +36,20 @@
                         if (!Number.isFinite(value)) return;
                         // Clamp zoom into configured range so slider and image stay in sync
                         this.scale = Math.min(this.maxScale, Math.max(this.minScale, value));
+                    },
+
+                    // Calculate the minimum scale needed for the image to fully cover the crop area
+                    calculateCoverScale(imgWidth, imgHeight) {
+                        // Viewport dimensions (the visible crop area in the UI)
+                        const viewportWidth = aspectRatio === 1 ? 250 : 320;
+                        const viewportHeight = aspectRatio === 1 ? 250 : 180;
+
+                        // Scale needed to cover in each dimension
+                        const scaleX = viewportWidth / imgWidth;
+                        const scaleY = viewportHeight / imgHeight;
+
+                        // Use the larger scale to ensure full coverage
+                        return Math.max(scaleX, scaleY);
                     },
 
                     handleFile(event) {
@@ -61,6 +74,12 @@
                             const img = new Image();
                             img.onload = () => {
                                 this.cropImage = img;
+
+                                this.coverScale = this.calculateCoverScale(img.width, img.height);
+                                this.minScale = this.coverScale * 0.5;
+                                this.maxScale = Math.max(3, this.coverScale * 3);
+                                this.scale = this.coverScale;
+
                                 this.cropperOpen = true;
                                 this.resetCrop();
                             };
@@ -70,7 +89,7 @@
                     },
 
                     resetCrop() {
-                        this.scale = this.minScale;
+                        this.scale = this.coverScale;
                         this.imageX = 0;
                         this.imageY = 0;
                     },
@@ -107,11 +126,19 @@
                             const formData = new FormData();
                             formData.append(uploadName, blob, 'upload.webp');
 
+                            // Get CSRF token from cookie for header-based validation
+                            // This prevents the middleware from consuming the request body
+                            const csrfToken = document.cookie
+                                .split('; ')
+                                .find(row => row.startsWith('csrf_token='))
+                                ?.split('=')[1];
+
                             const response = await fetch(endpointUrl, {
                                 method: 'POST',
                                 body: formData,
                                 headers: {
-                                    'X-Requested-With': 'XMLHttpRequest'
+                                    'X-Requested-With': 'XMLHttpRequest',
+                                    'X-CSRF-Token': csrfToken || ''
                                 }
                             });
 
@@ -211,78 +238,79 @@
             });
         }
     </script>
-    <!-- Hidden Input -->
-    <input type="file"
-           x-ref="fileInput"
-           accept="image/*"
-           class="hidden"
-           @change="handleFile($event)">
-    <!-- Cropper Modal - teleported to body to avoid overflow clipping -->
-    <template x-teleport="body">
-        <div x-show="cropperOpen"
-             x-cloak
-             class="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/80 backdrop-blur-sm p-4">
-            <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]"
-                 @click.outside="cropperOpen = false">
-                <div class="p-4 border-b border-slate-100 flex justify-between items-center">
-                    <h3 class="font-bold text-slate-800">{{ title }}</h3>
-                    <button @click="cropperOpen = false"
-                            class="text-slate-400 hover:text-slate-600">{{ icon('x', 'lg') }}</button>
-                </div>
-                <!-- Crop Area -->
-                <div class="relative bg-slate-900 overflow-hidden flex-1 min-h-[300px] cursor-move select-none"
-                     @mousedown="startDrag"
-                     @mousemove="onDrag"
-                     @mouseup="stopDrag"
-                     @mouseleave="stopDrag"
-                     @touchstart="startDrag"
-                     @touchmove="onDrag"
-                     @touchend="stopDrag">
-                    <!-- Image Layer -->
-                    <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
-                        <img :src="cropImage && cropImage.src"
-                             :style="`transform: translate(${imageX}px, ${imageY}px) scale(${scale});`"
-                             class="max-w-none transition-transform duration-75 origin-center"
-                             draggable="false">
+    <div x-data="imageUploader({ endpointUrl: '{{ endpoint }}', aspectRatio: {{ aspect_ratio }} })">
+        <input type="file"
+               x-ref="fileInput"
+               accept="image/*"
+               class="hidden"
+               @change="handleFile($event)">
+        <template x-teleport="body">
+            <div x-show="cropperOpen"
+                 x-cloak
+                 class="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/80 backdrop-blur-sm p-4">
+                <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]"
+                     @click.outside="cropperOpen = false">
+                    <div class="p-4 border-b border-slate-100 flex justify-between items-center">
+                        <h3 class="font-bold text-slate-800">{{ title }}</h3>
+                        <button @click="cropperOpen = false"
+                                class="text-slate-400 hover:text-slate-600">{{ icon('x', 'lg') }}</button>
                     </div>
-                    <div class="absolute inset-0 pointer-events-none bg-black/50">
-                        <!-- The transparent hole -->
-                        <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 border-2 border-white/50 shadow-[0_0_0_9999px_rgba(0,0,0,0.5)]"
-                             :style="`width: {{ 250 if aspect_ratio == 1 else 320 }}px; height: {{ 250 if aspect_ratio == 1 else 180 }}px; border-radius: {{ '50%' if aspect_ratio == 1 else '12px' }}`">
+                    <!-- Crop Area -->
+                    <div class="relative bg-slate-900 overflow-hidden flex-1 min-h-[300px] cursor-move select-none"
+                         @mousedown="startDrag"
+                         @mousemove="onDrag"
+                         @mouseup="stopDrag"
+                         @mouseleave="stopDrag"
+                         @touchstart="startDrag"
+                         @touchmove="onDrag"
+                         @touchend="stopDrag">
+                        <!-- Image Layer -->
+                        <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+                            <img :src="cropImage && cropImage.src"
+                                 :style="`transform: translate(${imageX}px, ${imageY}px) scale(${scale});`"
+                                 class="max-w-none transition-transform duration-75 origin-center"
+                                 draggable="false">
+                        </div>
+                        <div class="absolute inset-0 pointer-events-none bg-black/50">
+                            <!-- The transparent hole -->
+                            <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 border-2 border-white/50 shadow-[0_0_0_9999px_rgba(0,0,0,0.5)]"
+                                 :style="`width: {{ 250 if aspect_ratio == 1 else 320 }}px; height: {{ 250 if aspect_ratio == 1 else 180 }}px; border-radius: {{ '50%' if aspect_ratio == 1 else '12px' }}`">
+                            </div>
                         </div>
                     </div>
-                </div>
-                <!-- Controls -->
-                <div class="p-4 bg-white border-t border-slate-100">
-                    <div class="mb-4">
-                        <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Zoom</label>
-                        <input type="range"
-                               :min="minScale"
-                               :max="maxScale"
-                               step="0.05"
-                               :value="scale"
-                               @input="onZoomChange"
-                               class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-brand-600">
+                    <!-- Controls -->
+                    <div class="p-4 bg-white border-t border-slate-100">
+                        <div class="mb-4">
+                            <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Zoom</label>
+                            <input type="range"
+                                   :min="minScale"
+                                   :max="maxScale"
+                                   step="0.05"
+                                   :value="scale"
+                                   @input="onZoomChange"
+                                   class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-brand-600">
+                        </div>
+                        <div class="flex gap-3">
+                            <button @click="cropperOpen = false"
+                                    class="flex-1 px-4 py-2 border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-50">
+                                Cancel
+                            </button>
+                            <button @click="upload()"
+                                    :disabled="uploading"
+                                    class="flex-1 px-4 py-2 bg-brand-600 text-white rounded-xl font-bold hover:bg-brand-700 disabled:opacity-50 flex items-center justify-center gap-2">
+                                <span x-show="uploading"
+                                      class="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></span>
+                                <span x-text="uploading ? 'Uploading...' : 'Save Image'"></span>
+                            </button>
+                        </div>
+                        <p x-show="error"
+                           x-text="error"
+                           class="text-red-500 text-sm font-medium mt-3 text-center"></p>
                     </div>
-                    <div class="flex gap-3">
-                        <button @click="cropperOpen = false"
-                                class="flex-1 px-4 py-2 border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-50">
-                            Cancel
-                        </button>
-                        <button @click="upload()"
-                                :disabled="uploading"
-                                class="flex-1 px-4 py-2 bg-brand-600 text-white rounded-xl font-bold hover:bg-brand-700 disabled:opacity-50 flex items-center justify-center gap-2">
-                            <span x-show="uploading"
-                                  class="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></span>
-                            <span x-text="uploading ? 'Uploading...' : 'Save Image'"></span>
-                        </button>
-                    </div>
-                    <p x-show="error"
-                       x-text="error"
-                       class="text-red-500 text-sm font-medium mt-3 text-center"></p>
                 </div>
             </div>
-        </div>
-    </template>
-    {{ caller() }}
+        </template>
+        <!-- Caller provides the trigger button/UI -->
+        {{ caller() }}
+    </div>
 {% endmacro %}

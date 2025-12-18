@@ -1,0 +1,3 @@
+{% from "components/messages.html" import message_bubble %}
+{% set is_own = (message.sender_type == 'user' and message.sender_id == user.id) if acting_as == 'user' else (message.sender_type == 'organization' and message.sender_id == acting_id) %}
+{{ message_bubble(message, is_own, user) }}

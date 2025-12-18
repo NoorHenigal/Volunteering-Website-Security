@@ -24,6 +24,7 @@ from app.core.context import ContextDep, render_template
 from app.core.exceptions import http_exception_handler, validation_exception_handler
 from app.core.lifecycle import StartupCheckError, cleanup_shutdown_task, manage_test_shutdown, run_preflight_checks
 from app.demo.router import router as demo_router
+from app.messaging.router import router as messaging_router
 from app.opportunities.router import router as opp_router
 from app.organizations.router import router as org_router
 from app.profiles.router import router as profiles_router
@@ -108,6 +109,8 @@ async def add_security_headers(request: Request, call_next: Callable[[Request], 
                 with contextlib.suppress(Exception):
                     form = await request.form()
                     form_token = str(form.get("csrf_token")) if form.get("csrf_token") is not None else None
+                    # Cache form data for later use in parse_body
+                    request.state._cached_form = form
 
             sent_token = header_token or form_token
             if not cookie_token or not sent_token or sent_token != cookie_token:
@@ -158,6 +161,7 @@ async def home(ctx: ContextDep) -> Response:
 
 app.include_router(auth_router)
 app.include_router(demo_router)
+app.include_router(messaging_router)
 app.include_router(opp_router)
 app.include_router(org_router)
 app.include_router(profiles_router)
