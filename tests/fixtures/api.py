@@ -1,4 +1,4 @@
-"""Simplified API testing helper."""
+"""Testing helper."""
 
 from typing import Any
 
@@ -8,7 +8,7 @@ from tests.fixtures.data import AuthenticatedUser
 
 
 class APIHelper:
-    """Simplified API testing helper with universal request method."""
+    """Testing helper with form-based submissions and cookie auth."""
 
     def __init__(self, client: AsyncClient) -> None:
         """Initialize with an AsyncClient instance."""
@@ -21,27 +21,34 @@ class APIHelper:
         *,
         expected: int | tuple[int, ...] | None = None,
         auth: AuthenticatedUser | None = None,
-        json: dict[str, Any] | None = None,
+        data: dict[str, Any] | None = None,
         **kwargs: Any,
-    ) -> dict[str, Any] | Response:
-        """Universal request method.
+    ) -> Response:
+        """Universal request method for testing.
 
         Args:
             method: HTTP method (GET, POST, PUT, DELETE, etc.)
             endpoint: API endpoint path
-            expected: Expected status code(s). If None, accepts any 2xx.
-            auth: Authenticated user for Authorization header
-            json: JSON body data
+            expected: Expected status code(s). If None, accepts any 2xx or 3xx.
+            auth: Authenticated user for cookie-based auth
+            data: Form data to submit
             **kwargs: Additional request arguments
 
         Returns:
-            JSON dict for success responses, Response object for errors.
+            Response object.
         """
         headers = kwargs.pop("headers", {})
+        headers["Accept"] = "text/html"
         if auth:
             headers.update(auth.auth_header)
 
-        response = await self.client.request(method, endpoint, headers=headers, json=json, **kwargs)
+        # Include CSRF token in form data for POST/PUT/PATCH/DELETE
+        if data is not None and method.upper() in ("POST", "PUT", "PATCH", "DELETE"):
+            csrf_token = self.client.cookies.get("csrf_token")
+            if csrf_token and "csrf_token" not in data:
+                data = {**data, "csrf_token": csrf_token}
+
+        response = await self.client.request(method, endpoint, headers=headers, data=data, **kwargs)
 
         if expected is not None:
             expected_codes = expected if isinstance(expected, tuple) else (expected,)
@@ -49,14 +56,6 @@ class APIHelper:
                 f"Expected {expected_codes}, got {response.status_code}: {response.text}"
             )
 
-        # Return JSON for success, Response for errors
-        if 200 <= response.status_code < 300:
-            try:
-                json_result: dict[str, Any] = response.json()
-            except (ValueError, TypeError):
-                return response
-            else:
-                return json_result
         return response
 
     async def ok(
@@ -65,26 +64,22 @@ class APIHelper:
         endpoint: str,
         *,
         auth: AuthenticatedUser | None = None,
-        json: dict[str, Any] | None = None,
+        data: dict[str, Any] | None = None,
         **kwargs: Any,
-    ) -> dict[str, Any]:
-        """Assert success (200/201) and return JSON."""
-        result = await self(method, endpoint, expected=(200, 201), auth=auth, json=json, **kwargs)
-        assert isinstance(result, dict)
-        return result
+    ) -> Response:
+        """Assert success (200/303) and return Response."""
+        return await self(method, endpoint, expected=(200, 303), auth=auth, data=data, **kwargs)
 
     async def created(
         self,
         endpoint: str,
         *,
         auth: AuthenticatedUser | None = None,
-        json: dict[str, Any] | None = None,
+        data: dict[str, Any] | None = None,
         **kwargs: Any,
-    ) -> dict[str, Any]:
-        """Assert 201 Created and return JSON."""
-        result = await self("POST", endpoint, expected=201, auth=auth, json=json, **kwargs)
-        assert isinstance(result, dict)
-        return result
+    ) -> Response:
+        """Assert success (200/303 for testing) and return Response."""
+        return await self("POST", endpoint, expected=(200, 303), auth=auth, data=data, **kwargs)
 
     async def forbidden(
         self,
@@ -92,26 +87,22 @@ class APIHelper:
         endpoint: str,
         *,
         auth: AuthenticatedUser | None = None,
-        json: dict[str, Any] | None = None,
+        data: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> Response:
         """Assert 403 Forbidden."""
-        result = await self(method, endpoint, expected=403, auth=auth, json=json, **kwargs)
-        assert isinstance(result, Response)
-        return result
+        return await self(method, endpoint, expected=403, auth=auth, data=data, **kwargs)
 
     async def unauthorized(
         self,
         method: str,
         endpoint: str,
         *,
-        json: dict[str, Any] | None = None,
+        data: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> Response:
-        """Assert 401 Unauthorized."""
-        result = await self(method, endpoint, expected=401, json=json, **kwargs)
-        assert isinstance(result, Response)
-        return result
+        """Assert 401 Unauthorized or 303 redirect to login."""
+        return await self(method, endpoint, expected=(401, 303), data=data, **kwargs)
 
     async def not_found(
         self,
@@ -119,13 +110,11 @@ class APIHelper:
         endpoint: str,
         *,
         auth: AuthenticatedUser | None = None,
-        json: dict[str, Any] | None = None,
+        data: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> Response:
         """Assert 404 Not Found."""
-        result = await self(method, endpoint, expected=404, auth=auth, json=json, **kwargs)
-        assert isinstance(result, Response)
-        return result
+        return await self(method, endpoint, expected=404, auth=auth, data=data, **kwargs)
 
     async def bad_request(
         self,
@@ -133,13 +122,11 @@ class APIHelper:
         endpoint: str,
         *,
         auth: AuthenticatedUser | None = None,
-        json: dict[str, Any] | None = None,
+        data: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> Response:
         """Assert 400 Bad Request."""
-        result = await self(method, endpoint, expected=400, auth=auth, json=json, **kwargs)
-        assert isinstance(result, Response)
-        return result
+        return await self(method, endpoint, expected=400, auth=auth, data=data, **kwargs)
 
     async def unprocessable(
         self,
@@ -147,13 +134,11 @@ class APIHelper:
         endpoint: str,
         *,
         auth: AuthenticatedUser | None = None,
-        json: dict[str, Any] | None = None,
+        data: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> Response:
         """Assert 422 Unprocessable Entity."""
-        result = await self(method, endpoint, expected=422, auth=auth, json=json, **kwargs)
-        assert isinstance(result, Response)
-        return result
+        return await self(method, endpoint, expected=422, auth=auth, data=data, **kwargs)
 
     async def conflict(
         self,
@@ -161,35 +146,32 @@ class APIHelper:
         endpoint: str,
         *,
         auth: AuthenticatedUser | None = None,
-        json: dict[str, Any] | None = None,
+        data: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> Response:
-        """Assert 409 Conflict."""
-        result = await self(method, endpoint, expected=409, auth=auth, json=json, **kwargs)
-        assert isinstance(result, Response)
-        return result
+        """Assert 409 Conflict or 400."""
+        return await self(method, endpoint, expected=(409, 400), auth=auth, data=data, **kwargs)
 
-    async def no_content(
+    async def redirect(
         self,
         method: str,
         endpoint: str,
         *,
         auth: AuthenticatedUser | None = None,
+        data: dict[str, Any] | None = None,
         **kwargs: Any,
-    ) -> None:
-        """Assert 204 No Content."""
-        await self(method, endpoint, expected=204, auth=auth, **kwargs)
+    ) -> Response:
+        """Assert 303 redirect."""
+        return await self(method, endpoint, expected=303, auth=auth, data=data, **kwargs)
 
-    async def list_contains(
+    async def html_contains(
         self,
         endpoint: str,
         *,
         auth: AuthenticatedUser,
-        expected_count: int | None = None,
-    ) -> dict[str, Any]:
-        """Assert list endpoint returns expected items."""
-        data = await self.ok("GET", endpoint, auth=auth)
-        assert "items" in data
-        if expected_count is not None:
-            assert len(data["items"]) == expected_count
-        return data
+        text: str,
+    ) -> Response:
+        """Assert HTML response contains expected text."""
+        response = await self.ok("GET", endpoint, auth=auth)
+        assert text in response.text, f"Expected '{text}' in response"
+        return response

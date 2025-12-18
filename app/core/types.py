@@ -1,6 +1,6 @@
 """Shared type definitions and validators."""
 
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 from uuid import UUID
 
 from fastapi import Path
@@ -83,11 +83,23 @@ OrganizationIdPath = Annotated[UUID, Path(description="Organization UUID")]
 ApplicationIdPath = Annotated[UUID, Path(description="Application UUID")]
 
 
+# OpenAPI response definitions for UI-only endpoints (HTML responses)
+# Used by routers to document common HTTP status codes in OpenAPI schema
+UI_RESPONSES: dict[int | str, dict[str, Any]] = {
+    303: {"description": "Redirect", "content": {"text/html": {}}},
+    400: {"description": "Bad Request", "content": {"text/html": {}}},
+    401: {"description": "Unauthorized", "content": {"text/html": {}}},
+    403: {"description": "Forbidden", "content": {"text/html": {}}},
+    404: {"description": "Not Found", "content": {"text/html": {}}},
+    422: {"description": "Validation Error", "content": {"text/html": {}}},
+}
+
 __all__ = [
     "MUTABLE_CONFIG",
     "NULL_BYTE_ERROR",
     "ORM_CONFIG",
     "STRICT_CONFIG",
+    "UI_RESPONSES",
     "ApplicationIdPath",
     "BioField",
     "DescriptionField",
@@ -98,6 +110,8 @@ __all__ = [
     "OpportunityDescriptionField",
     "OpportunityIdPath",
     "OrganizationIdPath",
+    "OrganizationRoleField",
+    "OrganizationRoleType",
     "ProfileVisibilityField",
     "ProfileVisibilityType",
     "SlugPath",

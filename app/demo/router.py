@@ -1,4 +1,4 @@
-"""Demo mode UI endpoints."""
+"""Demo mode endpoints."""
 
 from __future__ import annotations
 

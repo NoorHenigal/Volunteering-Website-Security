@@ -1,4 +1,4 @@
-"""Messaging UI routes (HTMX/Jinja) and WebSocket endpoints."""
+"""Messaging routes and WebSocket endpoints."""
 
 import logging
 from dataclasses import dataclass

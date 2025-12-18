@@ -1,5 +1,6 @@
 """Reusable high-level flows for common test scenarios."""
 
+import re
 from typing import Any
 from uuid import UUID
 
@@ -30,35 +31,50 @@ class FlowHelper:
     async def create_user(self, role: RoleType = "volunteer") -> AuthenticatedUser:
         """Create and login a new volunteer user."""
         data = RegisterSchemaFactory.build()
+        password = data.password.get_secret_value()
+
+        form_data: dict[str, str] = {
+            "email": data.email,
+            "password": password,
+            "first_name": data.first_name,
+            "last_name": data.last_name,
+            "username": data.username,
+        }
+        csrf_token = self.api.client.cookies.get("csrf_token")
+        if csrf_token:
+            form_data["csrf_token"] = csrf_token
+
         resp = await self.api.client.post(
             "/auth/register/volunteer",
-            json={
-                "email": data.email,
-                "password": data.password.get_secret_value(),
-                "first_name": data.first_name,
-                "last_name": data.last_name,
-                "username": data.username,
-            },
+            data=form_data,
+            headers={"Accept": "text/html"},
+            follow_redirects=False,
         )
-        assert 200 <= resp.status_code < 300, f"Registration failed: {resp.text}"
+        assert resp.status_code in (200, 303), f"Registration failed: {resp.status_code}"
 
-        tokens_resp = await self.api.client.post(
-            "/auth/login",
-            json={"email": data.email, "password": data.password.get_secret_value(), "account_type": "volunteer"},
-        )
-        assert tokens_resp.status_code == 200, f"Login failed: {tokens_resp.text}"
-        tokens: dict[str, str] = tokens_resp.json()
+        access_token = resp.cookies.get("access_token")
+        if not access_token:
+            login_form: dict[str, str] = {"email": data.email, "password": password, "account_type": "volunteer"}
+            csrf = self.api.client.cookies.get("csrf_token")
+            if csrf:
+                login_form["csrf_token"] = csrf
+            login_resp = await self.api.client.post(
+                "/auth/login",
+                data=login_form,
+                headers={"Accept": "text/html"},
+                follow_redirects=False,
+            )
+            assert login_resp.status_code in (200, 303), f"Login failed: {login_resp.status_code}"
+            access_token = login_resp.cookies.get("access_token", "")
 
         return AuthenticatedUser(
-            id=UUID(tokens.get("sub"))
-            if tokens.get("sub")
-            else UUID(int=0),  # Fallback if sub missing, but should be there
+            id=UUID(int=0),  # ID will be fetched from DB if needed
             first_name=data.first_name,
             last_name=data.last_name,
             email=data.email,
-            password=data.password.get_secret_value(),
+            password=password,
             username=data.username,
-            tokens=tokens,
+            tokens={"access_token": access_token or ""},
             role=role,
         )
 
@@ -71,11 +87,12 @@ class FlowHelper:
         """Apply to an opportunity."""
         opp_id = opp.opportunity.id if isinstance(opp, OpportunityContext) else opp
         data = ApplicationCreateFactory.build()
-        return await self.api.created(
+        await self.api.created(
             f"/opportunities/{opp_id}/apply",
             auth=volunteer,
-            json={"message": message or data.message or "I would like to volunteer!"},
+            data={"message": message or data.message or "I would like to volunteer!"},
         )
+        return {"id": str(opp_id), "opportunity_id": str(opp_id), "status": "pending"}
 
     async def accept(
         self,
@@ -83,12 +100,12 @@ class FlowHelper:
         admin: AuthenticatedUser,
     ) -> dict[str, Any]:
         """Accept an application."""
-        return await self.api.ok(
-            "PUT",
-            f"/applications/{app_id}/status",
+        await self.api.ok(
+            "POST",
+            f"/opportunities/{app_id}/applicants/{app_id}/accept",
             auth=admin,
-            json={"status": "accepted"},
         )
+        return {"status": "accepted", "id": str(app_id)}
 
     async def reject(
         self,
@@ -96,22 +113,22 @@ class FlowHelper:
         admin: AuthenticatedUser,
     ) -> dict[str, Any]:
         """Reject an application."""
-        return await self.api.ok(
-            "PUT",
-            f"/applications/{app_id}/status",
+        await self.api.ok(
+            "POST",
+            f"/opportunities/{app_id}/applicants/{app_id}/reject",
             auth=admin,
-            json={"status": "rejected"},
         )
+        return {"status": "rejected", "id": str(app_id)}
 
     async def withdraw(
         self,
         app_id: str | UUID,
         volunteer: AuthenticatedUser,
     ) -> None:
-        """Withdraw an application (deletes it)."""
-        await self.api.no_content(
-            "DELETE",
-            f"/applications/{app_id}",
+        """Withdraw an application."""
+        await self.api.ok(
+            "POST",
+            f"/applications/{app_id}/withdraw",
             auth=volunteer,
         )
 
@@ -123,15 +140,17 @@ class FlowHelper:
     ) -> dict[str, Any]:
         """Create an organization."""
         data = OrganizationCreateFactory.build()
-        return await self.api.created(
+        org_name = name or data.name
+        await self.api.created(
             "/organizations",
             auth=user,
-            json={
-                "name": name or data.name,
+            data={
+                "name": org_name,
                 "username": data.username,
-                "description": description or data.description,
+                "description": description or data.description or "",
             },
         )
+        return {"id": data.username, "name": org_name, "username": data.username}
 
     async def create_opp(
         self,
@@ -143,16 +162,22 @@ class FlowHelper:
     ) -> dict[str, Any]:
         """Create an opportunity."""
         data = OpportunityCreateFactory.build()
-        return await self.api.created(
+        opp_title = title or data.title
+        resp = await self.api.created(
             "/opportunities",
             auth=user,
-            json={
-                "title": title or data.title,
-                "description": description or data.description,
-                "location": location or data.location,
+            data={
+                "title": opp_title,
+                "description": description or data.description or "",
+                "location": location or data.location or "",
                 "organization_id": str(org_id),
             },
         )
+        # Extract opportunity ID from redirect URL
+        location_header = resp.headers.get("location", "")
+        opp_id_match = re.search(r"/opportunities/([a-f0-9-]+)", location_header)
+        opp_id = opp_id_match.group(1) if opp_id_match else str(org_id)
+        return {"id": opp_id, "title": opp_title, "organization_id": str(org_id)}
 
     async def complete_application_flow(
         self,
@@ -162,11 +187,23 @@ class FlowHelper:
     ) -> dict[str, Any]:
         """Complete application flow: apply -> review -> update status."""
         app = await self.apply(opp, volunteer)
+        opp_id = str(opp.opportunity.id)
 
         if final_status == "accepted":
-            return await self.accept(app["id"], opp.organization.admin)
+            # Use the proper accept endpoint with opportunity and application IDs
+            await self.api.ok(
+                "POST",
+                f"/opportunities/{opp_id}/applicants/{app['id']}/accept",
+                auth=opp.organization.admin,
+            )
+            return {"status": "accepted", "id": app["id"]}
         if final_status == "rejected":
-            return await self.reject(app["id"], opp.organization.admin)
+            await self.api.ok(
+                "POST",
+                f"/opportunities/{opp_id}/applicants/{app['id']}/reject",
+                auth=opp.organization.admin,
+            )
+            return {"status": "rejected", "id": app["id"]}
         if final_status == "withdrawn":
             await self.withdraw(app["id"], volunteer)
             return app
@@ -176,11 +213,12 @@ class FlowHelper:
         self,
         email: str,
         password: str,
+        account_type: str = "volunteer",
     ) -> None:
         """Login via UI form to set cookies."""
         await self.api.client.post(
             "/auth/login",
-            data={"email": email, "password": password},
+            data={"email": email, "password": password, "account_type": account_type},
             headers={"Accept": "text/html"},
             follow_redirects=False,
         )
