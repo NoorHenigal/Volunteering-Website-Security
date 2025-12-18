@@ -5,7 +5,7 @@ import random
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Conversation, Message, User
@@ -193,8 +193,8 @@ async def clear_demo_conversation(db: AsyncSession, user_id: UUID) -> bool:
     if not session:
         return False
 
-    await db.execute(Message.__table__.delete().where(Message.conversation_id == session.conversation_id))
-    await db.execute(Conversation.__table__.delete().where(Conversation.id == session.conversation_id))
+    await db.execute(delete(Message).where(Message.conversation_id == session.conversation_id))
+    await db.execute(delete(Conversation).where(Conversation.id == session.conversation_id))
     await db.flush()
 
     return True
