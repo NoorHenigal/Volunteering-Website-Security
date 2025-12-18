@@ -63,6 +63,43 @@ async def render_block(request: Request, template_name: str, block_name: str, **
     return Response(content=html, media_type="text/html")
 
 
+async def render_error_page(
+    request: Request,
+    status_code: int,
+    title: str,
+    message: str | None = None,
+) -> Response:
+    """Render a styled error page using the error template."""
+    ctx = {
+        "request": request,
+        "page_title": title,
+        "error": message,
+        "csrf_token": getattr(request.state, "csrf_token", None) or request.cookies.get("csrf_token"),
+    }
+    return templates.TemplateResponse(request, "pages/error.html", ctx, status_code=status_code)
+
+
+async def render_success_page(
+    request: Request,
+    title: str,
+    message: str | None = None,
+    details: dict[str, str] | None = None,
+    redirect_url: str = "/",
+    button_text: str = "Go Home",
+) -> Response:
+    """Render a styled success page using the success template."""
+    ctx = {
+        "request": request,
+        "page_title": title,
+        "message": message,
+        "details": details,
+        "redirect_url": redirect_url,
+        "button_text": button_text,
+        "csrf_token": getattr(request.state, "csrf_token", None) or request.cookies.get("csrf_token"),
+    }
+    return templates.TemplateResponse(request, "pages/success.html", ctx, status_code=200)
+
+
 async def trigger_toast(response: Response, message: str, toast_type: str = "success") -> Response:
     """Add HX-Trigger header for toast notification."""
     trigger_data = {

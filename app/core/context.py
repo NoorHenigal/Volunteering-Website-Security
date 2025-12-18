@@ -9,12 +9,11 @@ from uuid import UUID
 
 from fastapi import Depends, Header, HTTPException, Request, Response, status
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, SecretBytes, SecretStr, ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.exceptions import serialize_validation_errors
-from app.core.htmx import htmx_redirect, is_htmx, render_block
+from app.core.htmx import htmx_redirect, is_htmx, render_block, render_error_page
 from app.core.security import get_user_from_cookie, get_user_from_token
 from app.core.templates import templates
 from app.db.session import get_db
@@ -30,7 +29,6 @@ def _get_secret_field_names(schema: type[BaseModel]) -> set[str]:
     secret_fields: set[str] = set()
     for field_name, field_info in schema.model_fields.items():
         annotation = field_info.annotation
-        # Handle Optional[SecretStr] and similar
         origin = getattr(annotation, "__origin__", None)
         if origin is not None:
             args = getattr(annotation, "__args__", ())
@@ -58,11 +56,9 @@ async def render_template(
     **context: object,
 ) -> Response:
     """Render a Jinja2 template. If block is specified, renders only that block."""
-    # If block is specified, use render_block for partial rendering
     if block:
         return await render_block(request, name, block, **context)
 
-    # Otherwise, render the full template
     ctx = dict(context)
     ctx.setdefault("request", request)
     ctx.setdefault("csrf_token", getattr(request.state, "csrf_token", None) or request.cookies.get("csrf_token"))
@@ -86,14 +82,6 @@ TEMPLATE_REQUIRED_ERROR = "Template required for UI responses"
 
 _DB_DEPENDENCY = Depends(get_db)
 _AUTH_HEADER = Header(default=None)
-
-
-def validation_error_response(e: ValidationError | RequestValidationError) -> JSONResponse:
-    """Convert validation error to 422 JSON response."""
-    return JSONResponse(
-        status_code=422,
-        content={"detail": serialize_validation_errors(e.errors()), "status_code": 422},
-    )
 
 
 def require_role(user: User, role: str, action: str) -> None:
@@ -124,18 +112,16 @@ class _UIRouteHandler(Protocol):
 
 
 def ui_auth_required(func: Callable[..., Awaitable[Response]]) -> _UIRouteHandler:
-    """Decorator that redirects to login if not authenticated. Injects `user` as second arg."""
+    """Decorator that requires authentication. Raises 401 if not authenticated. Injects `user` as second arg."""
     original_sig = inspect.signature(func)
     params = [p for p in original_sig.parameters.values() if p.name not in ("user", "_user")]
     new_sig = original_sig.replace(parameters=params)
 
     @wraps(func)
     async def wrapper(ctx: RequestContext, *args: object, **kwargs: object) -> Response:
-        result = ctx.require_ui_auth()
-        if isinstance(result, RedirectResponse):
-            return result
+        user = ctx.require_authenticated()
         # Inject user as second positional argument
-        return await func(ctx, result, *args, **kwargs)
+        return await func(ctx, user, *args, **kwargs)
 
     object.__setattr__(wrapper, "__signature__", new_sig)
     return cast("_UIRouteHandler", wrapper)
@@ -175,47 +161,40 @@ class RequestContext:
         self.user = user
         self.authorization = authorization
         self.is_htmx = is_htmx(request)
-        self.is_ui = self.is_htmx or (not authorization and "text/html" in request.headers.get("accept", ""))
 
     async def success_response(
         self,
-        data: BaseModel | None = None,
         redirect_url: str | None = None,
         template: str | None = None,
         block: str | None = None,
         status_code: int = 200,
         **template_ctx: object,
     ) -> Response:
-        """Return JSON for API requests, template/redirect for UI."""
-        if self.is_ui:
-            if redirect_url:
-                if self.is_htmx:
-                    return await htmx_redirect(redirect_url)
-                return RedirectResponse(url=redirect_url, status_code=303)
+        """Return template or redirect for UI requests."""
+        if redirect_url:
+            if self.is_htmx:
+                return await htmx_redirect(redirect_url)
+            return RedirectResponse(url=redirect_url, status_code=303)
 
-            if template and block and self.is_htmx:
-                return await render_block(
-                    self.request,
-                    template,
-                    block,
-                    user=self.user,
-                    **template_ctx,
-                )
-
-            if not template:
-                raise ValueError(TEMPLATE_REQUIRED_ERROR)
-            return await render_template(
+        if template and block and self.is_htmx:
+            return await render_block(
                 self.request,
                 template,
-                status_code=status_code,
-                block=None,
+                block,
                 user=self.user,
                 **template_ctx,
             )
 
-        if data:
-            return JSONResponse(content=data.model_dump(mode="json"), status_code=status_code)
-        return JSONResponse(content={}, status_code=status_code)
+        if not template:
+            raise ValueError(TEMPLATE_REQUIRED_ERROR)
+        return await render_template(
+            self.request,
+            template,
+            status_code=status_code,
+            block=None,
+            user=self.user,
+            **template_ctx,
+        )
 
     async def error_response(
         self,
@@ -225,60 +204,42 @@ class RequestContext:
         block: str | None = None,
         **template_ctx: object,
     ) -> Response:
-        """Return JSON error for API, template with error for UI."""
+        """Return template with error for UI requests."""
         if isinstance(error, HTTPException):
             error_msg = str(error.detail)
             status_code = error.status_code
         else:
             error_msg = str(error)
 
-        if self.is_ui:
-            if template:
-                if block and self.is_htmx:
-                    return await render_block(
-                        self.request,
-                        template,
-                        block,
-                        error=error_msg,
-                        user=self.user,
-                        **template_ctx,
-                    )
-                return await render_template(
+        if template:
+            if block and self.is_htmx:
+                return await render_block(
                     self.request,
                     template,
-                    status_code=status_code,
-                    block=None,
+                    block,
                     error=error_msg,
                     user=self.user,
                     **template_ctx,
                 )
-            # For HTMX requests without template, return inline error HTML
-            if self.is_htmx:
-                error_html = f'<div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm font-medium">{error_msg}</div>'
-                return Response(content=error_html, media_type="text/html", status_code=status_code)
-            return RedirectResponse(url="/auth/login", status_code=303)
+            return await render_template(
+                self.request,
+                template,
+                status_code=status_code,
+                block=None,
+                error=error_msg,
+                user=self.user,
+                **template_ctx,
+            )
+        if self.is_htmx:
+            error_html = f'<div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm font-medium">{error_msg}</div>'
+            return Response(content=error_html, media_type="text/html", status_code=status_code)
+        # Return HTML error page for non-HTMX requests using template
+        return await render_error_page(self.request, status_code, f"Error {status_code}", error_msg)
 
-        return JSONResponse(
-            content={"detail": error_msg, "status_code": status_code, "error_code": None},
-            status_code=status_code,
-        )
-
-    def require_authenticated(self, redirect_to: str = "/auth/login") -> User:
-        """Return user or raise 401 (API) / redirect (UI)."""
+    def require_authenticated(self) -> User:
+        """Return user or raise 401 if not authenticated."""
         if not self.user:
-            if self.is_ui:
-                raise HTTPException(
-                    status_code=status.HTTP_303_SEE_OTHER,
-                    detail=redirect_to,
-                    headers={"Location": redirect_to},
-                )
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
-        return self.user
-
-    def require_ui_auth(self) -> User | RedirectResponse:
-        """Return user or redirect response for UI routes."""
-        if not self.user:
-            return RedirectResponse(url="/auth/login", status_code=303)
         return self.user
 
     async def parse_body[T: BaseModel](self, schema: type[T], form_fields: dict[str, str]) -> T | None:
@@ -304,7 +265,6 @@ class RequestContext:
                 return schema(**body)
 
             if "application/x-www-form-urlencoded" in content_type or "multipart/form-data" in content_type:
-                # Use cached form data if available from CSRF middleware
                 form = getattr(self.request.state, "_cached_form", None)
                 if form is None:
                     form = await self.request.form()
@@ -314,9 +274,8 @@ class RequestContext:
                 # Map form field names to schema field names for redaction
                 form_name_to_schema = {v: k for k, v in form_fields.items()}
                 secret_form_keys = {fn for fn, sf in form_name_to_schema.items() if sf in secret_fields}
-                secret_form_keys.add("csrf_token")  # Always redact CSRF token
+                secret_form_keys.add("csrf_token")
 
-                # Log all form fields when in debug mode (with secrets redacted)
                 if log.isEnabledFor(logging.DEBUG):
                     log.debug("[MULTIPART] Parsing form for schema: %s", schema.__name__)
                     log.debug("[MULTIPART] Expected fields: %s", form_fields)
@@ -333,13 +292,11 @@ class RequestContext:
                     value = form.get(form_name)
                     if value is not None:
                         str_value = str(value).strip()
-                        # Convert empty strings to None for optional fields
                         if str_value == "":
                             field_info = schema.model_fields.get(field)
                             if field_info and field_info.is_required() is False:
                                 log.debug("[MULTIPART] Skipping optional empty field: %s", form_name)
                                 continue
-                        # Coerce UUID fields for strict models
                         field_info = schema.model_fields.get(field)
                         if field_info and field_info.annotation is UUID:
                             form_data[field] = UUID(str_value)
@@ -418,5 +375,4 @@ __all__ = [
     "require_system_admin",
     "require_volunteer_role",
     "ui_auth_required",
-    "validation_error_response",
 ]

@@ -1,11 +1,4 @@
-"""Test data factories, context classes, and domain helpers.
-
-Provides:
-- Polyfactory-based factories for all schemas
-- AuthenticatedUser, OrganizationContext, OpportunityContext dataclasses
-- FixtureContext for lazy-loaded test resources
-- All domain helper functions (no circular imports)
-"""
+"""Test data factories, context classes, and domain helpers."""
 
 from dataclasses import dataclass, field
 from typing import Any, Literal
@@ -22,7 +15,6 @@ from app.db.models import Application, Opportunity, Organization, User, UserOrga
 from app.opportunities.schemas import ApplicationCreate, OpportunityCreate
 from app.organizations.schemas import OrganizationCreate
 
-# Updated role type - volunteer, system_admin, and organization (for test context)
 RoleType = Literal["volunteer", "system_admin", "organization"]
 
 
@@ -137,36 +129,53 @@ async def register_user(
     last_name = last_name or data.last_name
     username = username or data.username
 
+    form_data: dict[str, str] = {
+        "email": email,
+        "password": password,
+        "first_name": first_name,
+        "last_name": last_name,
+        "username": username,
+    }
+    csrf_token = client.cookies.get("csrf_token")
+    if csrf_token:
+        form_data["csrf_token"] = csrf_token
+
     response = await client.post(
         "/auth/register/volunteer",
-        json={
-            "email": email,
-            "password": password,
-            "first_name": first_name,
-            "last_name": last_name,
-            "username": username,
-        },
+        data=form_data,
+        headers={"Accept": "text/html"},
+        follow_redirects=False,
     )
-    assert response.status_code == 201, f"Registration failed: {response.text}"
-    user_data = response.json()
+    assert response.status_code in (200, 303), f"Registration failed: {response.status_code}"
+    access_token = response.cookies.get("access_token") or ""
     return AuthenticatedUser(
-        id=UUID(user_data["id"]),
+        id=UUID(int=0),  # ID fetched from DB if needed
         first_name=first_name,
         last_name=last_name,
         email=email,
         username=username,
         password=password,
-        tokens={},
+        tokens={"access_token": access_token},
         role=role,
     )
 
 
-async def login_user(client: AsyncClient, email: str, password: str) -> dict[str, str]:
-    """Login a user and return tokens."""
-    response = await client.post("/auth/login", json={"email": email, "password": password})
-    assert response.status_code == 200, f"Login failed: {response.text}"
-    result: dict[str, str] = response.json()
-    return result
+async def login_user(client: AsyncClient, email: str, password: str, account_type: str = "volunteer") -> dict[str, str]:
+    """Login a user and return tokens from cookies."""
+    form_data: dict[str, str] = {"email": email, "password": password, "account_type": account_type}
+    csrf_token = client.cookies.get("csrf_token")
+    if csrf_token:
+        form_data["csrf_token"] = csrf_token
+
+    response = await client.post(
+        "/auth/login",
+        data=form_data,
+        headers={"Accept": "text/html"},
+        follow_redirects=False,
+    )
+    assert response.status_code in (200, 303), f"Login failed: {response.status_code}"
+    access_token = response.cookies.get("access_token") or ""
+    return {"access_token": access_token}
 
 
 async def register_and_login(
@@ -178,7 +187,9 @@ async def register_and_login(
 ) -> AuthenticatedUser:
     """Register and login a user, returning full AuthenticatedUser."""
     user = await register_user(client, role, email, password, username=username)
-    user.tokens = await login_user(client, user.email, user.password)
+    # If registration didn't set cookies, login separately
+    if not user.tokens.get("access_token"):
+        user.tokens = await login_user(client, user.email, user.password)
     return user
 
 

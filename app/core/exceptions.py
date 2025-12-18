@@ -1,12 +1,15 @@
 """Exception handlers and error helpers."""
 
+from __future__ import annotations
+
 import json
 from collections.abc import Sequence
 
 from fastapi import HTTPException, Request, status
-from fastapi.responses import JSONResponse
 from starlette.responses import RedirectResponse, Response
 from starlette.routing import Match
+
+from app.core.htmx import render_error_page
 
 HTTP_303_SEE_OTHER = 303
 
@@ -38,7 +41,7 @@ def conflict(condition: bool, message: str) -> None:
 
 
 async def http_exception_handler(request: Request, exc: Exception) -> Response:
-    """Handle HTTP exceptions. Adds Allow header for 405 responses."""
+    """Handle HTTP exceptions. Returns HTML error page for UI requests."""
     status_code = getattr(exc, "status_code", 500)
     detail = getattr(exc, "detail", str(exc))
     headers: dict[str, str] = getattr(exc, "headers", None) or {}
@@ -58,21 +61,24 @@ async def http_exception_handler(request: Request, exc: Exception) -> Response:
             allowed.add("OPTIONS")
             headers["Allow"] = ", ".join(sorted(allowed))
 
-    return JSONResponse(
-        status_code=status_code,
-        content={"detail": str(detail), "status_code": status_code, "error_code": None},
-        headers=headers,
-    )
+    response = await render_error_page(request, status_code, f"Error {status_code}", detail)
+    for key, value in headers.items():
+        response.headers[key] = value
+    return response
 
 
-async def validation_exception_handler(_request: Request, exc: Exception) -> Response:
-    """Handle validation exceptions with 422 response."""
-    errors: list[dict[str, object]] = getattr(exc, "errors", list)()
+async def validation_exception_handler(request: Request, exc: Exception) -> Response:
+    """Handle validation exceptions with 422 response - returns HTML error page."""
+    raw_errors: list[dict[str, object]] = getattr(exc, "errors", list)()
+    error_msgs: list[str] = []
+    for e in raw_errors:
+        loc = e.get("loc", ("field",))
+        field = loc[-1] if isinstance(loc, (list, tuple)) and loc else "field"
+        msg = e.get("msg", "Invalid")
+        error_msgs.append(f"{field}: {msg}")
+    error_str = "; ".join(error_msgs) if error_msgs else "Validation error"
 
-    return JSONResponse(
-        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-        content={"detail": serialize_validation_errors(errors), "status_code": 422},
-    )
+    return await render_error_page(request, status.HTTP_422_UNPROCESSABLE_CONTENT, "Validation Error", error_str)
 
 
 __all__ = [

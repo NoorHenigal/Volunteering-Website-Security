@@ -1,12 +1,12 @@
-"""Organization routes."""
+"""Organization routes (UI-only)."""
 
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, File, Form, HTTPException, Response, UploadFile, status
+from fastapi import APIRouter, File, Form, HTTPException, Response, UploadFile
+from fastapi.responses import HTMLResponse
 from starlette.concurrency import run_in_threadpool
 
-from app.core.base_schemas import ListResponse, PaginationMeta, error_responses
 from app.core.context import (
     ContextDep,
     render_template,
@@ -16,15 +16,15 @@ from app.core.dependencies import ImageServiceDep, OrganizationServiceDep
 from app.core.form_fields import ORGANIZATION_EDIT_FIELDS, with_values
 from app.core.htmx import handle_htmx_redirect
 from app.core.services.images import ImagePreset
+from app.core.types import UI_RESPONSES
 from app.db.models import Organization
-from app.organizations.schemas import (
-    OrganizationCreate,
-    OrganizationDetailResponse,
-    OrganizationResponse,
-    OrganizationUpdate,
-)
+from app.organizations.schemas import OrganizationCreate
 
-router = APIRouter(tags=["Organizations"])
+router = APIRouter(
+    tags=["Organizations"],
+    default_response_class=HTMLResponse,
+    responses=UI_RESPONSES,
+)
 
 
 async def _render_organization_detail(
@@ -50,52 +50,36 @@ async def _render_organization_detail(
     )
 
 
-@router.get(
-    "/organizations",
-    response_model=ListResponse[OrganizationResponse] | None,
-    responses=error_responses(auth=True),
-)
+@router.get("/organizations")
 async def list_organizations(
     ctx: ContextDep,
     org_svc: OrganizationServiceDep,
     page: int = 1,
-) -> Response | ListResponse[OrganizationResponse]:
+) -> Response:
     """List all organizations."""
     ctx.require_authenticated()
     limit = 9
 
     items, total = await org_svc.list_all(page=page, limit=limit)
 
-    if ctx.is_ui:
-        context = list_view_context(
-            items=items,
-            page_title="Organizations",
-            meta={"page": page, "total": total, "per_page": limit, "total_pages": (total + limit - 1) // limit},
-            show_create=ctx.user is not None,
-            empty_message="No organizations found",
-        )
-        return await ctx.success_response(template="pages/organizations/list.html", **context)
-
-    return ListResponse[OrganizationResponse](
-        items=[OrganizationResponse.model_validate(org) for org in items],
-        meta=PaginationMeta(total=total, page=page, per_page=limit),
+    context = list_view_context(
+        items=items,
+        page_title="Organizations",
+        meta={"page": page, "total": total, "per_page": limit, "total_pages": (total + limit - 1) // limit},
+        show_create=ctx.user is not None,
+        empty_message="No organizations found",
     )
+    return await ctx.success_response(template="pages/organizations/list.html", **context)
 
 
-@router.post(
-    "/organizations",
-    response_model=OrganizationResponse | None,
-    status_code=status.HTTP_201_CREATED,
-    responses=error_responses(auth=True, forbidden=True),
-)
+@router.post("/organizations")
 async def create_organization(
     ctx: ContextDep,
     org_svc: OrganizationServiceDep,
-) -> Response | OrganizationResponse:
+) -> Response:
     """Create a new organization."""
     user = ctx.require_authenticated()
 
-    # Parse body (JSON or Form)
     try:
         data = await ctx.parse_body_or_400(
             OrganizationCreate,
@@ -106,12 +90,11 @@ async def create_organization(
             },
         )
     except HTTPException as e:
-        if ctx.is_ui:
-            # For HTMX overlay submissions, return inline error
-            if ctx.is_htmx:
-                return await ctx.error_response(e, template=None, block=None)
-            return await ctx.error_response(e, template="pages/shared.html", view="form", block="form_content")
-        raise
+        if ctx.is_htmx:
+            return await ctx.error_response(e, template=None, block=None)
+        return await ctx.error_response(
+            e, template="pages/shared.html", view="form", block="form_content", page_title="Organizations"
+        )
 
     try:
         organization = await org_svc.create(
@@ -121,67 +104,45 @@ async def create_organization(
             admin_user_id=user.id,
         )
     except HTTPException as e:
-        if ctx.is_ui and ctx.is_htmx:
+        if ctx.is_htmx:
             return await ctx.error_response(e, template=None, block=None)
-        raise
+        return await ctx.error_response(
+            e, template="pages/shared.html", view="form", block="form_content", page_title="Organizations"
+        )
 
-    if ctx.is_ui:
-        return await handle_htmx_redirect(ctx, f"/{organization.username}")
-
-    return OrganizationResponse.model_validate(organization)
+    return await handle_htmx_redirect(ctx, f"/{organization.username}")
 
 
-@router.get(
-    "/organizations/{organization_id}",
-    response_model=OrganizationDetailResponse | None,
-    responses=error_responses(auth=True, not_found=True),
-)
+@router.get("/organizations/{organization_id}")
 async def get_organization(
     organization_id: UUID,
     ctx: ContextDep,
     org_svc: OrganizationServiceDep,
-) -> Response | OrganizationDetailResponse:
+) -> Response:
     """Get a single organization by ID."""
     ctx.require_authenticated()
 
-    if ctx.is_ui:
-        organization = await org_svc.get_by_id_with_opportunities(organization_id)
-        return await _render_organization_detail(ctx, organization, org_svc)
-
-    # API response
-    organization = await org_svc.get_by_id(organization_id)
-    members = await org_svc.get_members(organization_id)
-
-    return OrganizationDetailResponse(
-        id=organization.id,
-        name=organization.name,
-        description=organization.description,
-        members=members,
-        created_at=organization.created_at,
-        updated_at=organization.updated_at,
-    )
+    organization = await org_svc.get_by_id_with_opportunities(organization_id)
+    return await _render_organization_detail(ctx, organization, org_svc)
 
 
-@router.put(
-    "/organizations/{organization_id}",
-    response_model=OrganizationResponse,
-    responses=error_responses(auth=True, forbidden=True, not_found=True),
-)
+@router.put("/organizations/{organization_id}")
 async def update_organization(
     organization_id: UUID,
-    data: OrganizationUpdate,
     ctx: ContextDep,
     org_svc: OrganizationServiceDep,
-) -> OrganizationResponse:
+    name: Annotated[str, Form(...)],
+    description: Annotated[str, Form()] = "",
+) -> Response:
     """Update an organization."""
     organization = await org_svc.get_by_id(organization_id)
     await org_svc.require_admin(ctx.require_authenticated().id, organization_id)
 
-    organization = await org_svc.update(organization, name=data.name, description=data.description)
-    return OrganizationResponse.model_validate(organization)
+    await org_svc.update(organization, name=name, description=description if description else None)
+    return await handle_htmx_redirect(ctx, f"/{organization.username}")
 
 
-@router.get("/organizations/{organization_id}/edit", responses=error_responses(auth=True))
+@router.get("/organizations/{organization_id}/edit")
 async def edit_organization_form(
     organization_id: UUID,
     ctx: ContextDep,
@@ -236,23 +197,19 @@ async def update_organization_form(
         )
 
 
-@router.post(
-    "/organizations/{organization_id}/banner", response_model=OrganizationResponse, responses=error_responses(auth=True)
-)
+@router.post("/organizations/{organization_id}/banner")
 async def upload_organization_banner(
     organization_id: UUID,
     ctx: ContextDep,
     org_svc: OrganizationServiceDep,
     image_svc: ImageServiceDep,
     file: Annotated[UploadFile, File(...)],
-) -> OrganizationResponse:
+) -> Response:
     """Upload organization banner image."""
     user = ctx.require_authenticated()
     await org_svc.require_admin(user.id, organization_id)
 
     content = await file.read()
-
-    # Get current org to check for old banner
     org = await org_svc.get_by_id(organization_id)
 
     filename = await run_in_threadpool(
@@ -261,27 +218,23 @@ async def upload_organization_banner(
         organization_id,
         ImagePreset.BANNER,
     )
-    org = await org_svc.update_banner(organization_id, filename)
-    return OrganizationResponse.model_validate(org)
+    await org_svc.update_banner(organization_id, filename)
+    return await handle_htmx_redirect(ctx, f"/{org.username}")
 
 
-@router.post(
-    "/organizations/{organization_id}/logo", response_model=OrganizationResponse, responses=error_responses(auth=True)
-)
+@router.post("/organizations/{organization_id}/logo")
 async def upload_organization_logo(
     organization_id: UUID,
     ctx: ContextDep,
     org_svc: OrganizationServiceDep,
     image_svc: ImageServiceDep,
     file: Annotated[UploadFile, File(...)],
-) -> OrganizationResponse:
+) -> Response:
     """Upload organization logo image."""
     user = ctx.require_authenticated()
     await org_svc.require_admin(user.id, organization_id)
 
     content = await file.read()
-
-    # Get current org to check for old logo
     org = await org_svc.get_by_id(organization_id)
 
     filename = await run_in_threadpool(
@@ -290,15 +243,11 @@ async def upload_organization_logo(
         organization_id,
         ImagePreset.LOGO,
     )
-    org = await org_svc.update_logo(organization_id, filename)
-    return OrganizationResponse.model_validate(org)
+    await org_svc.update_logo(organization_id, filename)
+    return await handle_htmx_redirect(ctx, f"/{org.username}")
 
 
-@router.delete(
-    "/organizations/{organization_id}",
-    status_code=status.HTTP_204_NO_CONTENT,
-    responses=error_responses(auth=True, forbidden=True, not_found=True),
-)
+@router.delete("/organizations/{organization_id}")
 async def delete_organization(
     organization_id: UUID,
     ctx: ContextDep,
@@ -308,7 +257,7 @@ async def delete_organization(
     user = ctx.require_authenticated()
     await org_svc.require_admin(user.id, organization_id)
     await org_svc.soft_delete(organization_id)
-    return Response(status_code=204)
+    return await handle_htmx_redirect(ctx, "/organizations")
 
 
 @router.post("/organizations/{organization_id}/delete", include_in_schema=False)

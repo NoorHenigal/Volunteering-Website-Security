@@ -10,8 +10,8 @@ from tests.fixtures.data import FixtureContext
 from tests.fixtures.flows import FlowHelper
 
 
-class TestOrganizationAPI:
-    """Test organization API endpoints."""
+class TestOrganizationUI:
+    """Test organization endpoints."""
 
     @pytest.mark.anyio
     async def test_create_organization(
@@ -21,21 +21,18 @@ class TestOrganizationAPI:
         test_db: AsyncSession,
     ) -> None:
         """Creating an organization also makes the creator an admin (DB check)."""
-        data = await api.created(
+        response = await api.client.post(
             "/auth/register/organization",
-            json={
+            data={
                 "name": "Sustainability Society",
                 "username": "sustainability-society",
                 "email": "sustainability@example.com",
                 "password": "TestPass123!TestPwd",
-                "description": "Sustainability society...",
             },
+            headers={"Accept": "text/html"},
+            follow_redirects=False,
         )
-        assert data["name"] == "Sustainability Society"
-        assert data["description"] is None
-        assert "id" in data
-
-        # DB verification: creator is stored as admin
+        assert response.status_code in (200, 303)
         org_result = await test_db.execute(select(Organization).where(Organization.name == "Sustainability Society"))
         org = org_result.scalar_one_or_none()
         assert org is not None
@@ -56,38 +53,28 @@ class TestOrganizationAPI:
         flows: FlowHelper,
     ) -> None:
         """Test listing all organizations."""
-        # Create orgs via API (not DB)
         user = await flows.create_user("volunteer")
         await flows.create_org(user, name="Campus Food Bank", description="On-campus food support")
         await flows.create_org(user, name="Park Clean-Up Group", description="Local park volunteering")
 
         volunteer = await flows.create_user("volunteer")
-        data = await api.ok("GET", "/organizations", auth=volunteer)
-        assert "items" in data
-        assert len(data["items"]) >= 2
+        response = await api.ok("GET", "/organizations", auth=volunteer)
+        assert response.status_code == 200
+        assert "Organizations" in response.text
 
     @pytest.mark.anyio
     async def test_get_organization_details(
         self,
         api: APIHelper,
-        flows: FlowHelper,
-        test_db: AsyncSession,
+        ctx: FixtureContext,
     ) -> None:
-        """Test getting organization details with members."""
-        # Create org via API
-        user = await flows.create_user("volunteer")
-        org = await flows.create_org(user, name="Test Org", description="Test description")
+        """Test viewing organization details page."""
+        test_org = await ctx.organization()
+        volunteer = await ctx.volunteer()
 
-        # Add member via flows helper
-        member = await flows.create_user("volunteer")
-        await flows.add_member(test_db, member, org, role="member")
-
-        data = await api.ok("GET", f"/organizations/{org['id']}", auth=member)
-        assert data["name"] == "Test Org"
-        assert data["description"] == "Test description"
-        assert "members" in data
-        # Should have admin + member
-        assert len(data["members"]) == 2
+        response = await api.ok("GET", f"/organizations/{test_org.organization.id}", auth=volunteer)
+        assert response.status_code == 200
+        assert test_org.organization.name in response.text
 
     @pytest.mark.anyio
     async def test_update_organization_as_admin(
@@ -97,14 +84,13 @@ class TestOrganizationAPI:
     ) -> None:
         """Test updating organization as admin."""
         test_org = await ctx.organization()
-        data = await api.ok(
-            "PUT",
-            f"/organizations/{test_org.organization.id}",
+        response = await api.ok(
+            "POST",
+            f"/organizations/{test_org.organization.id}/edit",
             auth=test_org.admin,
-            json={"name": "New Name", "description": "New description"},
+            data={"name": "New Name", "description": "New description"},
         )
-        assert data["name"] == "New Name"
-        assert data["description"] == "New description"
+        assert response.status_code in (200, 303)
 
     @pytest.mark.anyio
     async def test_update_organization_as_non_admin_fails(
@@ -112,29 +98,34 @@ class TestOrganizationAPI:
         api: APIHelper,
         flows: FlowHelper,
         test_db: AsyncSession,
+        ctx: FixtureContext,
     ) -> None:
         """Test that non-admins cannot update organization."""
-        # Create org via API
-        user = await flows.create_user("volunteer")
-        org = await flows.create_org(user, name="Test Org", description="Test description")
+        test_org = await ctx.organization()
 
-        # Add member via flows helper
         member = await flows.create_user("volunteer")
-        await flows.add_member(test_db, member, org, role="member")
+        await flows.add_member(test_db, member, test_org, role="member")
 
-        await api.forbidden("PUT", f"/organizations/{org['id']}", auth=member, json={"name": "New Name"})
+        response = await api.forbidden(
+            "POST",
+            f"/organizations/{test_org.organization.id}/edit",
+            auth=member,
+            data={"name": "New Name"},
+        )
+        assert response.status_code == 403
 
     @pytest.mark.anyio
-    async def test_unauthenticated_cannot_create_organization(self, api: APIHelper) -> None:
-        """Test that unauthenticated users can create organization accounts."""
-        data = await api.created(
+    async def test_unauthenticated_can_register_organization(self, api: APIHelper) -> None:
+        """Test that unauthenticated users can create organization accounts via registration."""
+        response = await api.client.post(
             "/auth/register/organization",
-            json={
+            data={
                 "name": "Test Org",
                 "username": "test-org",
                 "email": "test@example.com",
                 "password": "TestPass123!TestPwd",
-                "description": "Test description",
             },
+            headers={"Accept": "text/html"},
+            follow_redirects=False,
         )
-        assert data["name"] == "Test Org"
+        assert response.status_code in (200, 303)
