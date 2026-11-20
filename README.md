@@ -1,4 +1,11 @@
 # KV6014-Volunteering-Project
+## My Role: Security Testing
+I was responsible for checking the security of the application.
+
+- Tested login and registration for weak password handling
+- Checked that passwords are hashed with Argon2
+- Reviewed input validation 
+- Reported issues to the team and verified the fixes
 
 ## Prerequisites
 
