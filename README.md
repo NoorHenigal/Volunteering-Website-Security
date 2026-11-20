@@ -7,6 +7,20 @@ I was responsible for checking the security of the application.
 - Reviewed input validation 
 - Reported issues to the team and verified the fixes
 
+## Team
+Built as a team project for KV6014 at Northumbria University.
+
+| Name | Role |
+|---|---|
+| Mohamed AlNoaimi | Team Leader & Main Developer |
+| Noor Mohamed | Security Tester – reviewed the app and advised developers on fixes |
+| Joe Carruthers | Developer |
+| James Chua | Developer |
+| Marcus | Designer & Developer |
+| Joe Donald | Designer & Developer |
+
+---
+
 ## Prerequisites
 
 1. Install **Python 3.14.2**
